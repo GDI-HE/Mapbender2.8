@@ -2782,8 +2782,8 @@ switch ($f) {
 		//remove mapbox osm and add bkg topplus web open
 		$js2 .= "var map = L.map('map', {center: [50, 7.44], zoom: 7, crs: L.CRS.EPSG4326});";
 		$js2 .= "L.tileLayer.wms('https://sgx.geodatenzentrum.de/wms_topplus_open?',{";
-        $js2 .= "	layers: 'web',";
-        $js2 .= "	format: 'image/png',";
+        $js2 .= "	layers: 'web_grau',";
+        $js2 .= "	format: 'image/png8',";
         $js2 .= "	attribution: 'BKG - 2021 - <a href=\'https://sg.geodatenzentrum.de/web_public/Datenquellen_TopPlus_Open.pdf\'  target=\'_blank\'>Datenquellen<a>'";
         $js2 .= "}).addTo(map);";
 		/*
@@ -3460,7 +3460,7 @@ switch ($f) {
 				$js2 .= "var map = L.map('map', {center: [50, 7.44], zoom: 7, crs: L.CRS.EPSG4326});";
 				$js2 .= "L.tileLayer.wms('https://sgx.geodatenzentrum.de/wms_topplus_open?',{";
         		$js2 .= "	layers: 'web_grau',";
-        		$js2 .= "	format: 'image/png',";
+        		$js2 .= "	format: 'image/png8',";
         		$js2 .= "	attribution: 'BKG - 2021 - <a href=\'https://sg.geodatenzentrum.de/web_public/Datenquellen_TopPlus_Open.pdf\'  target=\'_blank\'>Datenquellen<a>'";
         		$js2 .= "}).addTo(map);";
 				/*
