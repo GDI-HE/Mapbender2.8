@@ -815,9 +815,9 @@ $producerOrganizationCategory = 'property="producer" typeof="Organization"';
 /************************/
 switch ($layout) {
 	case "tabs":
-		$html .= '<link type="text/css" href="../extensions/jquery-ui-1.8.1.custom/css/custom-theme/jquery-ui-1.8.5.custom.css" rel="Stylesheet" />';	
-		$html .= '<script type="text/javascript" src="../extensions/jquery-ui-1.8.1.custom/js/jquery-1.4.2.min.js"></script>';
-		$html .= '<script type="text/javascript" src="../extensions/jquery-ui-1.8.1.custom/js/jquery-ui-1.8.1.custom.min.js"></script>';
+		$html .= '<link type="text/css" href="../extensions/jquery-ui-1.13.2.custom/jquery-ui.min.css" rel="Stylesheet" />';	
+		$html .= '<script type="text/javascript" src="../extensions/jquery-3.7.1/jquery-3.7.1.min.js"></script>';
+		$html .= '<script type="text/javascript" src="../extensions/jquery-ui-1.13.2.custom/jquery-ui.min.js"></script>';
 		//some js for dialog
 		//following is added to give a window with an interated link which can be included in external applications
 		$html .= '<script type="text/javascript">';
@@ -835,7 +835,7 @@ switch ($layout) {
 		$html .= '});';
 		$html .= '};';
 		$html .= 'hideCapabilitiesUrl = function () {';
-		$html .= 'if($(\'capabilitiesUrl.Popup\').size() > 0) {';
+		$html .= 'if($(\'capabilitiesUrl.Popup\').length > 0) {';
 		$html .= '$(\'capabilitiesUrl.Popup\').dialog(\'destroy\');';
 		$html .= '}';
 		$html .= '};';
@@ -862,10 +862,10 @@ switch ($layout) {
 		$html .= '</ul>';
 		break;
 	case "accordion":
-		$html .= '<link type="text/css" href="../extensions/jquery-ui-1.8.1.custom/css/custom-theme/jquery-ui-1.8.4.custom.css" rel="Stylesheet" />';	
-		$html .= '<script type="text/javascript" src="../extensions/jquery-ui-1.8.1.custom/js/jquery-1.4.2.min.js"></script>';
-		$html .= '<script type="text/javascript" src="../extensions/jquery-ui-1.8.1.custom/js/jquery-ui-1.8.1.custom.min.js"></script>';
-		//define the javascript functions
+		$html .= '<link type="text/css" href="../extensions/jquery-ui-1.13.2.custom/jquery-ui.min.css" rel="Stylesheet" />';	
+		$html .= '<script type="text/javascript" src="../extensions/jquery-3.7.1/jquery-3.7.1.min.js"></script>';
+		$html .= '<script type="text/javascript" src="../extensions/jquery-ui-1.13.2.custom/jquery-ui.min.js"></script>';
+//define the javascript functions
 		$html .= '<script type="text/javascript">';
 		$html .= '	$(function() {';
 		$html .= '		$("#accordion").accordion();';
