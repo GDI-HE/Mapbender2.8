@@ -151,33 +151,36 @@ function getMapcode(x,y) {
 	this.transformProjection();
 }
 
-function mod_showCoord_write(x,y){
-	if(document.getElementById(displayTarget)){
-		//var str = "<div class='actualcoords'>" + x + " / " +  y;
-		var str = "<div class='actualcoords'><div class='coords'>" + x + " / " +  y;
-		if (mod_showCoords_div_mapObj.epsg =='EPSG:4326' ||  mod_showCoords_div_mapObj.epsg=="EPSG:4258") {
-			strDMS = dec2dms(x) + " / " + dec2dms(y);
-			//str += " <br> " + strDMS;//
-			str += " <br> " + strDMS + "</div>";					   
-		}
-		if(mod_showCoords_div_fix != ""){
-			//extract coordinates from mod_showCoords_div_fix
-			
-			str += "<div class='selectedcoords'>" + mod_showCoords_div_fix + "</div>";
-			if (useMapcode == "true") {
-				str += '<div class="selectedmapcode"><?php  echo _mb('Get Mapcode for this selection'); ?><img src="../img/up-ilink.png" onclick="getMapcode('+clickx+','+clicky+');"><a class="mapcodeanchor" target="_blank" href="http://www.mapcode.com"><img class="mapcodehelp" src="../img/help.png"></a></div>';
-			}
-		}
-		str +=  "</div>";
-		writeTag("",displayTarget, str);
+function mod_showCoord_write(x, y) {
+    if (document.getElementById(displayTarget)) {
+        var str = "<div class='actualcoords'>";
+        if (mod_showCoords_div_mapObj.epsg == 'EPSG:25832') {
+            // UTM Zone 32N
+            str += "UTM Zone32N: <div class='coords'>" + x + " / " + y + "</div>";
+        } else if (mod_showCoords_div_mapObj.epsg == 'EPSG:4326' || mod_showCoords_div_mapObj.epsg == 'EPSG:4258') {
+            // Geographic coordinates
+            var strDMS = dec2dms(x) + " / " + dec2dms(y);
+            str += "Geographic coordinates: <div class='coords'>" + strDMS + "</div>";
+        } else if (mod_showCoords_div_mapObj.epsg == 'EPSG:31467') {
+            // Gauss-Krüger Zone 3
+            str += "Gauss-Krüger Zone 3: <div class='coords'>" + x + " / " + y + "</div>";
+        }
+        if (mod_showCoords_div_fix != "") {
+            // Extract coordinates from mod_showCoords_div_fix
+            str += "<div class='selectedcoords'>" + mod_showCoords_div_fix + "</div>";
+            if (useMapcode == "true") {
+                str += '<div class="selectedmapcode"><?php  echo _mb('Get Mapcode for this selection'); ?><img src="../img/up-ilink.png" onclick="getMapcode(' + clickx + ',' + clicky + ');"><a class="mapcodeanchor" target="_blank" href="http://www.mapcode.com"><img class="mapcodehelp" src="../img/help.png"></a></div>';
+            }
+        }
+		str += "</div>";
+        writeTag("", displayTarget, str);
 
-//erweiterung close-button
-		$(document.createElement('span')).attr({'id':'closeDivButton'}).appendTo(".actualcoords");
+
+        //erweiterung close-button
+        $(document.createElement('span')).attr({'id':'closeDivButton'}).appendTo(".actualcoords");
 		$("#closeDivButton").attr({'style':'position:absolute;top:1px;right:1px;border:1px solid transparent;cursor:pointer;'});
 		$("#closeDivButton").attr({'class':'ui-icon ui-icon-closethick'});
 		$("#closeDivButton").bind("click", mod_showCoords_div_disable) && $("#showCoords_div").removeClass('myOnClass');
-//		$("#closeDivButton").onclick = function(){
- //       writeTag("",displayTarget, "")};
-	}
+    }
 }
 
