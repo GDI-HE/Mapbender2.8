@@ -629,18 +629,23 @@ function addBboxEntry($bboxWfsArray, &$bboxWfs, &$countBbox, &$multiPolygonText,
 }
 
 function getGeometryFieldNameFromMapbenderDb($mapbenderGeoemtryFieldName, $mapbenderFeaturetypeName) {
-    if (!isset($mapbenderGeoemtryFieldName) || $mapbenderGeoemtryFieldName == '') {
-        $geometryFieldName = 'geometry';
+	//Ticket: 7322 - Due to registration issues with complex wfs services
+	//an additional filter logic was introduced in atom feed clients
+	//Conventional fes/ogc-Filters are replaced with BBOX + EPSG parameters in this case
+	//To allow a check for this - The geometryFieldName must remain empty to check or this lateron
+	if (!isset($mapbenderGeoemtryFieldName) || $mapbenderGeoemtryFieldName == '') {
+        //$geometryFieldName = 'geometry';
+		$geometryFieldName = '';
     } else {
         $geometryFieldName = $mapbenderGeoemtryFieldName;
-    }
-    if (strpos($mapbenderFeaturetypeName, ':') !== false) {
-        $ftNamespace = explode(':', $mapbenderFeaturetypeName);
-        $ftNamespace = $ftNamespace[0];
-        $geometryFieldName = $ftNamespace.':'.$geometryFieldName;
-    } else {
-        $ftNamespace = false;
-        $geometryFieldName = $geometryFieldName;
+		if (strpos($mapbenderFeaturetypeName, ':') !== false) {
+			$ftNamespace = explode(':', $mapbenderFeaturetypeName);
+			$ftNamespace = $ftNamespace[0];
+			$geometryFieldName = $ftNamespace.':'.$geometryFieldName;
+		} else {
+			$ftNamespace = false;
+			$geometryFieldName = $geometryFieldName;
+		}
     }
     return $geometryFieldName;
 }
@@ -653,6 +658,15 @@ function getBboxFilter($bbox, $crs, $wfs_version, $geometryFieldName, $switchAxi
         $newBbox[3] = $bbox[2];
         $bbox = $newBbox;
     }
+
+	//Ticket: 7322 - Due to registration issues with complex wfs services
+	//If geometry fieldname was not found, we fallback to url parameter BBOX
+	if($geometryFieldName == ''){
+		$crs_number = array_reverse(explode(":",$crs))[0];
+		$bboxFilter = "&BBOX=".$bbox[0].','.$bbox[1].','.$bbox[2].','.$bbox[3]."&EPSG=".$crs_number;
+		return $bboxFilter;
+	}
+
     //if geometry name has an namespace - separate them for wfs 1.1.0
     if (strpos($geometryFieldName, ':') !== false) {
         $ftNamespace = explode(':', $geometryFieldName);
@@ -1673,14 +1687,32 @@ function generateFeed($feedDoc, $recordId, $generateFrom) {
 					}
 					$gFLink = $wfsGetFeatureUrl."SERVICE=WFS&REQUEST=GetFeature&VERSION=";
 					$gFLink .= $mapbenderMetadata[$i]->wfs_version."&".$typeParameterName."=".$mapbenderMetadata[$i]->featuretype_name;
-					$gFLink .= "&srsName=".$mapbenderMetadata[$i]->featuretype_srs;
+					###########################  Ticket 7275 ########################################
+					// if($mapbenderMetadata[$i]->featuretype_srs == "urn:ogc:def:crs:EPSG::31466")
+					// 	$gFLink .= "&srsName=http://www.opengis.net/def/crs/epsg/0/31466";					
+					// else
+					// $gFLink .= "&srsName=".$mapbenderMetadata[$i]->featuretype_srs;
 					//TODO check if other epsg string should be used!
 					//$crsObject->identifier;
 					if (count($mapbenderMetadata[$i]->output_formats) >= 1 && strtoupper($mapbenderMetadata[$i]->geometry_field_name[0] !== "SHAPE")) {
 						//use first output format which have been found - TODO - check if it should be pulled from featuretype instead from wfs 
 						$gFLink .= "&outputFormat=".rawurlencode($mapbenderMetadata[$i]->output_formats[0]);
 					}
-					$gFLink .= "&FILTER=".rawurlencode(utf8_decode($bboxFilter));
+					//Ticket: 7322 - Due to registration issues with complex wfs services
+					//Fallback is populating links with BBOX parameter instead of ogc/fes-Filter
+					if (!strpos($bboxFilter,"fes") && !strpos($bboxFilterr,"ogc")){
+						$gFLink .= $bboxFilter;
+					}else{
+						
+						###########################  Ticket 7275 ########################################
+						//if($mapbenderMetadata[$i]->featuretype_srs == "urn:ogc:def:crs:EPSG::31466")
+						//	$gFLink .= "&srsName=http://www.opengis.net/def/crs/epsg/0/31466";					
+						//else
+							$gFLink .= "&srsName=".$mapbenderMetadata[$i]->featuretype_srs;
+
+						$gFLink .= "&FILTER=".rawurlencode(utf8_decode($bboxFilter));
+					}
+					//$gFLink .= "&FILTER=".rawurlencode(utf8_decode($bboxFilter));
 					$getFeatureLink[] = $gFLink;
 					$featureTypeName[] = $mapbenderMetadata[$i]->featuretype_name;
 					$featureTypeBbox[] = $bboxWfs[$mapbenderMetadata[$i]->featuretype_name][$l];
@@ -1984,6 +2016,7 @@ function generateFeed($feedDoc, $recordId, $generateFrom) {
 						$furtherLink[$m] = $getFeatureLink[$m];//was computed before
 						//discard filter if only one request is needed - problem with epsg codes? TODO solve problem
 						if (count($getFeatureLink) == 1) {
+
 							$splittedLink = explode('&FILTER=',$furtherLink[$m]);
 							$furtherLink[$m] = $splittedLink[0];
 						}
@@ -2407,7 +2440,7 @@ function fillMapbenderMetadata($dbResult, $generateFrom) {
 					$t = array('i');
 					$res = db_prep_query($sql,$v,$t);
 					//pull first element with type is string like "PropertyType"
-					$geometryElements = array("GeometryPropertyType","MultiSurfacePropertyType","GeometryPropertyType","CurvePropertyType","PolygonPropertyType","LineStringPropertyType","PointPropertyType","MultiPolygonPropertyType","MultiLineStringPropertyType","MultiPointPropertyType","SurfacePropertyType");
+					$geometryElements = array("GeometryPropertyType","MultiSurfacePropertyType","GeometryPropertyType","CurvePropertyType","PolygonPropertyType","LineStringPropertyType","PointPropertyType","MultiPolygonPropertyType","MultiLineStringPropertyType","MultiPointPropertyType","SurfacePropertyType", "MultiCurvePropertyType");
 					while ($row = db_fetch_array($res)) {
 						//$e = new mb_exception("php/mod_inspireDownloadFeed.php: test element_type: ".$row['element_type']);
 						if (in_array($row['element_type'], $geometryElements)) {
@@ -2417,7 +2450,10 @@ function fillMapbenderMetadata($dbResult, $generateFrom) {
 						}
 					}
 					if (count($mapbenderMetadata[$indexMapbenderMetadata]->geometry_field_name) < 1) {
-						$mapbenderMetadata[$indexMapbenderMetadata]->geometry_field_name[0] = "the_geom";
+						//Ticket 7322: This fields should remain empty if no geometry is found
+						//Fallbackvalue "the_geom" is currently jsut causing issues
+						//$mapbenderMetadata[$indexMapbenderMetadata]->geometry_field_name[0] = "the_geom";
+						$mapbenderMetadata[$indexMapbenderMetadata]->geometry_field_name[0] = "";
 					}
 				}
 				//overwrite mapbenderMetadata->minx ... which came from layer/featuretype metadata with bbox of metadata itself, if given

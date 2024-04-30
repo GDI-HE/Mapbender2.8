@@ -814,7 +814,15 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
     			$url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."service=WFS&request=GetFeature&version=".$version."&".strtolower($typeNameParameterName)."=".$featureTypeName."&resultType=hits".$namespaces;
     			
 				if ($filter != null) {
-    			    $url .= "&FILTER=".urlencode($filter);
+					//Ticket: 7322 - Due to registration issues with complex wfs services
+					//an additional filter logic was introduced in atom feed clients
+					//Conventional fes/ogc-Filters are replaced with BBOX + EPSG parameters int this case
+					//and must be concatenated differently here
+					if (!strpos($filter,"fes") && !strpos($filter,"ogc")){
+						$url .= $filter;
+					}else{
+						$url .= "&FILTER=".urlencode($filter);
+					}
     			}
 				#$e = new mb_exception("URL for count by GET: " . $url);
     			//auth is already integrated in ows class
