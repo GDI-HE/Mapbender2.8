@@ -1280,7 +1280,7 @@ class searchMetadata
 				if ($i > 0) {
 					$whereStr .= " AND ";
 				}
-				$whereStr .= "searchtext LIKE $" . ($i + 1);
+				$whereStr .= "(strict_word_similarity($" . ($i + 1) . ", searchtext) > 0.2)";
 				//output for debugging
 				$e = new mb_notice("Part of string" . $i . ": " . $searchStringArray[$i]);
 				$e = new mb_notice("converted: " . $this->replaceChars_all($searchStringArray[$i]));
