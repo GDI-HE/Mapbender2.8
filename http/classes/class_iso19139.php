@@ -288,13 +288,20 @@ XML;
 				//$e = new mb_exception("topicCatHash: ".$row['md_topic_category_code_en'] ." : ". $topicCatHash[$row['md_topic_category_code_en']] );	
 			}
 			//inspire
-			$inspireCatHash = array();
+			$inspireCatHash_en = array();
 			$sql = "SELECT inspire_category_id, inspire_category_code_en FROM inspire_category";
 			$res = db_query($sql);
 			while ($row = db_fetch_array($res)){
-				$inspireCatHash[$row['inspire_category_code_en']] = (integer)$row['inspire_category_id'];
-				//$e = new mb_exception("inspireCatHash: ".$row['inspire_category_code_en'] ." : ". $row['inspire_category_id'] );	
+				$inspireCatHash_en[$row['inspire_category_code_en']] = (integer)$row['inspire_category_id'];
+				//$e = new mb_exception("inspireCatHash_en: ".$row['inspire_category_code_en'] ." : ". $row['inspire_category_id'] );	
 			}
+			$inspireCatHash_de = array();
+                        $sql = "SELECT inspire_category_id, inspire_category_code_de FROM inspire_category";
+                        $res = db_query($sql);
+                        while ($row = db_fetch_array($res)){
+                                $inspireCatHash_de[$row['inspire_category_code_de']] = (integer)$row['inspire_category_id'];
+                                //$e = new mb_exception("inspireCatHash_de: ".$row['inspire_category_code_de'] ." : ". $row['inspire_category_id'] );
+                        }
 			//custom
 			//keywords - as text i custom category - special keywords of geoportal instance defined as keys!
 			$customCatHash = array();
@@ -410,9 +417,12 @@ XML;
 				//$e = new mb_exception("Keyword: ".$keyword);
 				//$e = new mb_exception("Thesaurus: ".$thesaurusName[0]);
 				//check if keyword is inspire thematic key and add it into mapbenders inspire category
-				if (is_int($inspireCatHash[trim($keyword)])) {
-					$this->inspireCategories[] = $inspireCatHash[trim($keyword)];
+				if (is_int($inspireCatHash_en[trim($keyword)])) {
+					$this->inspireCategories[] = $inspireCatHash_en[trim($keyword)];
 				}
+				if (is_int($inspireCatHash_de[trim($keyword)])) {
+                                        $this->inspireCategories[] = $inspireCatHash_de[trim($keyword)];
+                                }
 				//check if keyword is a key in mapbenders custom keywords and add it to mapbenders custom categories
 				if (is_int($customCatHash[trim($keyword)])) {
 					//$e = new mb_exception("class_iso19139.php: found entry ".$customCatHash[trim($keyword)]." for custom keyword: ".trim($keyword));
