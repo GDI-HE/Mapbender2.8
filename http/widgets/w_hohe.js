@@ -2,6 +2,7 @@ var jsonPoints = [];
 var paintPoints = false;
 var uebergeben = false;
 var create = false;
+var string_cursor = "";
 $.widget("mapbender.mb_hohe", {
 	options: {
 		measurePointDiameter: 6,
@@ -212,10 +213,22 @@ $.widget("mapbender.mb_hohe", {
 				else
 					this._trigger("update", null, -5);
 				l = -1;
+				//if((string_cursor = this.element.css("cursor")) != "corsshair")
+				if((this.element.css("cursor")) != "crosshair")
+				{
+					string_cursor = this.element.css("cursor");
+				    this.element.css("cursor", "crosshair");
+				}
 				break;
 			}
 		}
-		if (l > 0) this._trigger("update", null, -2);
+		//if (l > 0) this._trigger("update", null, -2);
+		if (l > 0) {
+			this._trigger("update", null, -2);
+			if(this.element.css("cursor") == "crosshair") {
+				this.element.css("cursor", string_cursor);
+			}
+		}
 	},
 	/*
 	Diese Funtkion ist in mb_hohe_widget mit der Funktion reinitializeMeasure verknüpft
@@ -316,7 +329,7 @@ $.widget("mapbender.mb_hohe", {
 		}
 		paintPoints = true;
 		div.remove();
-
+		this._trigger("new",null,null);
 		uebergeben = true;
         var l = jsonPoints.length;
 		for (var i = 0; i < l; i++)
@@ -506,6 +519,7 @@ $.widget("mapbender.mb_hohe", {
 		this.element
 			.bind("mousemove", $.proxy(this, "_measure"))
 			.bind("mousedown", $.proxy(this, "_addPoint"))
+			.bind("onwheel",$.proxy(this, "_measure"))
 			.css("cursor", "crosshair");
 	},
 
@@ -551,7 +565,9 @@ $.widget("mapbender.mb_hohe", {
 		jsonPoints = [];
 		paintPoints = false;
 		uebergeben = false;
+		create = false;
 		this._$canvas.remove();
+		this.element.unbind("onwheel",$.proxy(this, "_measure"));
 		this._map.events.afterMapRequest.unregister($.proxy(this._redraw, this));
 		$.Widget.prototype.destroy.apply(this, arguments); // default destroy
 		$(this.element).data("mb_hohe", null);

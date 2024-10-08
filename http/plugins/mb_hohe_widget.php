@@ -14,7 +14,7 @@ var MeasureApi = function (o) {
 				echo nl2br(htmlentities("Klicken Sie in die Karte, um eine Strecke zu zeichnen, mit Doppelklick beim letzten Punkt wird ein Hoehendiagramm erzeugt.", ENT_QUOTES, "UTF-8"));
 			?></div></div>",
 		informationHtml =
-                        "<canvas id='can' width='630' height='250'></canvas>";
+                        "<canvas id='can' width='660' height='250'></canvas>";
 
 	var jsonarray = [];		  
         
@@ -44,16 +44,32 @@ var MeasureApi = function (o) {
 			dialogClass: "ownSuperClass",
             autoOpen: false,
 			position: [20,80],
-                        width : 'auto',
-                        heigth: 'auto',
-                        title: 'Höhenprofil',
-                        open: function() {$('#toolsContainer').hide() && $('a.toggleToolsContainer').removeClass('activeToggle');},
-                        close: function() {$('#altitudeProfile').removeClass("myOnClass");button.stop();}
+            width : 'auto',
+            height: 'auto',
+            title: 'Höhenprofil',
+            buttons: [
+                {
+                    text: "Neu",
+                    click: function() {
+                        resetII();
+                    }
+                }
+            ],
+            open: function() {
+                $('#toolsContainer').hide();
+                $('a.toggleToolsContainer').removeClass('activeToggle');
+            },
+            close: function() {
+                $('#altitudeProfile').removeClass("myOnClass");
+                button.stop();
+            }
                         
 		}).bind("dialogclose", function () {
 			button.stop();
 			that.destroy();
-		});
+		}).bind("mousedown", function (e) {
+			testButton(e.offsetX,e.offsetY);
+        });
 
 		//
 		// Initialise button
@@ -91,7 +107,7 @@ var MeasureApi = function (o) {
                  
                  if(data == -1)
                  {
-                   ctx.clearRect(0, 0, 630, 250);
+                   ctx.clearRect(0, 0, 660, 250);
                    prep_json(jsonarray);
                    
                    draw_lineII();
@@ -102,7 +118,7 @@ var MeasureApi = function (o) {
                  else if (data == -2)
                  {
                    
-                   ctx.clearRect(0, 0, 630, 250);
+                   ctx.clearRect(0, 0, 660, 250);
                    draw_lineII();
                    draw_Points(data);
                    draw_stuetzpunkte();
@@ -113,7 +129,7 @@ var MeasureApi = function (o) {
                  else
                  {
                    if(data == -5) data = 0;
-                   ctx.clearRect(0, 0, 630, 250);
+                   ctx.clearRect(0, 0, 660, 250);
                    draw_lineII();
                    draw_Points(data);
                    draw_stuetzpunkte();
@@ -135,20 +151,71 @@ var MeasureApi = function (o) {
 		that.activate();
 	};
 
+    var reset = function () {
+		if (o.$target.size() > 0) {
+			o.$target.mb_hohe(o).mousedown(function(event) {
+		        switch (event.which) {
+                    case 1:
+                    //alert('Left Mouse button pressed.');
+			            resetII();
+                    break;
+                    case 2:
+		            //alert('Middle Mouse button pressed.');
+                    break;
+                    
+                    case 3:if (o.$target.size() > 0) {
+			        //alert('Right Mouse button pressed.');
+		            }
+                    break;
+    
+                    default:
+                    // alert('You have a strange Mouse!');
+                }
+            });
+        }
+    };
+    
+    var resetII = function () {
+        if (o.$target.size() > 0) {
+            o.$target.mb_hohe("destroy")
+				.unbind("mb_hohepointadded", updateJsonArray)
+				.unbind("mb_hohecleardia", clearJsonArray)
+				.unbind("mb_hoheupdate", updateView)
+				.unbind("mb_measurelastpointadded", finishMeasure)
+				.unbind("mb_hohenew", reset)
+				.unbind("mousedown")
+				.unbind("mb_measurereinitialize", reinitializeMeasure);
+		}
+		ctx.clearRect(0, 0, 600, 250);
+		points = [];
+		jsonarray = [];
+		hideMeasureData();
+		ctx.fillText(t,9,15);
+		hoehe_min = 700;
+		hoehe_max = 100;
+		gesamt_laenge = 0;
+		measureDialog.html(defaultHtml);
+		//remove measured x and y values from print dialog
+		$('input[name="measured_x_values"]').val("");
+		$('input[name="measured_y_values"]').val("");
+		that.activate();
+    };
+
 	this.activate = function () {
-                //remove measured x and y values from print dialog
-                $('input[name="measured_x_values"]').val("");
-                $('input[name="measured_y_values"]').val("");
+				//remove measured x and y values from print dialog
+				$('input[name="measured_x_values"]').val("");
+				$('input[name="measured_y_values"]').val("");
 
 		if (o.$target.size() > 0) {
 			o.$target
 				.mb_hohe(o)
-                                .bind("mb_hohecleardia", clearJsonArray)
-                                .bind("mb_hohepointadded", updateJsonArray)                                
+				.bind("mb_hohecleardia", clearJsonArray)
+				.bind("mb_hohepointadded", updateJsonArray)                                
 				.bind("mb_hoheupdate", updateView)				
 				.bind("mb_hohelastpointadded", finishMeasure)
 				.bind("mb_hohereinitialize", reinitializeMeasure)
-				.bind("click", changeDialogContent);
+				.bind("click", changeDialogContent)
+				.bind("mb_hohenew", reset);
 		}
 		if (!inProgress) {
 			inProgress = true;
@@ -156,39 +223,41 @@ var MeasureApi = function (o) {
 		}
 
 		measureDialog.dialog("open");
-                setText();
+		setText();
 	};
 
 	this.destroy = function () {
 		if (o.$target.size() > 0) {
 			o.$target.mb_hohe("destroy")
-                                .unbind("mb_hohepointadded", updateJsonArray)
-                                .unbind("mb_hohecleardia", clearJsonArray)
+				.unbind("mb_hohepointadded", updateJsonArray)
+				.unbind("mb_hohecleardia", clearJsonArray)
 				.unbind("mb_hoheupdate", updateView)
-                                .unbind("mb_measurelastpointadded", finishMeasure)
+				.unbind("mb_measurelastpointadded", finishMeasure)
+				.unbind("mb_hohenew", reset)
+				.unbind("mousedown")
 				.unbind("mb_measurereinitialize", reinitializeMeasure);
 		}
-                ctx.clearRect(0, 0, 600, 250);
-                points = [];
-                jsonarray = [];
-		hideMeasureData();
-                ctx.fillText(t,9,15);
-                hoehe_min = 700;
-                hoehe_max = 100;
-                gesamt_laenge = 0;
+				ctx.clearRect(0, 0, 660, 250);
+				points = [];
+				jsonarray = [];
+				//hideMeasureData();
+				ctx.fillText(t,9,15);
+				hoehe_min = 700;
+				hoehe_max = 100;
+				gesamt_laenge = 0;
 		if (measureDialog.dialog("isOpen")) {
 			measureDialog.dialog("close");
 		}
 		measureDialog.html(defaultHtml);
 
-                //remove measured x and y values from print dialog
-                $('input[name="measured_x_values"]').val("");
-                $('input[name="measured_y_values"]').val("");
+		//remove measured x and y values from print dialog
+		$('input[name="measured_x_values"]').val("");
+		$('input[name="measured_y_values"]').val("");
 	};
 	
 	this.deactivate = function () {
 		if (o.$target.size() > 0) {
-			o.$target.mb_hohe("deactivate");
+			o.$target.mb_hohe("deactivate").unbind("mousedown");
 		}
 	};
 
@@ -216,9 +285,14 @@ var color_coord_garnicht = '#A3ABA7';
 var line_100 = '#333333';
 var c = document.getElementById("can");
 var ctx = c.getContext("2d");
-
-
-
+ctx.width = 500;
+var testButton = function(x,y) {
+    if ((620 <= x) && (x <= 620 + 70) &&  (220 <= y )&& (y <= 220 + 20)){
+        resetII();
+        return true;
+        }
+    else return false;
+};
 
 /*
  
@@ -239,7 +313,7 @@ hier wird berücksichtigt wenn start1 und/oder start2 nicht im 0-Punkt liegen f�
             return (wert2 / s_2) * s_1;
         else
             return Math.ceil(((wert2 - start2) / s_2) * s_1 + start1);
-    }
+    };
 
 
 /*
@@ -274,7 +348,7 @@ hoehe_min, hoehe_max werden ermittelt.
             };
             points.push(daten);
         }
-    }
+    };
 
 
 
@@ -375,10 +449,10 @@ Anpassung der Einheit der x - Achse des Diagramms
 
         if(gesamt > 999) {
             return "" + (Math.floor((teil/1000) * 10) / 10) + " km";
-        }
-        else
+        } else {
             return "" + Math.floor(teil) + " m";
-    }
+        }
+    };
 
 /*
 stuetzpunkte sind die Punkte die der Anwender tatsächsich geklickt hat,
@@ -386,44 +460,35 @@ sie werden hier hervorgehoben gezeicnet.
 */
 
     var draw_stuetzpunkte = function() {
-
         ctx.fillStyle = "#888888";
-        for(var i = 0;i< points_count; i++)
-           if(points[i].stuetzpunkt)
-               ctx.fillRect(points[i].x-2,points[i].y-1,4,4);
-
-        ctx.fillStyle = "#888888";
-
-    }
+        if (points && points.length > 0) {
+            for (var i = 0; i < points.length; i++) {
+                if(points[i].stuetzpunkt) {
+                    ctx.fillRect(points[i].x - 2, points[i].y - 1, 4, 4);
+                }
+            }
+        }
+    };
 
 //zeichne Fadenkreuz
     var draw_Points = function(mark) {
-
-
-        if(mark >= 0) {
-
+        if(mark >= 0 && mark < points_count) {
             ctx.beginPath();
             ctx.moveTo(points[mark].x - 2,points[mark].y+1);
             ctx.lineTo(30,points[mark].y+1);
-	
             ctx.moveTo(points[mark].x + 2,points[mark].y+1);
             ctx.lineTo(width-30,points[mark].y+1);
-	
             ctx.moveTo(points[mark].x,points[mark].y - 1);
             ctx.lineTo(points[mark].x,20);
-	
             ctx.moveTo(points[mark].x,points[mark].y + 3);
             ctx.lineTo(points[mark].x,height-20);
-	
-	
             ctx.lineWidth = 1;
             ctx.strokeStyle = line_100;
             ctx.stroke();
             ctx.fillStyle = line_100;
             ctx.fillText('~ ' + points[mark].hoehe + ' m',points[mark].x + 8,points[mark].y - 5);
-        
         }
-    }
+    };
 /*
 erste Linie: von 0 bis punkt0.höhe, 
 dann Linie zeichnen von Punkt zu Punkt
@@ -442,21 +507,18 @@ am Schluss zur Grundlinie hinunterheichnen und mit 0 Punkt verbinden -> cosePath
         ctx.lineTo(width-30,height-20);
         ctx.lineTo(30,height-20);
         ctx.closePath();
-
         ctx.fillStyle = color_coord;
         ctx.fill();
-
         ctx.lineWidth = 0.1;
         ctx.strokeStyle = color_coord;
         ctx.stroke(); 
-}
+};
 /*
 neu 27.01.2020
 der geschlossen Linienpfad ist hier die Fläche unterhalb 2 Punkten
 er wird farblich gezeichnet je nach dem ob die zwei Punkte in der BBox sind oder nicht.
 */
     var draw_lineII = function () {
-
 		for (var i = 1; i < points_count; i++) {
 			if(i == 1) {
 				ctx.beginPath();
@@ -474,9 +536,9 @@ er wird farblich gezeichnet je nach dem ob die zwei Punkte in der BBox sind oder
 				else ctx.fillStyle = color_coord_garnicht;
 				
 				ctx.fill();
-
 				ctx.lineWidth = 0.1;
-				if(points[i - 1].ist_in_BBox && points[i].ist_in_BBox)
+
+                if(points[i - 1].ist_in_BBox && points[i].ist_in_BBox)
 					ctx.strokeStyle = color_coord;
 				else if(points[i - 1].ist_in_BBox || points[i].ist_in_BBox)
 					ctx.strokeStyle = color_coord_halb;
@@ -485,10 +547,8 @@ er wird farblich gezeichnet je nach dem ob die zwei Punkte in der BBox sind oder
 				ctx.stroke();
 				ctx.moveTo(points[i].x, points[i].y);
 				continue;
-			
 			}
-			
-			
+
 			ctx.beginPath();
 			ctx.lineTo(points[i].x, points[i].y);
 			ctx.lineTo(points[i].x,height - 20);
@@ -513,19 +573,16 @@ er wird farblich gezeichnet je nach dem ob die zwei Punkte in der BBox sind oder
 			else ctx.strokeStyle = color_coord_garnicht;
 		
 			ctx.stroke();
-			
-			
 		}
-
-
-    }
+    };
 
     var setText = function() {
         ctx.font = "12px Arial";
 
         ctx.clearRect(0, 0, 600, 250);
-        ctx.fillText("Sie koennen mit Klicken eine Strecke in die Kartei zeichnen. Beim letzten Punkt bitte ein Doppelklick.",9,15);
-        ctx.fillText("Nach dem Erstellen koennen Sie ueber die Strecke fahren und bekommen die Hoehe angezeigt.",9,30);
+        ctx.fillText("1. Sie koennen mit Klicken eine Strecke in die Kartei zeichnen. Beim letzten Punkt bitte einen Doppelklick.",9,15);
+        ctx.fillText("2. Fahren Sie mit dem Mauszeiger ueber die Strecke - die Hoehe im Diagramm wird angezeigt.",9,45);
+        ctx.fillText("3. Ein Klick in die Karte oder auf <Neu> setzt das Diagramm zurück",9,75);
         draw_stuetzpunkte();
     }
 
