@@ -374,8 +374,8 @@ var SaveWmcApi = function () {
 			}
 
 			if(attributes.abstract != ""){
-				if(!attributes.abstract.match(/^[a-zA-Z0-9äöüÄÖÜß_\- \"§&()?:,=./\s\\r\\n\\t]+$/)){
-                               		alert("Allowed characters for abstract are: A-Z, a-z, 0-9, -, _, äA, öO, üU, ß, \", , , =, /, &, §, (), : , .");
+				if(!attributes.abstract.match(/^[a-zA-Z0-9äöüÄÖÜß_\- \"§&()?:,=./\s\\r\\n\\t!]+$/)){
+                               		alert("Allowed characters for abstract are: A-Z, a-z, 0-9, -, _, äA, öO, üU, ß, \", , , =, /, &, §, (), : , ., !, ?");
                                		return;
 				}
 			}
