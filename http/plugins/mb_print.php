@@ -344,11 +344,13 @@ var PrintPDF = function (options) {
     //show printBox for first entry in printTemplate selectbox
     $("." + myId + "-dialog").bind("dialogopen", function () {
       printObj.createPrintBox();
+      //Mapbender.unbindPanEvents();
     });
 
     //destroy printBox if printDialog is closed
     $("." + myId + "-dialog").bind("dialogclose", function () {
       destroyPrintBox();
+      //Mapbender.bindPanEvents();
     });
   };
 

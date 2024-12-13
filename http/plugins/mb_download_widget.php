@@ -65,12 +65,12 @@
         
         areaLimit = '<?php echo _mb("Dataset list"); ?>';
 		defaultHtml = "<div title='" + title + "'></div>";
-	    descriptionHtml = "<div id='description'><?php 
+	    descriptionHtml = "<div id='description'><a style='outline:none;' href='https://www.geopackage.org/' target='_blank'><img src='../img/geopackage-2.png' width='25' height='25'></a><br><?php 
 				echo nl2br(htmlentities(_mb("BETA: Module for download regional limited data as Geopackage. Actually the allowed region area is limited to ") . $areaLimit . _mb(" km2."), ENT_QUOTES, "UTF-8"));
-			?><br><a style='' href='https://www.geopackage.org/' target='_blank'><img src='../img/geopackage-2.png' width='25' height='25'></a></div>";
-		startDigitizeHtml = "<div id='start-digitize' ><?php 
-				echo nl2br(htmlentities(_mb("Click in the map and digitize the area of interest."), ENT_QUOTES, "UTF-8"));
 			?></div>";
+		startDigitizeHtml = "<div id='start-digitize' ><b><?php 
+				echo nl2br(htmlentities(_mb("Click in the map and digitize the area of interest."), ENT_QUOTES, "UTF-8"));
+			?></b></div>";
 	    userInfoHtml = "<div id='identity'><?php
                 echo nl2br(htmlentities(_mb("Your logged in as") . ":", ENT_QUOTES, "UTF-8"));
             ?><div id='user-info'></div></div>";
@@ -99,10 +99,24 @@
 		downloadDialog.dialog({
 			width: 370,
 			autoOpen: false,
-			position: [o.$target.offset().left+20, o.$target.offset().top+80]
+			position: [o.$target.offset().left+20, o.$target.offset().top+80],
+			open: function() {
+    			$('#toolsContainer').hide();
+    			$('a.toggleToolsContainer').removeClass('activeToggle');
+    			Mapbender.disableFeatureInfo();
+				Mapbender.unbindPanEvents();    			
+			},
+			close: function() {
+				mb_enableButton('pan1');
+				Mapbender.bindPanEvents();
+				Mapbender.enableFeatureInfo();
+				$(document.querySelector('#sdi_download_widget')).removeClass('myOnClass');	
+			}			
 		}).bind("dialogclose", function () {
 			button.stop();
-			$(this).find('.digitize-image').unbind('click');
+			mb_enableButton('pan1');
+			Mapbender.bindPanEvents();
+			Mapbender.enableFeatureInfo();
 			that.destroy();
 		});
 
@@ -120,6 +134,7 @@
 		});
 		checkSession();
 		
+	
  	};
  	
  	var reinitializeDigitize = function() {
@@ -141,9 +156,9 @@
         var digit = o.$target.data('mb_digitize');
         // problem : shallow copying: https://code.tutsplus.com/the-best-way-to-deep-copy-an-object-in-javascript--cms-39655a
         var pts = digit._digitizePoints;
-        //console.log(pts);
+        //console.log(pts);/
         var ptsWgs84 = JSON.parse(JSON.stringify(pts));
-        console.log(ptsWgs84);       
+        //console.log(ptsWgs84);       
         // TODO: render permanent ;-) - the problem is, that the points are converted into 4326 - the geometry is altered!        
         var tp = pts.closedPolygon ? geomType.polygon : (pts.closedLine ? geomType.line : geomType.point);        
         var tpWgs84 = ptsWgs84.closedPolygon ? geomType.polygon : (ptsWgs84.closedLine ? geomType.line : geomType.point);       
@@ -254,7 +269,7 @@
         			//console.log(currentLayer);
         		}
     		}
-    		console.log(sdi_list);
+    		//console.log(sdi_list);
             //get list of layers db ids
             layer_ids = [];
             // TODO - does deeper hierachies exists?
@@ -280,11 +295,14 @@
                 	
             inProgress = false;
             that.deactivate();
+
+			// Panning wieder aktivieren
+        	Mapbender.bindPanEvents();
         }
     };
     
     var checkSession = function() {
-    	console.log("checkSession");
+    	//console.log("checkSession");
         $.ajax({
             url: '../php/mod_showLoggedInUser.php?outputFormat=json',
             type: 'POST',
@@ -351,7 +369,7 @@
 			alert('<?php echo _mb('Package creation startet - you will get an email with a download link, if the process is finished!');?>');
 			that.destroy();
         } else {
-        	console.log("<?php echo _mb('No option selected - please select some to create geopackage!');?>");
+        	//console.log("<?php echo _mb('No option selected - please select some to create geopackage!');?>");
         }
     };
     
@@ -359,14 +377,14 @@
     	//console.log(JSON.stringify(obj));
     	//$('#load-options-spinner').hide();
 		if (!success) {
-			console.log("problem when invoking generateCache");
+			//console.log("problem when invoking generateCache");
 			alert(message);
 			//reload form
 			that.destroy();
 			return;
 		} else {
 			//
-			console.log("generateCache invoked successfully");
+			//console.log("generateCache invoked successfully");
 			// result is a list of download options
 			// iterate over list and show table for select raster or vector!
 			//console.log(obj);
@@ -480,12 +498,12 @@
     	$('#load-options-spinner').hide();
     	$('#dataset-list-header').show();
 		if (!success) {
-			console.log("problem when invoking checkOptions");
+			//console.log("problem when invoking checkOptions");
 			alert(message);
 			return;
 		} else {
 			//
-			console.log("check options invoked successfully");
+			//console.log("check options invoked successfully");
 			// result is a list of download options
 			// iterate over list and show table for select raster or vector!
 		    createDownloadForm(obj);
@@ -496,7 +514,7 @@
       			"text-decoration": "underline",
   				"text-decoration-color": 'blue'
     		});
-			console.log(obj);
+			//console.log(obj);
 			that.show_area_of_interest();
 			// show table with checkboxes for download underlying data
 			
@@ -505,7 +523,7 @@
 	};
 	
     this.requestDownloadOptions = function (sdiArray, area_of_interest) {
-    	console.log(sdiArray);
+    	//console.log(sdiArray);
     	
     	var download_configuration = {}
     	download_configuration.area_of_interest = area_of_interest;
@@ -538,11 +556,11 @@
     //this.area_of_interest = {};
     
     this.show_area_of_interest = function() {
-    	console.log(JSON.stringify(that.area_of_interest));
+    	//console.log(JSON.stringify(that.area_of_interest));
     }
     
  	this.activate = function () {
- 		console.log('activate');
+ 		//console.log('activate');
 		downloadDialog.dialog("open");
 		/*if (!$('#dataset-list').length) {
 			$('#dataset-list-header').hide();
@@ -562,6 +580,7 @@
 			$('#dataset-list-header').show();
 		}
 		if (userLoggedIn == false) {
+			Mapbender.bindPanEvents();
 			return;
 		}
         var mode = status.match(/(new|edit)-.+/);
@@ -611,8 +630,8 @@
 	
 	this.deactivate = function () {
 		if (o.$target.size() > 0) {
-			console.log('deactivate');
-			console.log(o.$target);	
+			//console.log('deactivate');
+			//console.log(o.$target);	
 			o.$target.mb_digitize("deactivate");
 		}
 		$('#start-digitize').hide();

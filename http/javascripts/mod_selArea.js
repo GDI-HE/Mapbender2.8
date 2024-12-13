@@ -45,6 +45,7 @@ Mapbender.events.init.register(function () {
                 map.setCenter(extent);
                 map.setMapRequest();
             }
+            mb_enableButton('pan1');
         });
         return false;
     };

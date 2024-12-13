@@ -305,7 +305,10 @@ $.widget("mapbender.mb_hohe", {
 		var img = document.createElement('img');
 		img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><rect x="10" y="40" width="60" height="80" opacity="1"><animate id="a" begin="0;b.end-0.25s" attributeName="opacity" dur="0.75s" values="1;.2" fill="freeze"/></rect><rect x="90" y="40" width="60" height="80" opacity=".4"><animate begin="a.begin+0.15s" attributeName="opacity" dur="0.75s" values="1;.2" fill="freeze"/></rect><rect x="170" y="40" width="60" height="80" opacity=".3"><animate id="b" begin="a.begin+0.3s" attributeName="opacity" dur="0.75s" values="1;.2" fill="freeze"/></rect></svg>');
 		div.append(img);
-		document.querySelector('.ownSuperClass').append(div);	
+		document.querySelector('.ownSuperClass').append(div);
+		$(document.querySelector('#hoheCancelButton')).button('disable');	
+		this.deactivate();
+		Mapbender.bindPanEvents();
 
 		var data = new FormData()
 		data.append('action', 'getheigth')
@@ -337,7 +340,12 @@ $.widget("mapbender.mb_hohe", {
 			this._trigger("update", null, -1);
 			this._draw(undefined, {
 				not_clicked: true
-			});
+		});
+
+		// Enable the NEW button and PanEvents after processing is complete		
+		//Mapbender.bindPanEvents();
+		$(document.querySelector('#hoheNewButton')).button('enable');
+
 		return  re;
 	},
 

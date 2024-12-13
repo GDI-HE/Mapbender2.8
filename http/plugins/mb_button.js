@@ -66,9 +66,34 @@ var ButtonApi = function (o) {
 	}).hide().dialog({
 		autoOpen: false,
 		position: [o.$target.offset().left+20, o.$target.offset().top+80],
-                dialogClass: o.target + "-dialog",
-		close: function() {$button.removeClass("myOnClass");button.stop();}
+		width: o.dialogWidth,
+        height: o.dialogHeight,
+        dialogClass: o.target + "-dialog",
+		open: function() {
+            Mapbender.disableFeatureInfo();
+        },
+		close: function() {
+			$button.removeClass("myOnClass");
+			button.stop();
+			mb_enableButton('pan1');
+			Mapbender.enableFeatureInfo();	
+			if (o.target[0] === 'coordsLookup' && Mapbender.modules[o.target[0]] && typeof Mapbender.modules[o.target[0]].emptyFieldsAndMarker === "function") {
+                Mapbender.modules.coordsLookup.emptyFieldsAndMarker();
+            }		
+		}
         });
+
+		// Overlay-Div erstellen und hinzufügen
+		var overlay = $('<div class="dialog-overlay"></div>').css({
+			position: 'absolute',
+			top: 0,
+			left: 0,
+			width: '100%',
+			height: '100%',
+			background: 'transparent',
+			zIndex: 9999,
+			display: 'none'
+		}).appendTo(dialog.parent());
 
         var openDialog = function () {
 		//workaround for new GUI 2019 - loadwmc normally cannot be called via mb_button.js!
@@ -81,8 +106,9 @@ var ButtonApi = function (o) {
 		dialog.dialog({ width: options.dialogWidth });
 		$('#toolsContainer').hide() && $('a.toggleToolsContainer').removeClass('activeToggle');
 		$('#tree2Container').hide() && $('a.toggleLayerTree').removeClass('activeToggle');
-		$('.ui-dialog').css('top', '80px');$('.ui-dialog').css('left', '20px');;
-	};
+		$('.ui-dialog').css('top', '80px');$('.ui-dialog').css('left', '20px');
+		mb_enableButton('pan1');
+    };
 
 	var button = new Mapbender.Button({
 		domElement: $button.get(0),
