@@ -64,7 +64,7 @@ if (featureInfoPrintButton === undefined) {
   var featureInfoPrintButton = '#printPDF';
 }
 if (featureInfoShowAlert === undefined) {
-  var featureInfoShowAlert = 3; //0:noAlert,1:alert,2:divAlert,3:divAlertTransparent
+  var featureInfoShowAlert = 0; //0:noAlert,1:alert,2:divAlert,3:divAlertTransparent
 }
 
 var mod_featureInfo_elName = "<?php echo $e_id;?>";
