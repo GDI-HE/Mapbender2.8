@@ -125,10 +125,21 @@ var MeasureApi = function (o) {
 			width: 350,
 			autoOpen: false,
 			position: [o.$target.offset().left+20, o.$target.offset().top+80],
-			close: function (){$('#measure_widget').removeClass('myOnClass')}
+			open: function() {
+				$('#toolsContainer').hide();
+				$('a.toggleToolsContainer').removeClass('activeToggle');
+				//Mapbender.bindPanEvents();
+				//Mapbender.disableFeatureInfo();
+
+			},
+			close: function (){
+				$('#measure_widget').removeClass('myOnClass');
+				mb_enableButton('pan1');				
+			}
 		}).bind("dialogclose", function () {
 			button.stop();
 			that.destroy();
+			mb_enableButton('pan1');
 		});
 
 		//
@@ -299,7 +310,7 @@ var MeasureApi = function (o) {
 		}
 
 		measureDialog.dialog("open");
-		$('#toolsContainer').hide() && $('a.toggleToolsContainer').removeClass('activeToggle');
+		
 	};
 
 	this.destroy = function () {

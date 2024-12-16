@@ -515,16 +515,16 @@ var SaveWmcApi = function () {
 			height: 400,
 			width: 400,
 			modal: false,
-			beforeclose: function (event, ui) {
-				try {
-					$saveWmcDialog.parent().effect("transfer", {
-						to: $this
-					}, 300);
-				}
-				catch (exc) {
-					new Mb_warning("jq_ui_effect is missing.");
-				}
-			},
+			// beforeclose: function (event, ui) {
+			// 	try {
+			// 		$saveWmcDialog.parent().effect("transfer", {
+			// 			to: $this
+			// 		}, 300);
+			// 	}
+			// 	catch (exc) {
+			// 		new Mb_warning("jq_ui_effect is missing.");
+			// 	}
+			// },
 			close: function() {$('#savewmc').toggleClass('myOnClass')},
 			buttons: getButtons()
 		});
