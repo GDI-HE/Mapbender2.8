@@ -960,9 +960,25 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 editDialog.parent().find('a > span.ui-icon-closethick').bind('click', function() {
                     o.$target.mb_digitize('modeOff');
                 });
+                function disablePanning() {
+                    setOverrideAutoPan(true);
+                    for (var i = 0; i < mb_button.length; i++) {
+                        if (mb_button[i].elName === 'pan1') {
+                            mb_button_click(i);
+                            break;
+                        }
+                    }
+                }
                 editDialog.find('.digitize-move').bind('click', function() {
-                    o.$target.mb_digitize('moveMode');
-                    $(this).addClass('active').siblings().removeClass('active');
+                    if ($(this).hasClass('active')) {
+                        o.$target.mb_digitize('modeOff');
+                        $(this).removeClass('active');
+                        mb_enableButton('pan1');
+                    } else { 
+                        o.$target.mb_digitize('moveMode');
+                        $(this).addClass('active').siblings().removeClass('active');
+                        disablePanning();
+                    }
                 });
                 editDialog.find('.digitize-style').bind('click', function () {
                   var featureIdx = $link.attr('idx');
@@ -974,16 +990,38 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 }
                 editDialog.find('.digitize-add-vertex,.digitize-move-vertex,.digitize-delete-vertex').css('display', point ? 'none' : '');
                 editDialog.find('.digitize-add-vertex').bind('click', function() {
-                    o.$target.mb_digitize('addVertexMode');
-                    $(this).addClass('active').siblings().removeClass('active');
+                    if ($(this).hasClass('active')) {
+                        o.$target.mb_digitize('modeOff');
+                        $(this).removeClass('active');
+                        mb_enableButton('pan1');
+                    } else {
+                        o.$target.mb_digitize('addVertexMode');
+                        $(this).addClass('active').siblings().removeClass('active');
+                        disablePanning();
+                    }
                 });
                 editDialog.find('.digitize-move-vertex').bind('click', function() {
-                    o.$target.mb_digitize('moveVertexMode');
-                    $(this).addClass('active').siblings().removeClass('active');
+                    if ($(this).hasClass('active')) {
+                        o.$target.mb_digitize('modeOff');
+                        $(this).removeClass('active');
+                        mb_enableButton('pan1');
+                    } else {
+                        o.$target.mb_digitize('moveVertexMode');
+                        $(this).addClass('active').siblings().removeClass('active');
+                        disablePanning();
+                    }
                 });
+
                 editDialog.find('.digitize-delete-vertex').bind('click', function() {
-                    o.$target.mb_digitize('deleteVertexMode');
-                    $(this).addClass('active').siblings().removeClass('active');
+                    if ($(this).hasClass('active')) {
+                        o.$target.mb_digitize('modeOff');
+                        $(this).removeClass('active');
+                        mb_enableButton('pan1');
+                    } else {
+                        o.$target.mb_digitize('deleteVertexMode');
+                        $(this).addClass('active').siblings().removeClass('active');
+                        disablePanning();
+                    }
                 });
                 var preview = editDialog.find('.digitize-preview').html('').get(0);
                 kml.renderPreview(feature, preview);
@@ -1404,19 +1442,12 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 inProgress = true;
             }
             setOverrideAutoPan(true);
-            //mb_disableButton('pan1'); 
-            // Überprüfen und deaktivieren Sie den Button mit der ID 'pan1'
-            //var panButton = $('#pan1');
-            //if (panButton.hasClass('myOnClass')) {
-                //console.log('Button ist bereits aktiviert');
-                //mb_disableButton('pan1');
-                for (var i = 0; i < mb_button.length; i++) {
-                    if (mb_button[i].elName === 'pan1') {
-                        mb_button_click(i);
-                        break;
-                    }
+            for (var i = 0; i < mb_button.length; i++) {
+                if (mb_button[i].elName === 'pan1') {
+                    mb_button_click(i);
+                    break;
                 }
-            //}
+            }
         };
 
         this.destroy = function() {
