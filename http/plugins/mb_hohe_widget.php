@@ -44,25 +44,28 @@ var MeasureApi = function (o) {
             height: 'auto',
             title: 'Höhenprofil',
             buttons: [
-                {
-                    text: "Abbrechen",
-                    id: "hoheCancelButton",
-                    click: function() {
-                        resetII();
-                        that.deactivate();
-                        Mapbender.bindPanEvents();
-                        $(document.querySelector('#hoheCancelButton')).button('disable');
-                        $(document.querySelector('#hoheNewButton')).button('enable');
-                    }
-                },
+                //{
+                //    text: "Abbrechen",
+                //    id: "hoheCancelButton",
+                //    click: function() {
+                //        //console.log("mb_hohe_widget.php[click_abort_begin]: panEventsActive=" + panEventsActive);
+                //        resetII();
+                //        that.deactivate();
+                //        //mapbender.bindPanEvents();
+                //        //mb_enableButton('pan1');
+                //        $(document.querySelector('#hoheCancelButton')).button('disable');
+                //        $(document.querySelector('#hoheNewButton')).button('enable');
+                //        //console.log("mb_hohe_widget.php[click_abort_end]: panEventsActive=" + panEventsActive);
+                //    }
+                //},
                 {
                     text: "Neu",
                     id: "hoheNewButton",
                     click: function() {
                         Mapbender.unbindPanEvents();
                         resetII();
-                        $(document.querySelector('#hoheCancelButton')).button('enable');
-                        $(document.querySelector('#hoheNewButton')).button('disable');
+                        //$(document.querySelector('#hoheCancelButton')).button('enable');
+                        //$(document.querySelector('#hoheNewButton')).button('disable');
                     }
                 }
             ],
@@ -70,26 +73,26 @@ var MeasureApi = function (o) {
                 $('#toolsContainer').hide();
                 $('a.toggleToolsContainer').removeClass('activeToggle');
                 Mapbender.disableFeatureInfo();
-                $(document.querySelector('#hoheCancelButton')).button('enable');
-                $(document.querySelector('#hoheNewButton')).button('disable');
+                //$(document.querySelector('#hoheCancelButton')).button('enable');
+                //$(document.querySelector('#hoheNewButton')).button('disable');
             },
             close: function() {
                 $('#altitudeProfile').removeClass("myOnClass");
                 button.stop();
+                
+                Mapbender.enableFeatureInfo();
                 mb_enableButton('pan1');
                 Mapbender.bindPanEvents();
-                Mapbender.enableFeatureInfo();
             }
                         
-		}).bind("dialogclose", function () {
-			button.stop();
-			that.destroy();
+        }).bind("dialogclose", function () {
+            button.stop();
+            that.destroy();
             mb_enableButton('pan1');
             Mapbender.bindPanEvents();
             Mapbender.enableFeatureInfo();
-		}).bind("mousedown", function (e) {
-			testButton(e.offsetX,e.offsetY);
-        });
+            
+		});
 
 		//
 		// Initialise button

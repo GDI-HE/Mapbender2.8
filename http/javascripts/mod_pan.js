@@ -99,14 +99,16 @@ Mapbender.events.init.register(function () {
     }
 
     Mapbender.bindPanEvents = function() {
+        //console.log('mod_pan.js[bindPanEvents{f} called(bindIfFalse): panEventsActive=' + panEventsActive);
         if (!panEventsActive) {
             $(map.getDomElement()).bind('mousedown', movestart)
                                   .bind('mouseleave', moveend);
-            panEventsActive = true;
+            panEventsActive = true;            
         }
     }
 
     Mapbender.unbindPanEvents = function() {
+        //console.log('mod_pan.js[unbindPanEvents{f} called(unbindIfTrue): panEventsActive=' + panEventsActive);
         if (panEventsActive) {
             $(map.getDomElement()).unbind('mousedown', movestart)
                                   .unbind('mouseleave', moveend);
@@ -148,6 +150,21 @@ Mapbender.events.init.register(function () {
 
     $(document).bind("dragstart", ".ui-dialog", function() {
         var dialog = $(this);
+
+        // Überprüfen, ob das Dragging von der Titelleiste ausgelöst wurde
+        // und nicht vom Schließen-Button oder dessen Icon
+        var $titleBar = dialog.find('.ui-dialog-titlebar');
+        var $closeButton = dialog.find('.ui-dialog-titlebar-close');
+        if (
+            !$(event.target).is($titleBar) &&
+            $(event.target).closest('.ui-dialog-titlebar').length === 0 ||
+            $(event.target).is($closeButton) ||
+            $(event.target).closest('.ui-dialog-titlebar-close').length > 0
+        ) {
+            // Dragging wurde nicht von der Titelleiste gestartet oder vom Schließen-Button, ignorieren
+            return;
+        }
+
         if (dialog.find('.dialog-overlay').length > 0) {
             if (panEventsActive) {
                 Mapbender.unbindPanEvents();
@@ -158,7 +175,7 @@ Mapbender.events.init.register(function () {
             showOverlay();
         }
     });
-    
+     
     $(document).bind("resizestop", ".ui-dialog", function() {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {

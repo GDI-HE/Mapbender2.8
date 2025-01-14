@@ -282,6 +282,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             $('li').live('click', function() {
                 if ($(this).children('.digitize-close').length === 1) {
                     $(this).parent().menu('destroy').remove();
+                    $('.contextmenu-overlay').remove();
                 }
             });
 
@@ -291,12 +292,14 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 var url = item.url;
                 $('li[title="' + url + '"] > a').die('contextmenu').live('contextmenu', function(e) {
                     e.preventDefault();
-                    contextmenuLayer(e);
+                    var self = this;
+                    contextmenuLayer.call(self, e);
                     return false;
                 });
                 $('li[title="' + url + '"] > ul > li').die('contextmenu').live('contextmenu', function(e) {
                     e.preventDefault();
-                    contextmenuObject(e);
+                    var self = this;
+                    contextmenuObject.call(self, e);
                     return false;
                 }).die('click').live('click', function(e) {
                         if ($(e.srcElement).is('button,input')) {
@@ -597,7 +600,13 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             if ($('.digitize-contextmenu').length != 0) {
                 return;
             }
-            $(document.body).append(menu);
+            
+            // Create the overlay
+            var overlay = $('<div class="contextmenu-overlay"></div>');
+            $('body').append(overlay);
+            // Append the menu to the overlay
+            overlay.append(menu);
+            
             var pos = $link.offset();
             menu.css({
                     position: 'absolute',
@@ -611,16 +620,38 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     },
                     function() {
                         $(this).removeClass('ui-state-hover');
-                    });
+                    }
+                );
+            // Event listener for clicks on the overöay
+            overlay.bind('click.contextmenu', function(event) {
+                // Check if the click was outside the context menu
+                if (!menu.is(event.target) && menu.has(event.target).length === 0) {
+                    // Destroy the context menu
+                    menu.menu('destroy').remove();
+                    // Remove the click event listener
+                    overlay.remove();
+                }
+            });                
+            
             menu.children('li:has(.digitize-zoomto)').bind('click', function() {
                 var kml = $('#mapframe1').data('kml');
                 var url = $link.parent().parent().attr('title');
                 kml.zoomToFeature(url, $link.attr('idx'));
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
-            menu.children('li:has(.digitize-pencil)').bind('click', editObject($link, menu));
-            menu.children('li:has(.digitize-copy)').bind('click', copyObject($link, menu));
-            menu.children('li:has(.digitize-label)').bind('click', labelObject($link, menu));
+            menu.children('li:has(.digitize-pencil)').bind('click', function() {
+            editObject($link, menu)();
+            overlay.remove();
+            });
+            menu.children('li:has(.digitize-copy)').bind('click', function() {
+            copyObject($link, menu)();
+            overlay.remove();
+            });
+            menu.children('li:has(.digitize-label)').bind('click', function() {
+            labelObject($link, menu)();
+            overlay.remove();
+            });
             menu.children('li:has(.digitize-export)').bind('click', function() {
                 var kml = $('#mapframe1').data('kml');
                 var url = $link.parent().parent().attr('title');
@@ -628,6 +659,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 var data = kml._kmls[url];
                 exportItem(data.data.features[idx]);
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
             menu.children('li:has(.digitize-remove)').bind('click', function() {
                 var kml = $('#mapframe1').data('kml');
@@ -642,9 +674,11 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 kml.reorderFeatures(url, ids);
 
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
             menu.children('li:has(.digitize-style)').bind('click', function() {
                 editDialog.dialog('close');
+                overlay.remove();
                 var url = $link.parent().parent().attr('title');
                 var idx = $link.attr('idx');
                 editSingleFeatureStyle(idx, url, menu);
@@ -1084,7 +1118,14 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             if ($('.digitize-contextmenu').length != 0) {
                 return;
             }
-            $(document.body).append(menu);
+            
+            // Create the overlay
+            var overlay = $('<div class="contextmenu-overlay"></div>');
+            $('body').append(overlay);
+
+            // Append the menu to the overlay
+            overlay.append(menu);
+
             var pos = $link.offset();
             menu.css({
                     position: 'absolute',
@@ -1099,14 +1140,29 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     function() {
                         $(this).removeClass('ui-state-hover');
                     });
+            
+            // Event listener for clicks on the document
+            overlay.bind('click.contextmenu', function(event) {
+                // Check if the click was outside the context menu
+                if (!menu.is(event.target) && menu.has(event.target).length === 0) {
+                    // Destroy the context menu
+                    menu.menu('destroy').remove();
+                    // Remove the click event listener
+                    overlay.remove();
+                }
+            });
+        
+        
             menu.children('li:has(.digitize-zoomto)').bind('click', function() {
                 $link.click();
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
             menu.children('li:has(.digitize-remove)').bind('click', function() {
                 $('#mapframe1').data('kml').remove($link.parent().attr('title'));
                 $link.parent().remove();
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
             menu.children('li:has(.digitize-export)').bind('click', function() {
                 var kml = $('#mapframe1').data('kml');
@@ -1114,11 +1170,13 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 var data = kml._kmls[url];
                 exportItem(data.data);
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
             menu.children('li:has(.digitize-add,.digitize-pencil)').bind('click', function() {
                 editDialog.dialog('close');
                 attributesDialog.dialog('close');
                 editStyleDialog.dialog('close');
+                overlay.remove();
 
                 digitizeDialog.dialog('open');
 
@@ -1126,19 +1184,19 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     status = 'new-point';
                     $(this).addClass('active').siblings().removeClass('active');
                     digitizingFor = $link.parent().attr('title');
-                    that.activate();
+                    that.activate();                    
                 });
                 digitizeDialog.find('.digitize-line').bind('click', function() {
                     status = 'new-line';
                     $(this).addClass('active').siblings().removeClass('active');
                     digitizingFor = $link.parent().attr('title');
-                    that.activate();
+                    that.activate();                    
                 });
                 digitizeDialog.find('.digitize-polygon').bind('click', function() {
                     status = 'new-polygon';
                     $(this).addClass('active').siblings().removeClass('active');
                     digitizingFor = $link.parent().attr('title');
-                    that.activate();
+                    that.activate();                    
                 });
                 // get the featureCollection data
                 var url = $link.parent().attr('title');
@@ -1161,6 +1219,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     kml.reorderFeatures(url, ids);
                 });
                 menu.menu('destroy').remove();
+                overlay.remove();
             });
             return false;
         };
@@ -1178,7 +1237,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 attributesDialog.html(editAttributesHtml);
                 attributesDialog.dialog('open');
                 attributesDialog.find('.digitize-add').bind('click', function() {
-                    var newRow = $('<tr><td><input type="text"></input></td><td><input type="text"></input></td></tr>');
+                    var newRow = $('<tr><td><input style="width:99px" type="text"></input></td><td><input type="text"></input></td></tr>');
                     attributesDialog.find('table').append(newRow);
                     newRow.find('input').first().bind('change', function() {
                         newRow.find('input').last().attr('name', $(this).val());
@@ -1195,6 +1254,9 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     kml.addGeometry(pts, digitizingFor, attributes);
                     attributesDialog.find('.digitize-save').unbind('click');
                     attributesDialog.dialog('close');
+                    var $mapframe1 = $('#mapframe1');
+                    $mapframe1.unbind('click');
+                    mb_enableButton('pan1');                                     
                 });
             }
         };
@@ -1341,6 +1403,20 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             if (!inProgress) {
                 inProgress = true;
             }
+            setOverrideAutoPan(true);
+            //mb_disableButton('pan1'); 
+            // Überprüfen und deaktivieren Sie den Button mit der ID 'pan1'
+            //var panButton = $('#pan1');
+            //if (panButton.hasClass('myOnClass')) {
+                //console.log('Button ist bereits aktiviert');
+                //mb_disableButton('pan1');
+                for (var i = 0; i < mb_button.length; i++) {
+                    if (mb_button[i].elName === 'pan1') {
+                        mb_button_click(i);
+                        break;
+                    }
+                }
+            //}
         };
 
         this.destroy = function() {
@@ -1355,16 +1431,22 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             //remove digitized x and y values from print dialog
             $('input[name="digitized_x_values"]').val("");
             $('input[name="digitized_y_values"]').val("");
+            setOverrideAutoPan(false);
+            mb_enableButton('pan1');
         };
 
         this.deactivate = function() {
             if (o.$target.size() > 0) {
                 o.$target.mb_digitize("deactivate");
             }
+            setOverrideAutoPan(false);
+            mb_enableButton('pan1');
         };
 
         this.closeEditDialog = function() {
             editDialog.dialog('close');
+            setOverrideAutoPan(false);
+            mb_enableButton('pan1');
         };
 
         create();

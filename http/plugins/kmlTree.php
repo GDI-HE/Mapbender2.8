@@ -76,10 +76,18 @@ var KmlTree = function(o) {
     var $KMLfolder = $('<li class="open kml"><ul></ul></li>');
     $kmlTree.append($KMLfolder);
 
-    $addButton = $('<button title="<?php echo _mb('add geodata');?> "class="add" name="addkml" value="addkml"></button>');
+    $addButton = $('<button title="<?php echo _mb('add geodata');?> "class="add" style="outline: none;" name="addkml" value="addkml"><span class="icon-add-geodata"></span>Ebene erstellen/laden</button>');
 
-    var selectButton = $('<img title="<?php echo _mb('select features');?> "id="toggle-select-features" src="../img/osgeo_graphics/geosilk/cursor.png"></img>');
-
+    var selectButton = $('<button title="<?php echo _mb('select features');?> "id="toggle-select-features"><img class="icon-select-geodata" src="../img/osgeo_graphics/geosilk/cursor.png"></img><?php echo _mb('select features');?></button>');
+    
+    $addButton.hover(
+    function() {
+        $(this).addClass('myOverClass');
+    }, function() {
+        $(this).removeClass('myOverClass');
+    }
+    );
+    
     $addButton.click(function() {
         if ($('#mySpatialData').dialog('isOpen') === true) {
 
@@ -101,6 +109,15 @@ var KmlTree = function(o) {
             var dlgcontent = '<div id="kml-load-tabs">' + '<ul><li><a class="icon icon-wmc" href="#kml-from-wmc"><?php echo _mb("Stored data");?></a></li>' + '<li><a class="icon icon-local" href="#kml-from-upload"><?php echo _mb("Upload");?></a></li>' + '<li><a class="icon icon-remote" href="#kml-from-url"><?php echo _mb("External source");?></a></li>' + '<li><a class="icon icon-new" href="#kml-new"><?php echo _mb("New");?></a></li></ul>' + '<div id="kml-from-wmc"><?php echo _mb("WMC");?></div>' + '<div id="kml-from-upload">' + '<iframe name="kml-upload-target" style="width: 0; height: 0; border: 0px;"></iframe>' + '<form action="../php/uploadKml.php" method="post" enctype="multipart/form-data" target="kml-upload-target">' + '<input type="file" name="kml"></input>' + '<input type="submit" class="upload" value="Upload"></input><br>' + '<?php echo _mb("You can upload local KML, GPX and geoJSON files here. The filename should have the typical file extension (.kml, .gpx or .geojson) and the size is limited to 250kb of data.");?>' + '</div>' + '</form>' + '<div id="kml-from-url">URL: <input class="kmlurl" /><button class="add" name="add" value="add"></button><br>' + '<?php echo _mb("You can give an url to a datafile which is located somewhere in the www. Only KML, geoJSON and GPX files are supported. The files will be validated before they are loaded into the mapviewer.");?>' + '</div>' + '<div id="kml-new">' + '<label><?php echo _mb("Title");?>: <input type="text" name="kml-new-title"></input></label>' + '<button class="add-kml"></button><br>' + '<?php echo _mb("Define a self speaking name for your new dataset collection.");?>' + '</div>' + '</div>';
             $('#kml-load-tabs').remove();
             $(dlg).append(dlgcontent);
+
+            // Add the event listener for the Enter key after the content is added
+            $('#kml-load-tabs input[name="kml-new-title"]').keypress(function(e) {
+                if (e.which === 13) { // Enter key pressed
+                    e.preventDefault(); // Prevent form submission
+                    $('#kml-load-tabs button.add-kml').click(); // Trigger click event
+                }
+            });
+
             $.ajax({
                 type: 'get',
                 url: '../php/mb_list_wmc_local_data.php',
@@ -557,6 +574,8 @@ var KmlTree = function(o) {
                 }
             });
             $('#kml-load-tabs').tabs();
+            $('#kml-load-tabs ul li:eq(3) a').click(); // Simulieren eines Klicks auf den letzten Tab-Link
+            $('#kml-load-tabs').find('input[name="kml-new-title"]').focus(); // Fokus auf das Eingabefeld setzen
             $('#kml-load-tabs').find('button.add').bind('click', function() {
                 $('#mapframe1').kml({ //TODO: what is happening?
                     url: $('#kml-load-tabs').find('.kmlurl').val()
@@ -632,8 +651,12 @@ var KmlTree = function(o) {
 
         }
     });
-    $KMLfolder.find('ul').before(selectButton);
+    
     $KMLfolder.find("ul").before($addButton);
+    $KMLfolder.find('ul').before(selectButton);
+
+    var helpDiv = $('<div class="kmlTreeHelpText" style="display:none;"><p><b>Hilfe:</b></p><p>Durch klicken + ziehen in der Karte - Rechteck aufziehen.<p><p>Gezeichnete Objekte werden markiert und hervorgehoben.</p><p>Gewählte Objekte können gelöscht oder exportiert werden</p><p><b>Hinweis:</b> Die Objekte müssen vollständig im Rechteck enthalten sein.</p></div>');
+    selectButton.after(helpDiv);
 
     var btn = new Mapbender.Button({
         domElement: selectButton[0],
@@ -644,10 +667,12 @@ var KmlTree = function(o) {
         go: function() {
             var kml = $('#mapframe1').data('kml');
             kml.setQueriedLayer(true);
+            $('.kmlTreeHelpText').show();
         },
         stop: function() {
             var kml = $('#mapframe1').data('kml');
             kml.setQueriedLayer(false);
+            $('.kmlTreeHelpText').hide();
         }
     });
 
@@ -658,11 +683,13 @@ var KmlTree = function(o) {
             $KMLfolder.find('ul li[title="' + title + '"]').remove();
         }
         abbrevTitle = title.length < 20 ? title : title.substr(0, 17) + "...";
-        $kmlEntry = $('<li title="' + title + '" class="open"><button class="digitize-menu-arrow"></button><button class="toggle" name="toggle" value="toggle" ></button> <input type="checkbox"' + checked + '/><a href="#">' + abbrevTitle + '</a></li>');
+        $kmlEntry = $('<li title="' + title + '" class="open feature-container"><button class="digitize-menu-arrow"></button><button class="toggle" name="toggle" value="toggle" ></button><input type="checkbox"' + checked + '/><a href="#" style="margin-left:2px;">' + abbrevTitle + '</a></li>');
         $KMLfolder.children("ul").append($kmlEntry);
 
         $kmlEntry.find("a").bind("click", (function(url) {
             return function() {
+                event.preventDefault();
+                event.stopPropagation();
                 $('#mapframe1').data('kml').zoomToLayer(url);
             };
         })(obj.url));

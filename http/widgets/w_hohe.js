@@ -306,9 +306,9 @@ $.widget("mapbender.mb_hohe", {
 		img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><rect x="10" y="40" width="60" height="80" opacity="1"><animate id="a" begin="0;b.end-0.25s" attributeName="opacity" dur="0.75s" values="1;.2" fill="freeze"/></rect><rect x="90" y="40" width="60" height="80" opacity=".4"><animate begin="a.begin+0.15s" attributeName="opacity" dur="0.75s" values="1;.2" fill="freeze"/></rect><rect x="170" y="40" width="60" height="80" opacity=".3"><animate id="b" begin="a.begin+0.3s" attributeName="opacity" dur="0.75s" values="1;.2" fill="freeze"/></rect></svg>');
 		div.append(img);
 		document.querySelector('.ownSuperClass').append(div);
-		$(document.querySelector('#hoheCancelButton')).button('disable');	
+		//$(document.querySelector('#hoheCancelButton')).button('disable');	
 		this.deactivate();
-		Mapbender.bindPanEvents();
+		//Mapbender.bindPanEvents();
 
 		var data = new FormData()
 		data.append('action', 'getheigth')
@@ -343,8 +343,9 @@ $.widget("mapbender.mb_hohe", {
 		});
 
 		// Enable the NEW button and PanEvents after processing is complete		
+		
+		$('#hoheNewButton').button('enable');
 		//Mapbender.bindPanEvents();
-		$(document.querySelector('#hoheNewButton')).button('enable');
 
 		return  re;
 	},
@@ -577,6 +578,15 @@ $.widget("mapbender.mb_hohe", {
 		this._$canvas.remove();
 		this.element.unbind("onwheel",$.proxy(this, "_measure"));
 		this._map.events.afterMapRequest.unregister($.proxy(this._redraw, this));
+
+		// Entfernen des verbleibenden click-Handlers
+        //this.element.unbind("click", this.reinitializeProxy);
+
+		// Aktivieren von PanEvents und FeatureInfo
+		//mb_enableButton('pan1');
+		//Mapbender.enableFeatureInfo();
+		//Mapbender.bindPanEvents();
+
 		$.Widget.prototype.destroy.apply(this, arguments); // default destroy
 		$(this.element).data("mb_hohe", null);
 	}

@@ -76,12 +76,20 @@ var ButtonApi = function (o) {
 			$button.removeClass("myOnClass");
 			button.stop();
 			mb_enableButton('pan1');
+			Mapbender.bindPanEvents();
 			Mapbender.enableFeatureInfo();	
 			if (o.target[0] === 'coordsLookup' && Mapbender.modules[o.target[0]] && typeof Mapbender.modules[o.target[0]].emptyFieldsAndMarker === "function") {
                 Mapbender.modules.coordsLookup.emptyFieldsAndMarker();
-            }		
+            }
+			overlay.hide();		
 		}
-        });
+        }).bind("dialogclose", function () {
+			button.stop();
+			
+            mb_enableButton('pan1');
+            Mapbender.bindPanEvents();
+            Mapbender.enableFeatureInfo();
+		});
 
 		// Overlay-Div erstellen und hinzufügen
 		var overlay = $('<div class="dialog-overlay"></div>').css({
