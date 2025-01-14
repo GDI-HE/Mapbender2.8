@@ -61,6 +61,15 @@ Mapbender.events.init.register(function () {
         var dif = stopPos.minus(startPos);
         map.moveMap(dif.x, dif.y);
         isDragging = true;
+
+        // Aktualisiere die Position des KML-Rendering-Pane während des Pannens
+        var kmlPane = $('#kml-rendering-pane');
+        if (kmlPane.length) {
+            kmlPane.css({
+                transform: 'translate(' + dif.x + 'px, ' + dif.y + 'px)'
+            });
+        }
+
         if (!$.browser.msie){
             return true;
         }
@@ -95,6 +104,15 @@ Mapbender.events.init.register(function () {
         $(document)
             .unbind("mousemove", move)
             .unbind("mouseup", moveend);
+        
+        // Zurücksetzen der Position des KML-Rendering-Pane
+        var kmlPane = $('#kml-rendering-pane');
+        if (kmlPane.length) {
+            kmlPane.css({
+                transform: 'none'
+            });
+        }
+
         return false;
     }
 
