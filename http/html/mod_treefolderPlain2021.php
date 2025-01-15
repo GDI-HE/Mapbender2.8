@@ -634,67 +634,133 @@ function handleOpacity(mapObj_id, wms_id, increment) {
 //---end------------- opacity --------------------
 
 function move_up(j,k,l){
-	if(isNaN(j)&&isNaN(k)&&isNaN(l)){
-		j=selectedMap;
-		k=selectedWMS;
-		l=selectedLayer;
-	}
-	if(j==-1||k==-1||l==-1){
-		alert("<?php echo _mb('You have to select the WMS you want to move up!');?> ")
-		return;
-	}
-	var lid= mb_mapObj[j].wms[k].objLayer[l].layer_id;
-	if(! mb_mapObj[j].move( mb_mapObj[j].wms[k].wms_id, lid, reverseWms)){
-		alert("<?php echo _mb('Illegal move operation');?>");
-		return;
-	}
-	treeState = getState();
-	 mb_mapObj[j].zoom(true, 1.0);
-	 mb_execloadWmsSubFunctions();
-	//find layer and select
-	for(k=0;k< mb_mapObj[j].wms.length;k++){
-		for(l=0;l< mb_mapObj[j].wms[k].objLayer.length;l++){
-			if( mb_mapObj[j].wms[k].objLayer[l].layer_id==lid){
-				select(j,k,l);
-				if(l!=0)
-					selectNode(String(lid));
-				else
-					selectNode("wms_"+String( mb_mapObj[j].wms[k].wms_id));
-			}
-		}
-	}
+    if(isNaN(j)&&isNaN(k)&&isNaN(l)){
+        j=selectedMap;
+        k=selectedWMS;
+        l=selectedLayer;
+    }
+    if(j==-1||k==-1||l==-1){
+        alert("<?php echo _mb('You have to select the WMS or Layer you want to move up!');?> ")
+        return;
+    }
+    var lid = mb_mapObj[j].wms[k].objLayer[l].layer_id;
+    //console.log("Moving up: ", j, k, l, lid);
+    if (reverseWms) {
+        if (l < mb_mapObj[j].wms[k].objLayer.length - 1) {
+            // Move the Layer down (because reverse is true)
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, false)) {
+                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
+                return;
+            }
+        } else if (k < mb_mapObj[j].wms.length - 1 && l == mb_mapObj[j].wms[k].objLayer.length - 1) {
+            // Move the WMS down (because reverse is true)
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, false)) {
+                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
+                return;
+            }
+        } else {
+            alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
+            return;
+        }
+    } else {
+        if (l > 0) {
+            // Move the Layer up
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, true)) {
+                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
+                return;
+            }
+        } else if (k > 0 && l == 0) {
+            // Move the WMS up
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, true)) {
+                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
+                return;
+            }
+        } else {
+            alert("<?php echo _mb('Cannot move up, already at the top!');?>");
+            return;
+        }
+    }
+    treeState = getState();
+    mb_mapObj[j].zoom(true, 1.0);
+    mb_execloadWmsSubFunctions();
+    reloadTree();
+    //find layer and select
+    for(var m=0; m< mb_mapObj[j].wms.length; m++){
+        for(var n=0; n< mb_mapObj[j].wms[m].objLayer.length; n++){
+            if( mb_mapObj[j].wms[m].objLayer[n].layer_id == lid){
+                select(j,m,n);
+                if(n != 0)
+                    selectNode(String(lid));
+                else
+                    selectNode("wms_" + String( mb_mapObj[j].wms[m].wms_id));
+            }
+        }
+    }
 }
 
 function move_down(j,k,l){
-	if(isNaN(j)&&isNaN(k)&&isNaN(l)){
-		j=selectedMap;
-		k=selectedWMS;
-		l=selectedLayer;
-	}
-	if(j==-1||k==-1||l==-1){
-		alert("<?php echo _mb('You have to select the WMS you want to move down!');?>")
-		return;
-	}
-	var lid= mb_mapObj[j].wms[k].objLayer[l].layer_id;
-	if(! mb_mapObj[j].move( mb_mapObj[j].wms[k].wms_id, lid, reverseWms)){
-		alert("<?php echo _mb('Illegal move operation');?>");
-		return;
-	}
-	treeState = getState();
-	 mb_mapObj[j].zoom(true, 1.0);
-	 mb_execloadWmsSubFunctions();
-	//find layer and select
-	for(k=0;k< mb_mapObj[j].wms.length;k++){
-		for(l=0;l< mb_mapObj[j].wms[k].objLayer.length;l++){
-			if( mb_mapObj[j].wms[k].objLayer[l].layer_id==lid){
-				select(j,k,l);
-				if(l!=0)
-					selectNode(String(lid));
-				else
-					selectNode("wms_"+String( mb_mapObj[j].wms[k].wms_id));
-			}
-		}
-	}
+    if(isNaN(j)&&isNaN(k)&&isNaN(l)){
+        j=selectedMap;
+        k=selectedWMS;
+        l=selectedLayer;
+    }
+    if(j==-1||k==-1||l==-1){
+        alert("<?php echo _mb('You have to select the WMS or Layer you want to move down!');?>")
+        return;
+    }
+    var lid = mb_mapObj[j].wms[k].objLayer[l].layer_id;
+    //console.log("Moving down: ", j, k, l, lid);
+    if (reverseWms) {
+        if (l > 0) {
+            // Move the Layer up (because reverse is true)
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, true)) {
+                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
+                return;
+            }
+        } else if (k > 0 && l == 0) {
+            // Move the WMS up (because reverse is true)
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, true)) {
+                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
+                return;
+            }
+        } else {
+            alert("<?php echo _mb('Cannot move up, already at the top!');?>");
+            return;
+        }
+    } else {
+        if (l < mb_mapObj[j].wms[k].objLayer.length - 1) {
+            // Move the Layer down
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, false)) {
+                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
+                return;
+            }
+        } else if (k < mb_mapObj[j].wms.length - 1 && l == mb_mapObj[j].wms[k].objLayer.length - 1) {
+            // Move the WMS down
+            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, false)) {
+                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
+                return;
+            }
+        } else {
+            alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
+            return;
+        }
+    }
+    treeState = getState();
+    mb_mapObj[j].zoom(true, 1.0);
+    mb_execloadWmsSubFunctions();
+    reloadTree();
+    //find layer and select
+    for(var m=0; m< mb_mapObj[j].wms.length; m++){
+        for(var n=0; n< mb_mapObj[j].wms[m].objLayer.length; n++){
+            if( mb_mapObj[j].wms[m].objLayer[n].layer_id == lid){
+                select(j,m,n);
+                if(n != 0)
+                    selectNode(String(lid));
+                else
+                    selectNode("wms_" + String( mb_mapObj[j].wms[m].wms_id));
+            }
+        }
+    }
 }
 
 function remove_wms(j,k,l){
