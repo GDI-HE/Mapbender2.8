@@ -626,7 +626,7 @@ $.widget("mapbender.mb_digitize", {
             .unbind("mousemove", this._digitize)
             .unbind("click", this.reinitializeProxy)
             .css("cursor", "default");
-
+            mb_enableButton('pan1');
     },
     // delete everything
     destroy: function () {

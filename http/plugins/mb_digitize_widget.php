@@ -1255,6 +1255,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     });
                     kml.addGeometry(pts, digitizingFor, attributes);
                     attributesDialog.find('.digitize-save').unbind('click');
+                    $('#mapframe1').unbind('click');
                     attributesDialog.dialog('close');                                                      
                 });
             }
