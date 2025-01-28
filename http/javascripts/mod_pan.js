@@ -5,7 +5,7 @@
  * panning tool for the map
  * 
  * Files:
- *  - http/javascripts/mod_pan2.js
+ *  - http/javascripts/mod_pan.js
  *
  * SQL:
  * > <SQL for element> 

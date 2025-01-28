@@ -171,6 +171,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 dig.isPaused = false;
             }
         });
+
         var create = function() {
             $.ajax({
                 url: '../extensions/makiicons/selection.json',
@@ -960,25 +961,10 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 editDialog.parent().find('a > span.ui-icon-closethick').bind('click', function() {
                     o.$target.mb_digitize('modeOff');
                 });
-                function disablePanning() {
-                    setOverrideAutoPan(true);
-                    for (var i = 0; i < mb_button.length; i++) {
-                        if (mb_button[i].elName === 'pan1') {
-                            mb_button_click(i);
-                            break;
-                        }
-                    }
-                }
+
                 editDialog.find('.digitize-move').bind('click', function() {
-                    if ($(this).hasClass('active')) {
-                        o.$target.mb_digitize('modeOff');
-                        $(this).removeClass('active');
-                        mb_enableButton('pan1');
-                    } else { 
-                        o.$target.mb_digitize('moveMode');
-                        $(this).addClass('active').siblings().removeClass('active');
-                        disablePanning();
-                    }
+                    o.$target.mb_digitize('moveMode');
+                    $(this).addClass('active').siblings().removeClass('active');
                 });
                 editDialog.find('.digitize-style').bind('click', function () {
                   var featureIdx = $link.attr('idx');
@@ -990,38 +976,16 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                 }
                 editDialog.find('.digitize-add-vertex,.digitize-move-vertex,.digitize-delete-vertex').css('display', point ? 'none' : '');
                 editDialog.find('.digitize-add-vertex').bind('click', function() {
-                    if ($(this).hasClass('active')) {
-                        o.$target.mb_digitize('modeOff');
-                        $(this).removeClass('active');
-                        mb_enableButton('pan1');
-                    } else {
-                        o.$target.mb_digitize('addVertexMode');
-                        $(this).addClass('active').siblings().removeClass('active');
-                        disablePanning();
-                    }
+                    o.$target.mb_digitize('addVertexMode');
+                    $(this).addClass('active').siblings().removeClass('active');
                 });
                 editDialog.find('.digitize-move-vertex').bind('click', function() {
-                    if ($(this).hasClass('active')) {
-                        o.$target.mb_digitize('modeOff');
-                        $(this).removeClass('active');
-                        mb_enableButton('pan1');
-                    } else {
-                        o.$target.mb_digitize('moveVertexMode');
-                        $(this).addClass('active').siblings().removeClass('active');
-                        disablePanning();
-                    }
+                    o.$target.mb_digitize('moveVertexMode');
+                    $(this).addClass('active').siblings().removeClass('active');
                 });
-
                 editDialog.find('.digitize-delete-vertex').bind('click', function() {
-                    if ($(this).hasClass('active')) {
-                        o.$target.mb_digitize('modeOff');
-                        $(this).removeClass('active');
-                        mb_enableButton('pan1');
-                    } else {
-                        o.$target.mb_digitize('deleteVertexMode');
-                        $(this).addClass('active').siblings().removeClass('active');
-                        disablePanning();
-                    }
+                    o.$target.mb_digitize('deleteVertexMode');
+                    $(this).addClass('active').siblings().removeClass('active');
                 });
                 var preview = editDialog.find('.digitize-preview').html('').get(0);
                 kml.renderPreview(feature, preview);
@@ -1222,19 +1186,19 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     status = 'new-point';
                     $(this).addClass('active').siblings().removeClass('active');
                     digitizingFor = $link.parent().attr('title');
-                    that.activate();                    
+                    that.activate();
                 });
                 digitizeDialog.find('.digitize-line').bind('click', function() {
                     status = 'new-line';
                     $(this).addClass('active').siblings().removeClass('active');
                     digitizingFor = $link.parent().attr('title');
-                    that.activate();                    
+                    that.activate();
                 });
                 digitizeDialog.find('.digitize-polygon').bind('click', function() {
                     status = 'new-polygon';
                     $(this).addClass('active').siblings().removeClass('active');
                     digitizingFor = $link.parent().attr('title');
-                    that.activate();                    
+                    that.activate();
                 });
                 // get the featureCollection data
                 var url = $link.parent().attr('title');
@@ -1291,10 +1255,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                     });
                     kml.addGeometry(pts, digitizingFor, attributes);
                     attributesDialog.find('.digitize-save').unbind('click');
-                    attributesDialog.dialog('close');
-                    var $mapframe1 = $('#mapframe1');
-                    $mapframe1.unbind('click');
-                    mb_enableButton('pan1');                                     
+                    attributesDialog.dialog('close');                                                      
                 });
             }
         };
@@ -1441,13 +1402,6 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             if (!inProgress) {
                 inProgress = true;
             }
-            setOverrideAutoPan(true);
-            for (var i = 0; i < mb_button.length; i++) {
-                if (mb_button[i].elName === 'pan1') {
-                    mb_button_click(i);
-                    break;
-                }
-            }
         };
 
         this.destroy = function() {
@@ -1462,22 +1416,16 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             //remove digitized x and y values from print dialog
             $('input[name="digitized_x_values"]').val("");
             $('input[name="digitized_y_values"]').val("");
-            setOverrideAutoPan(false);
-            mb_enableButton('pan1');
         };
 
         this.deactivate = function() {
             if (o.$target.size() > 0) {
                 o.$target.mb_digitize("deactivate");
             }
-            setOverrideAutoPan(false);
-            mb_enableButton('pan1');
         };
 
         this.closeEditDialog = function() {
             editDialog.dialog('close');
-            setOverrideAutoPan(false);
-            mb_enableButton('pan1');
         };
 
         create();

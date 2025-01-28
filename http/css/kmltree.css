@@ -172,16 +172,7 @@ ul.kmlTree li.kml  li input{
 	border-radius: 10px;
 	box-shadow: 2px 2px 6px #e7e7e7;
 }
-.kmlTreeHelpText::before {
-	content: '';
-	position: absolute;
-	width: 0;
-	height: 0;
-	border-left: 10px solid transparent;
-	border-right: 10px solid transparent;
-	border-bottom: 12px solid #137673;
-	margin: -22px 0px 0px 10px;
-}
+
 
 /* a kmlItem Node */
 
