@@ -58,7 +58,6 @@
 				}else{
 					jQuery(this).css({'width':dtHeight,'top':dtTop,'margin-left':dtOffset});
 				}
-				
 				if(jQuery.browser.msie){	
 					var slideNumLeft = parseInt(jQuery(this).find('.slide-number').css('left')) - 14;
 					jQuery(this).find('.slide-number').css({'left': slideNumLeft})

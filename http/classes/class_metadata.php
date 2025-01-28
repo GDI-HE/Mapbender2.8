@@ -753,7 +753,25 @@ class searchMetadata
 			for ($i = 0; $i < count($datasetMatrix); $i++) {
 				$layerCount = 0;
 				foreach ($this->datasetJSON->dataset->srv[$i]->coupledResources->layer as $layer) {
-					$this->datasetJSON->dataset->srv[$i]->coupledResources->layer[$layerCount]->srv = json_decode($coupledLayers->internalResult)->wms->srv[$layerSearchArray[$layer->id]];
+					
+					//first add whole srv result
+					$subTree = json_decode($coupledLayers->internalResult)->wms->srv[$layerSearchArray[$layer->id]];
+					$this->datasetJSON->dataset->srv[$i]->coupledResources->layer[$layerCount]->srv = $subTree;
+					# not only add the service object, but also the layer title, ...
+					# maybe it is easier to get the right layer and add this as the "root" layer object instead of the whole subtree
+					// extract layer with id from subtree
+					if (is_array($subTree->layer) && isset($layer->id)) {
+						$coupledLayer = $this->findLayer($subTree->layer, $layer->id);
+					
+						//reinitialize layer array
+						if ($coupledLayer != false) {
+							//delete sublayers from found layer !
+							unset($coupledLayer->layer);
+							$this->datasetJSON->dataset->srv[$i]->coupledResources->layer[$layerCount]->srv->layer = array();
+							$this->datasetJSON->dataset->srv[$i]->coupledResources->layer[$layerCount]->srv->layer[0] = $coupledLayer; 
+						}
+					}
+					//$this->datasetJSON->dataset->srv[$i]->coupledResources->layer[$layerCount]->srv = json_decode($coupledLayers->internalResult)->wms->srv[$layerSearchArray[$layer->id]];
 					$layerCount++;
 				}
 				$featuretypeCount = 0;
@@ -774,7 +792,7 @@ class searchMetadata
 				if ($downloadOptionsArray[$datasetMatrix[$i]['fileidentifier']] != null) {
 					$this->datasetJSON->dataset->srv[$i]->coupledResources->inspireAtomFeeds = json_decode($downloadOptionsArray[$datasetMatrix[$i]['fileidentifier']]);
 				} else {
-					$downloadOptionsFromMetadata = json_decode(getDownloadOptions(array($datasetMatrix[$i]['fileidentifier']), $this->protocol . "://" . $this->hostName . "/mapbender/"));
+					$downloadOptionsFromMetadata = json_decode(getDownloadOptions(array($datasetMatrix[$i]['fileidentifier']), $this->protocol . "://" . $this->hostName . "/mapbender/", $this->protocol . "://" . $this->hostName));
 					//try to load coupled atom feeds from mod_getDownloadOptions and add them to result list! (if no wms layer nor wfs featuretype is available)
 					foreach ($downloadOptionsFromMetadata->{$datasetMatrix[$i]['fileidentifier']}->option as $dlOption) {
 						if ($dlOption->type == "downloadlink" || $dlOption->type == "distribution" || $dlOption->type == "remotelist") {
@@ -908,7 +926,9 @@ class searchMetadata
 					$this->wmsJSON->wms->srv[$j]->abstract = $subLayers[$rootIndex]['wms_abstract'];
 					$this->wmsJSON->wms->srv[$j]->date = date("d.m.Y", $subLayers[$rootIndex]['wms_timestamp']);
 					$this->wmsJSON->wms->srv[$j]->loadCount = (int) $subLayers[$rootIndex]['load_count'];
-					$this->wmsJSON->wms->srv[$j]->getMapUrl = $this->getMapUrlfromWMSId((int) $subLayers[$rootIndex]['wms_id']);
+					$this->wmsJSON->wms->srv[$j]->getMapUrl = $this->getUrlsFromWMSId((int) $subLayers[$rootIndex]['wms_id'])['getMap'];
+					//add getcapabilities url
+					$this->wmsJSON->wms->srv[$j]->originalGetCapabilitiesUrl = $this->getUrlsFromWMSId((int) $subLayers[$rootIndex]['wms_id'])['getCapabilities'];
 					$spatialSource = "";
 					$stateOrProvince = $subLayers[$rootIndex]['stateorprovince'];
 					if ($stateOrProvince == "NULL" || $stateOrProvince == "") {
@@ -957,6 +977,7 @@ class searchMetadata
 					$this->wmsJSON->wms->srv[$j]->layer[0]->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?languageCode=" . $this->languageCode . "&resource=layer&layout=tabs&id=" . (int) $subLayers[$rootIndex]['layer_id'];
 					$this->wmsJSON->wms->srv[$j]->layer[0]->previewURL = $this->protocol . "://" . $this->hostName . "/mapbender/geoportal/mod_showPreview.php?resource=layer&id=" . (int) $subLayers[$rootIndex]['layer_id'];
 					$legendInfo = $this->getInfofromLayerId($this->wmsJSON->wms->srv[$j]->layer[0]->id);
+					$this->wmsJSON->wms->srv[$j]->layer[0]->originalGetCapabilitiesUrl = $legendInfo['originalCapabilitiesUrl'];
 					$this->wmsJSON->wms->srv[$j]->layer[0]->getLegendGraphicUrl = $legendInfo['getLegendGraphicUrl'];
 					$this->wmsJSON->wms->srv[$j]->layer[0]->getLegendGraphicUrlFormat = $legendInfo['getLegendGraphicUrlFormat'];
 					$this->wmsJSON->wms->srv[$j]->layer[0]->legendUrl = $legendInfo['legendUrl'];
@@ -965,7 +986,7 @@ class searchMetadata
 					$this->wmsJSON->wms->srv[$j]->layer[0]->maxScale = $legendInfo['maxScale'];
 					//pull downloadOptions as json with function from other script: php/mod_getDownloadOptions.php
 					$downloadOptionsCs = str_replace("{", "", str_replace("}", "", str_replace("}{", ",", $legendInfo['downloadOptions'])));
-					$downloadOptions = json_decode(getDownloadOptions(explode(',', $downloadOptionsCs), $this->protocol . "://" . $this->hostName . "/mapbender/"));
+					$downloadOptions = json_decode(getDownloadOptions(explode(',', $downloadOptionsCs), $this->protocol . "://" . $this->hostName . "/mapbender/", $this->protocol . "://" . $this->hostName));
 					$this->wmsJSON->wms->srv[$j]->layer[0]->downloadOptions = $downloadOptions;
 
 					if ($subLayers[$rootIndex]['layer_name'] == '') {
@@ -1845,14 +1866,15 @@ class searchMetadata
 		return $return_permission;
 	}
 
-	private function getMapUrlfromWMSId($wmsId)
+	private function getUrlsFromWMSId($wmsId)
 	{
-		$sql = "SELECT wms_getmap, wms_owsproxy FROM wms WHERE wms_id = $1";
+		$sql = "SELECT wms_getmap, wms_getcapabilities, wms_owsproxy FROM wms WHERE wms_id = $1";
 		$v = array($wmsId);
 		$t = array('i');
 		$res = db_prep_query($sql, $v, $t);
 		while ($row = db_fetch_array($res)) {
 			$getMap = $row['wms_getmap'];
+			$getCapabilities = $row['wms_getcapabilities'];
 			$owsProxy = $row['wms_owsproxy'];
 		}
 		//hostname does not exist! - use hostname from parameter instead
@@ -1861,12 +1883,18 @@ class searchMetadata
 			$sessionId = "00000000000000000000000000000000";
 			$getMap = $this->protocol . "://" . $this->hostName . "/owsproxy/" . $sessionId . "/" . $owsProxy . "?";
 		}
-		return $getMap;
+		if ($owsProxy != null && $owsProxy != '') {
+			$sessionId = "00000000000000000000000000000000";
+			$getCapabilities = $this->protocol . "://" . $this->hostName . "/owsproxy/" . $sessionId . "/" . $owsProxy . "?";
+		}
+		$returnArray['getMap'] = $getMap;
+		$returnArray['getCapabilities'] = $getCapabilities;
+		return $returnArray;
 	}
 
 	private function getInfofromLayerId($layerId)
 	{
-		$sql = "SELECT layer_wms.*, layer_style.legendurl, layer_style.legendurlformat FROM (SELECT layer_id, f_get_download_options_for_layer(layer_id) as layer_metadata, layer_minscale, layer_maxscale, wms_getlegendurl, wms_owsproxy FROM layer INNER JOIN wms ON layer.fkey_wms_id = wms.wms_id WHERE layer.layer_id = $1) as layer_wms LEFT OUTER JOIN layer_style ON layer_style.fkey_layer_id = layer_wms.layer_id";
+		$sql = "SELECT layer_wms.*, layer_style.legendurl, layer_style.legendurlformat FROM (SELECT layer_id, f_get_download_options_for_layer(layer_id) as layer_metadata, layer_minscale, layer_maxscale, wms_getlegendurl, wms_owsproxy, wms_getcapabilities FROM layer INNER JOIN wms ON layer.fkey_wms_id = wms.wms_id WHERE layer.layer_id = $1) as layer_wms LEFT OUTER JOIN layer_style ON layer_style.fkey_layer_id = layer_wms.layer_id";
 		$v = array($layerId);
 		$t = array('i');
 		$res = db_prep_query($sql, $v, $t);
@@ -1878,6 +1906,7 @@ class searchMetadata
 			$minScale = $row['layer_minscale'];
 			$maxScale = $row['layer_maxscale'];
 			$downloadOptions = $row['layer_metadata'];
+			$originalCapabilitiesUrl = $row['wms_getcapabilities'];
 		}
 		//hostname does not exist! - use hostname from parameter instead
 		if ($owsProxy != null && $owsProxy != '' && $getLegendUrl != '' && $getLegendUrl != null) {
@@ -1887,6 +1916,11 @@ class searchMetadata
 			$legendUrl = str_replace($getLegendUrl, $getLegendUrlNew, $legendUrl);
 			$getLegendUrl = $getLegendUrlNew;
 		}
+		if ($owsProxy != null && $owsProxy != '') {
+			$sessionId = "00000000000000000000000000000000";
+			$originalCapabilitiesUrl = $this->protocol . "://" . $this->hostName . "/owsproxy/" . $sessionId . "/" . $owsProxy . "?";
+		}
+		$returnArray['originalCapabilitiesUrl'] = $originalCapabilitiesUrl;
 		$returnArray['legendUrl'] = $legendUrl;
 		$returnArray['getLegendGraphicUrl'] = $getLegendUrl;
 		$returnArray['getLegendGraphicUrlFormat'] = $legendUrlFormat;
@@ -2048,13 +2082,14 @@ class searchMetadata
 			$servObject->layer[$countsublayer]->previewURL = $this->protocol . "://" . $this->hostName . "/mapbender/geoportal/mod_showPreview.php?resource=layer&id=" . $child['layer_id'];
 			$servObject->layer[$countsublayer]->getCapabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/php/wms.php?layer_id=" . $child['layer_id'] . "&INSPIRE=1&VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities";
 			$legendInfo = $this->getInfofromLayerId($servObject->layer[$countsublayer]->id);
+			$servObject->layer[$countsublayer]->originalGetCapabilitiesUrl = $legendInfo['originalCapabilitiesUrl'];
 			$servObject->layer[$countsublayer]->getLegendGraphicUrl = $legendInfo['getLegendGraphicUrl'];
 			$servObject->layer[$countsublayer]->getLegendGraphicUrlFormat = $legendInfo['getLegendGraphicUrlFormat'];
 			$servObject->layer[$countsublayer]->legendUrl = $legendInfo['legendUrl'];
 			$servObject->layer[$countsublayer]->minScale = $legendInfo['minScale'];
 			$servObject->layer[$countsublayer]->maxScale = $legendInfo['maxScale'];
 			$downloadOptionsCs = str_replace("{", "", str_replace("}", "", str_replace("}{", ",", $legendInfo['downloadOptions'])));
-			$downloadOptions = json_decode(getDownloadOptions(explode(',', $downloadOptionsCs), $this->protocol . "://" . $this->hostName . "/mapbender/"));
+			$downloadOptions = json_decode(getDownloadOptions(explode(',', $downloadOptionsCs), $this->protocol . "://" . $this->hostName . "/mapbender/", $this->protocol . "://" . $this->hostName));
 			$servObject->layer[$countsublayer]->downloadOptions = $downloadOptions;
 			$servObject->layer[$countsublayer]->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?languageCode=" . $this->languageCode . "&resource=layer&layout=tabs&id=" . $child['layer_id'];
 			if ($child['layer_name'] == '') {
@@ -2211,6 +2246,29 @@ class searchMetadata
 				#exit;
 			}
 			fclose($h);
+		}
+	}
+
+	// recursive function to extract a layer by id from a returned hierarchical wms srv layer array search result 
+	private function findLayer($layerArray, $layerId) {
+		$e = new mb_notice("classes/class_metadata.php: method->findLayer: search for id: " . (integer)$layerId);
+		if (is_array($layerArray)) {
+			//sometimes we get a list of all sublayers - we have to iterate over them
+			// invoke recursive for each sublayer
+			foreach ($layerArray as $subLayer) {
+				if ((integer)$subLayer->id == (integer)$layerId) {
+					if (isset($subLayer)) {
+						return $subLayer;
+					}
+				} else {
+					//go to next hierarchy level
+					if (is_array($subLayer->layer)) {
+						return $this->findLayer($subLayer->layer, $layerId);
+					}
+				}
+			}
+		} else {
+			$e = new mb_notice("classes/class_metadata.php: method->findLayer: layer object is not an array!");
 		}
 	}
 
