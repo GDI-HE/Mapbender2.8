@@ -21,6 +21,7 @@
 //Script for pulling all download options for one or more metadataset which are identified by their fileidentifier
 require_once(dirname(__FILE__) . "/../../core/globalSettings.php");
 require_once(dirname(__FILE__) . "/../classes/class_Uuid.php");
+require_once(dirname(__FILE__) . "/../classes/class_administration.php");
 global $configObject;
 if (file_exists(dirname(__FILE__)."/../../conf/linkedDataProxy.json")) {
      $configObject = json_decode(file_get_contents("../../conf/linkedDataProxy.json"));
@@ -110,7 +111,7 @@ if (defined("MAPBENDER_PATH") && MAPBENDER_PATH != '') {
 $mapbenderPathArray = parse_url($mapbenderPath);
 $mapbenderServerUrl = $mapbenderPathArray['scheme']."://".$mapbenderPathArray['host'];
 
-function getDownloadOptions($idList, $webPath=false) {
+function getDownloadOptions($idList, $webPath=false, $mapbenderServerUrl=false) {
 	global $configObject;
 	//define query to pull all download options - actually only the inspire download services (atom feeds, ogc api features, directwfs)
 	
@@ -168,7 +169,7 @@ SELECT foo2.*, termsofuse.name AS tou_name, termsofuse.isopen AS tou_isopen FROM
     SELECT foo.*, wfs_termsofuse.fkey_termsofuse_id::integer AS tou_id FROM (
         SELECT fkey_wfs_id AS service_id, service_uuid, featuretype_id AS resource_id, featuretype_name AS resource_name, 'rest' AS resource_type, NULL::text AS datalink, NULL::text AS datalink_text, title, 'GeoJSON,GML,HTML' AS format, license_source_note FROM (
             SELECT wfs_featuretype.featuretype_id, wfs_featuretype.featuretype_name, wfs_featuretype.fkey_wfs_id, open_wfs.uuid AS service_uuid, wfs_featuretype.inspire_download, open_wfs.wfs_license_source_note AS license_source_note FROM wfs_featuretype 
-                INNER JOIN (SELECT * FROM (SELECT wfs_id, wfs_version, uuid, wfs_termsofuse.fkey_termsofuse_id , wfs_license_source_note FROM wfs INNER JOIN wfs_termsofuse ON wfs_id = fkey_wfs_id) AS wfs_tou INNER JOIN termsofuse ON fkey_termsofuse_id = termsofuse_id WHERE isopen = 1) AS open_wfs
+                INNER JOIN (SELECT * FROM (SELECT wfs_id, wfs_version, uuid, wfs_termsofuse.fkey_termsofuse_id , wfs_license_source_note FROM wfs INNER JOIN wfs_termsofuse ON wfs_id = fkey_wfs_id) AS wfs_tou INNER JOIN termsofuse ON fkey_termsofuse_id = termsofuse_id) AS open_wfs
                     ON wfs_featuretype.fkey_wfs_id = open_wfs.wfs_id WHERE (open_wfs.wfs_version = '1.1.0' OR open_wfs.wfs_version = '2.0.0' OR open_wfs.wfs_version = '2.0.2') AND wfs_featuretype.featuretype_searchable = 1 ORDER BY featuretype_id) AS featuretype_wfs2 
                         INNER JOIN (select metadata_id, title, format, uuid, fkey_featuretype_id FROM mb_metadata INNER JOIN ows_relation_metadata ON ows_relation_metadata.fkey_metadata_id = mb_metadata.metadata_id) AS metadata_relation 
                             ON metadata_relation.fkey_featuretype_id = featuretype_wfs2.featuretype_id AND metadata_relation.uuid = $1) AS foo
@@ -243,7 +244,7 @@ die();*/
 						$m = count($downloadOptions->{$idList[$i]}->option[$serviceIdIndex]->featureType);
 						//echo "m: ".$m."<br>";
 						$downloadOptions->{$idList[$i]}->option[$serviceIdIndex]->featureType[$m] = $row['resource_id'];
-$downloadOptions->{$idList[$i]}->option[$serviceIdIndex]->featureType[$m]->name = $row['resource_name'];
+						$downloadOptions->{$idList[$i]}->option[$serviceIdIndex]->featureType[$m]->name = $row['resource_name'];
 					}
 					if (!$wfsRequestObjectExists){
 						$downloadOptions->{$idList[$i]}->option[$j]->type = "wfsrequest";
@@ -282,7 +283,7 @@ $downloadOptions->{$idList[$i]}->option[$serviceIdIndex]->featureType[$m]->name 
 					$downloadOptions->{$idList[$i]}->option[$j]->serviceId = $row['service_id']; //wms_id
 					$downloadOptions->{$idList[$i]}->option[$j]->serviceUuid = $row['service_uuid'];//This is a layer uuid - not a service uuid!!!!
 					$downloadOptions->{$idList[$i]}->option[$j]->resourceId = $row['resource_id'];
-$downloadOptions->{$idList[$i]}->option[$j]->resourceName = $row['resource_name'];
+					$downloadOptions->{$idList[$i]}->option[$j]->resourceName = $row['resource_name'];
 					$downloadOptions->{$idList[$i]}->option[$j]->format = $row['format'];
 					$downloadOptions->{$idList[$i]}->option[$j]->dataLink = $row['datalink'];
 					//new 2019/07
@@ -488,6 +489,8 @@ $downloadOptions->{$idList[$i]}->option[$j]->resourceName = $row['resource_name'
 				    }
 				    break;
 				case "directwfs":
+					//2025 - add originalGetCapabilitiesUrl if security proxy is not enabled to enhance DCAT interface for open hessen
+
 				    $downloadOptions->{$idList[$i]}->option[$j]->type = "directwfs";
 				    
 				    $downloadOptions->{$idList[$i]}->option[$j]->serviceId = $row['service_id'];
@@ -507,7 +510,9 @@ $downloadOptions->{$idList[$i]}->option[$j]->resourceName = $row['resource_name'
 				    //FEATURETYPE_ID=32&REQUEST=GetCapabilities&SERVICE=WFS&INSPIRE=1
 				    $downloadOptions->{$idList[$i]}->option[$j]->accessUrl = $webPath."php/wfs.php?FEATURETYPE_ID=".$row['resource_id']."&REQUEST=GetCapabilities&SERVICE=WFS&INSPIRE=1";
 				    $downloadOptions->{$idList[$i]}->option[$j]->accessClient = $webPath."php/wfs.php?FEATURETYPE_ID=".$row['resource_id']."&REQUEST=GetCapabilities&SERVICE=WFS&INSPIRE=1";
-				    //new in 2024
+				    // new 2025
+					$downloadOptions->{$idList[$i]}->option[$j]->originalGetCapabilitiesUrl = $mapbenderServerUrl . "/registry/wfs/" . $row['service_id'] . "?";
+					//new in 2024
 				    $downloadOptions->{$idList[$i]}->option[$j]->licenseId = $row['tou_name'];
 				    $downloadOptions->{$idList[$i]}->option[$j]->isopen = $row['tou_isopen'];
 				    $downloadOptions->{$idList[$i]}->option[$j]->licenseInternalId = $row['tou_id'];
@@ -533,7 +538,7 @@ $downloadOptions->{$idList[$i]}->option[$j]->resourceName = $row['resource_name'
 	return $result;
 }
 
-$downloadOptions = getDownloadOptions($idList, $mapbenderPath);
+$downloadOptions = getDownloadOptions($idList, $mapbenderPath, $mapbenderServerUrl);
 
 if ($downloadOptions != "null" && $outputFormat == "json") {
 	header('Content-Type: application/json; charset='.CHARSET);
