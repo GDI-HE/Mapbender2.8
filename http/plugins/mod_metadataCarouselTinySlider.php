@@ -242,7 +242,7 @@ that.removeEvent();
 
     this.addElementToSlider = function(item) {
         that.mainSlider.destroy();	
-        $("div.my-slider").append('<div class="slider-item" resourceId="'+item.id+'" title="' + item.title + ' - ' + item.abstract + '"><div class="card"><span class="load-count">'+item.loadCount+'</span><img class="load_image" src="../img/osgeo_graphics/document-send-symbolic.symbolic.png" title="Load" resourceId="'+item.id+'" resourceTitle="'+item.title+'"><img src="'+item.previewURL+'" alt=""></div></div>');
+        $("div.my-slider").append('<div class="slider-item" resourceId="'+item.id+'" title="' + item.title + ' - ' + item.abstract + '"><div class="card"><span class="load-count">'+item.loadCount+'</span><img class="load_image" src="../img/osgeo_graphics/document-send-symbolic.symbolic.png" title="Load" resourceId="'+item.id+'" resourceTitle="'+item.title+'"><img loading="lazy" src="'+item.previewURL+'" alt=""></div></div>');
         $(".dummy").remove();
         that.mainSlider = that.mainSlider.rebuild();  
         //add events again! 
