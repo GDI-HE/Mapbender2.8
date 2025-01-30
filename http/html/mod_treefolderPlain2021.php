@@ -184,11 +184,7 @@ var categories = {};
 var arrNodes = eval(arrNodesStr);
 function _foo(){selectedMap=-1;selectedWMS=-1;selectedLayer=-1}
 // some defaults
-if (typeof(reverse) === 'undefined' || reverse == 'false') {
-	reverseWms = false;
-} else { 
-	reverseWms = true;
-}
+if (typeof(reverse) === 'undefined')reverse = 'false';
 if (typeof(switchwms) === 'undefined')switchwms = 'true';
 if (typeof(ficheckbox) === 'undefined')ficheckbox = 'false';
 if (typeof(metadatalink) === 'undefined')metadatalink = 'false';
@@ -634,133 +630,67 @@ function handleOpacity(mapObj_id, wms_id, increment) {
 //---end------------- opacity --------------------
 
 function move_up(j,k,l){
-    if(isNaN(j)&&isNaN(k)&&isNaN(l)){
-        j=selectedMap;
-        k=selectedWMS;
-        l=selectedLayer;
-    }
-    if(j==-1||k==-1||l==-1){
-        alert("<?php echo _mb('You have to select the WMS or Layer you want to move up!');?> ")
-        return;
-    }
-    var lid = mb_mapObj[j].wms[k].objLayer[l].layer_id;
-    //console.log("Moving up: ", j, k, l, lid);
-    if (reverseWms) {
-        if (l < mb_mapObj[j].wms[k].objLayer.length - 1) {
-            // Move the Layer down (because reverse is true)
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, false)) {
-                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
-                return;
-            }
-        } else if (k < mb_mapObj[j].wms.length - 1 && l == mb_mapObj[j].wms[k].objLayer.length - 1) {
-            // Move the WMS down (because reverse is true)
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, false)) {
-                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
-                return;
-            }
-        } else {
-            alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
-            return;
-        }
-    } else {
-        if (l > 0) {
-            // Move the Layer up
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, true)) {
-                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
-                return;
-            }
-        } else if (k > 0 && l == 0) {
-            // Move the WMS up
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, true)) {
-                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
-                return;
-            }
-        } else {
-            alert("<?php echo _mb('Cannot move up, already at the top!');?>");
-            return;
-        }
-    }
-    treeState = getState();
-    mb_mapObj[j].zoom(true, 1.0);
-    mb_execloadWmsSubFunctions();
-    reloadTree();
-    //find layer and select
-    for(var m=0; m< mb_mapObj[j].wms.length; m++){
-        for(var n=0; n< mb_mapObj[j].wms[m].objLayer.length; n++){
-            if( mb_mapObj[j].wms[m].objLayer[n].layer_id == lid){
-                select(j,m,n);
-                if(n != 0)
-                    selectNode(String(lid));
-                else
-                    selectNode("wms_" + String( mb_mapObj[j].wms[m].wms_id));
-            }
-        }
-    }
+	if(isNaN(j)&&isNaN(k)&&isNaN(l)){
+		j=selectedMap;
+		k=selectedWMS;
+		l=selectedLayer;
+	}
+	if(j==-1||k==-1||l==-1){
+		alert("<?php echo _mb('You have to select the WMS you want to move up!');?> ")
+		return;
+	}
+	var lid= mb_mapObj[j].wms[k].objLayer[l].layer_id;
+	if(! mb_mapObj[j].move( mb_mapObj[j].wms[k].wms_id,lid,(reverse=="true")?false:true)){
+		alert("<?php echo _mb('Illegal move operation');?>");
+		return;
+	}
+	treeState = getState();
+	 mb_mapObj[j].zoom(true, 1.0);
+	 mb_execloadWmsSubFunctions();
+	//find layer and select
+	for(k=0;k< mb_mapObj[j].wms.length;k++){
+		for(l=0;l< mb_mapObj[j].wms[k].objLayer.length;l++){
+			if( mb_mapObj[j].wms[k].objLayer[l].layer_id==lid){
+				select(j,k,l);
+				if(l!=0)
+					selectNode(String(lid));
+				else
+					selectNode("wms_"+String( mb_mapObj[j].wms[k].wms_id));
+			}
+		}
+	}
 }
 
 function move_down(j,k,l){
-    if(isNaN(j)&&isNaN(k)&&isNaN(l)){
-        j=selectedMap;
-        k=selectedWMS;
-        l=selectedLayer;
-    }
-    if(j==-1||k==-1||l==-1){
-        alert("<?php echo _mb('You have to select the WMS or Layer you want to move down!');?>")
-        return;
-    }
-    var lid = mb_mapObj[j].wms[k].objLayer[l].layer_id;
-    //console.log("Moving down: ", j, k, l, lid);
-    if (reverseWms) {
-        if (l > 0) {
-            // Move the Layer up (because reverse is true)
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, true)) {
-                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
-                return;
-            }
-        } else if (k > 0 && l == 0) {
-            // Move the WMS up (because reverse is true)
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, true)) {
-                alert("<?php echo _mb('Cannot move up, already at the top!');?>");
-                return;
-            }
-        } else {
-            alert("<?php echo _mb('Cannot move up, already at the top!');?>");
-            return;
-        }
-    } else {
-        if (l < mb_mapObj[j].wms[k].objLayer.length - 1) {
-            // Move the Layer down
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, lid, false)) {
-                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
-                return;
-            }
-        } else if (k < mb_mapObj[j].wms.length - 1 && l == mb_mapObj[j].wms[k].objLayer.length - 1) {
-            // Move the WMS down
-            if (!mb_mapObj[j].move(mb_mapObj[j].wms[k].wms_id, null, false)) {
-                alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
-                return;
-            }
-        } else {
-            alert("<?php echo _mb('Cannot move down, already at the bottom!');?>");
-            return;
-        }
-    }
-    treeState = getState();
-    mb_mapObj[j].zoom(true, 1.0);
-    mb_execloadWmsSubFunctions();
-    reloadTree();
-    //find layer and select
-    for(var m=0; m< mb_mapObj[j].wms.length; m++){
-        for(var n=0; n< mb_mapObj[j].wms[m].objLayer.length; n++){
-            if( mb_mapObj[j].wms[m].objLayer[n].layer_id == lid){
-                select(j,m,n);
-                if(n != 0)
-                    selectNode(String(lid));
-                else
-                    selectNode("wms_" + String( mb_mapObj[j].wms[m].wms_id));
-            }
-        }
-    }
+	if(isNaN(j)&&isNaN(k)&&isNaN(l)){
+		j=selectedMap;
+		k=selectedWMS;
+		l=selectedLayer;
+	}
+	if(j==-1||k==-1||l==-1){
+		alert("<?php echo _mb('You have to select the WMS you want to move down!');?>")
+		return;
+	}
+	var lid= mb_mapObj[j].wms[k].objLayer[l].layer_id;
+	if(! mb_mapObj[j].move( mb_mapObj[j].wms[k].wms_id,lid,(reverse=="true")?true:false)){
+		alert("<?php echo _mb('Illegal move operation');?>");
+		return;
+	}
+	treeState = getState();
+	 mb_mapObj[j].zoom(true, 1.0);
+	 mb_execloadWmsSubFunctions();
+	//find layer and select
+	for(k=0;k< mb_mapObj[j].wms.length;k++){
+		for(l=0;l< mb_mapObj[j].wms[k].objLayer.length;l++){
+			if( mb_mapObj[j].wms[k].objLayer[l].layer_id==lid){
+				select(j,k,l);
+				if(l!=0)
+					selectNode(String(lid));
+				else
+					selectNode("wms_"+String( mb_mapObj[j].wms[k].wms_id));
+			}
+		}
+	}
 }
 
 function remove_wms(j,k,l){
@@ -1108,11 +1038,11 @@ function initArray(){
 									eval("categories['wms_"+ mb_mapObj[i].wms[ii].wms_id+"'] = parentNode");
 
 								var c_menu="[";
-								if(reverseWms==true){
+								if(reverse=="true"){
 									if(menu.indexOf("wms_down")!=-1 && ii!= mb_mapObj[i].wms.length-1)c_menu+="menu_move_up,";
-									if(menu.indexOf("wms_up")!=-1 && parentObj!="")c_menu+="menu_move_down,";
+									if(menu.indexOf("wms_up")!=-1 && ii!=0)c_menu+="menu_move_down,";
 								} else {
-									if(menu.indexOf("wms_up")!=-1 && parentObj!="")c_menu+="menu_move_up,";
+									if(menu.indexOf("wms_up")!=-1 && ii!=0)c_menu+="menu_move_up,";
 									if(menu.indexOf("wms_down")!=-1 && ii!= mb_mapObj[i].wms.length-1)c_menu+="menu_move_down,";
 								}
 								if(menu.indexOf("remove")!=-1)c_menu+="menu_delete,";
@@ -1126,7 +1056,7 @@ function initArray(){
 								if(metadatalink == 'true'){
 									controls+='<a class="metadata_link" href="'+defaultMetadataUrl + '&id='+temp.layer_uid+'"'+' target=\'_blank\' onclick="metadata_window = window.open(this.href,\'Metadata\',\'Width=700, Height=550,scrollbars=yes,menubar=yes,toolbar=yes\'); metadata_window.focus(); return false;"><img alt="'+msgObj.tooltipMetadata+'" title="'+msgObj.tooltipMetadata+'" src="'+imagedir+'/info.svg" /></a>';
 								}
-								addNode(parentNode,["wms_"+ mb_mapObj[i].wms[ii].wms_id,[temp.layer_currentTitle,((metadatalink=='true'&&wmsbuttons != 'true')?('javascript:openwindow(\"'+ defaultMetadataUrl + '&id='+temp.layer_uid+'\",'+metadataWidth+','+metadataHeight+');'):"javascript:select("+i+","+ii+","+iii+");"),,,temp.layer_currentTitle,eval(c_menu),controls,[i,ii,iii]]],false,false,reverseWms);
+								addNode(parentNode,["wms_"+ mb_mapObj[i].wms[ii].wms_id,[temp.layer_currentTitle,((metadatalink=='true'&&wmsbuttons != 'true')?('javascript:openwindow(\"'+ defaultMetadataUrl + '&id='+temp.layer_uid+'\",'+metadataWidth+','+metadataHeight+');'):"javascript:select("+i+","+ii+","+iii+");"),,,temp.layer_currentTitle,eval(c_menu),controls,[i,ii,iii]]],false,false,reverse=="true");
 								parentObj = parentNode+"|wms_"+ mb_mapObj[i].wms[ii].wms_id;
 							}
 							if( mb_mapObj[i].wms[ii].objLayer[iii].layer_parent && (handlesublayer=="true"|| mb_mapObj[i].wms[ii].objLayer[iii].layer_parent=="0")){
@@ -1144,12 +1074,12 @@ function initArray(){
 								}
 								if(temp.gui_layer_selectable == '1' || temp.gui_layer_queryable == '1'){
 									var c_menu="[";
-									if(reverseWms==true){
+									if(reverse=="true"){
 										if(menu.indexOf("layer_down")!=-1 && iii!= mb_mapObj[i].wms[ii].objLayer.length-1)c_menu+="menu_move_up,";
-										if(menu.indexOf("layer_up")!=-1 && iii!=1)c_menu+="menu_move_down,";
+										if(menu.indexOf("layer_up")!=-1 && iii!=0)c_menu+="menu_move_down,";
 									}
 									else{
-										if(menu.indexOf("layer_up")!=-1 && iii!=1)c_menu+="menu_move_up,";
+										if(menu.indexOf("layer_up")!=-1 && iii!=0)c_menu+="menu_move_up,";
 										if(menu.indexOf("layer_down")!=-1 && iii!= mb_mapObj[i].wms[ii].objLayer.length-1)c_menu+="menu_move_down,";
 									}
 									if(menu.indexOf("metainfo")!=-1)c_menu+="menu_metalink,";
@@ -1253,7 +1183,7 @@ function initArray(){
 									else{
 										groupedImageStyle ='verticaldots.svg';
 									}
-									addNode(parentObj + parentLayer, [temp.layer_id,[temp.layer_currentTitle,((metadatalink=='true'&&wmsbuttons != 'true')?('javascript:openwindow(\"'+ defaultMetadataUrl + '&id='+temp.layer_uid+'\",'+metadataWidth+','+metadataHeight+');'):"javascript:select("+i+","+ii+","+iii+");"),,((c_menu!='[]'&&temp.layer_name!="")?groupedImageStyle:null),temp.layer_currentTitle,eval(c_menu),controls.join(""),[i,ii,iii]]],false,false,false);
+									addNode(parentObj + parentLayer, [temp.layer_id,[temp.layer_currentTitle,((metadatalink=='true'&&wmsbuttons != 'true')?('javascript:openwindow(\"'+ defaultMetadataUrl + '&id='+temp.layer_uid+'\",'+metadataWidth+','+metadataHeight+');'):"javascript:select("+i+","+ii+","+iii+");"),,((c_menu!='[]'&&temp.layer_name!="")?groupedImageStyle:null),temp.layer_currentTitle,eval(c_menu),controls.join(""),[i,ii,iii]]],false,false,reverse=="true");
 								}
 							}
 						}
