@@ -1076,10 +1076,9 @@ function initArray(){
 									var c_menu="[";
 									if(reverse=="true"){
 										if(menu.indexOf("layer_down")!=-1 && iii!= mb_mapObj[i].wms[ii].objLayer.length-1)c_menu+="menu_move_up,";
-										if(menu.indexOf("layer_up")!=-1 && iii!=0)c_menu+="menu_move_down,";
-									}
-									else{
-										if(menu.indexOf("layer_up")!=-1 && iii!=0)c_menu+="menu_move_up,";
+										if(menu.indexOf("layer_up")!=-1 && iii!=1)c_menu+="menu_move_down,";
+									} else {
+										if(menu.indexOf("layer_up")!=-1 && iii!=1)c_menu+="menu_move_up,";
 										if(menu.indexOf("layer_down")!=-1 && iii!= mb_mapObj[i].wms[ii].objLayer.length-1)c_menu+="menu_move_down,";
 									}
 									if(menu.indexOf("metainfo")!=-1)c_menu+="menu_metalink,";
