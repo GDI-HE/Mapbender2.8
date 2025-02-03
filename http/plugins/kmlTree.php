@@ -653,29 +653,7 @@ var KmlTree = function(o) {
     });
     
     $KMLfolder.find("ul").before($addButton);
-    //$KMLfolder.find('ul').before(selectButton);
-
-    //var helpDiv = $('<div class="kmlTreeHelpText" style="display:none;"><p><b>Hilfe:</b></p><p>Durch klicken + ziehen in der Karte - Rechteck aufziehen.<p><p>Gezeichnete Objekte werden markiert und hervorgehoben.</p><p>Gewählte Objekte können gelöscht oder exportiert werden</p><p><b>Hinweis:</b> Die Objekte müssen vollständig im Rechteck enthalten sein.</p></div>');
-    //selectButton.after(helpDiv);
-
-    //var btn = new Mapbender.Button({
-    //    domElement: selectButton[0],
-    //    over: '../img/osgeo_graphics/geosilk/cursor_selected.png',
-    //    on: '../img/osgeo_graphics/geosilk/cursor_selected.png',
-    //    off: '../img/osgeo_graphics/geosilk/cursor.png',
-    //    name: 'toggle-select-features',
-    //    go: function() {
-    //        var kml = $('#mapframe1').data('kml');
-    //        kml.setQueriedLayer(true);
-    //        $('.kmlTreeHelpText').show();
-    //    },
-    //    stop: function() {
-    //        var kml = $('#mapframe1').data('kml');
-    //        kml.setQueriedLayer(false);
-    //        $('.kmlTreeHelpText').hide();
-    //    }
-    //});
-
+ 
     o.$target.bind('kml:loaded', function(e, obj) {
         var checked = obj.display ? 'checked="checked"' : '';
         title = obj.url;

@@ -207,7 +207,6 @@ var SaveWmcApi = function () {
 		//if compression is demanded see http://rosettacode.org/wiki/LZW_compression#JavaScript
 		if (beLzwCompressed == 'true') { //
 			mapObjectToSend=LZWCompress(mapObjectToSend);
-			//alert(LZWDecompress(mapObjectToSend));
 		}
 		// actual save request
 		var req = new Mapbender.Ajax.Request({
@@ -434,65 +433,37 @@ var SaveWmcApi = function () {
 		$('#savewmc').removeClass('myOverClass');
 	});
 	Mapbender.events.afterInit.register(function(){
-		//check if wmc should be saved into session
 		if (saveInSession === 1) {
-			//if onbeforeunload should be supported use it!
 			if (browserCompatibilityMode === 0) {
-				//options.$target.each(function () {
 				var supportsOnbeforeunload = true; //TODO: The problem is the time for a job on onunload - there is not much. Therefor only simple things work - not saving a huge amount of data thru ajax
-				/*for (var prop in window) {
-    					if (prop === 'onbeforeunload') {
-    						supportsOnbeforeunload = true;
-    						break;
-    					}
-				}*/
-				//alert("Support of onBeforeUnload: "+supportsOnbeforeunload+" Browser:"+navigator.userAgent);
 				if (supportsOnbeforeunload) {
-					//$(window).bind('beforeunload', function(){//after hint in web http://stackoverflow.com/questions/4376596/jquery-unload-or-beforeunload
 					window.onbeforeunload = function(e){//after hint in web http://stackoverflow.com/questions/4376596/jquery-unload-or-beforeunload
 						var e = e || window.event;
-						//alert("Write WMC to session - onBeforeUnload!");
 						if (!window.resetSession) {
 							that.save({
 								session : true
 							});
-							//pausecomp(1000); //hope that fix the synro problem
-							//alert("onbeforeunload: no reset of session stored wmc requested - wmc will be saved into session!");
 							alert(translatedI18nObj.labelSaveInSession);
 						}
-												// For IE and Firefox
-  						//if (e) {
-    						//	e.returnValue = 'Any string';
-  						//}
-  						// For Safari
-  						//return 'Any string';
 					};
 				} else {
 					$(window).bind('unload', function(){
-						//alert("Write WMC to session - onUnload!");
 						if (!window.resetSession) {
 							that.save({
 								session : true
 							});
-							//pausecomp(1000);
-							//alert("onunload: no reset of session stored wmc requested - wmc will be saved into session!");
 							alert(translatedI18nObj.labelSaveInSession);
 						}
 					});
 				}
 		} else {
-			//alert("Your are in a browser compatibility mode - this make the application slow!");
-			// hack to attach the eventhandler after all initial wms have been added to the map
 			setTimeout(function(){
 				options.$target.each(function () {
 					$(this).mapbender().events.afterMapRequest.register(function () {
 						if (!window.resetSession) {
-							//if (!prohibitSaveWmc) {
 								that.save({
 									session : true
 								});
-							//}
-							//alert('afterMapRequest Saving!');
 						}
 					});
 				});
@@ -515,38 +486,19 @@ var SaveWmcApi = function () {
 			height: 400,
 			width: 400,
 			modal: false,
-			// beforeclose: function (event, ui) {
-			// 	try {
-			// 		$saveWmcDialog.parent().effect("transfer", {
-			// 			to: $this
-			// 		}, 300);
-			// 	}
-			// 	catch (exc) {
-			// 		new Mb_warning("jq_ui_effect is missing.");
-			// 	}
-			// },
 			close: function() {$('#savewmc').toggleClass('myOnClass')},
 			buttons: getButtons()
 		});
-		// set uuid
 	});
 
-//	Mapbender.events.localize.register(function () {
 if(Mapbender.modules.i18n){
 		Mapbender.modules.i18n.queue(options.id, originalI18nObj, function (translatedObj) {
 			if (typeof translatedObj !== "object") {
 				return;
 			}
 			translatedI18nObj = translatedObj;
-//			try {
-//				localize();
-//			}
-//			catch (exc) {
-//				new Mapbender.Warning("Error when translating: " . exc.message);
-//			}
 		});
 }
-//	});
 };
 
 $this.mapbender(new SaveWmcApi());
