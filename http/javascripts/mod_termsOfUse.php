@@ -48,4 +48,13 @@ function mod_copyright(){
 		map_el.appendChild(el_top);
 	}
 	writeTag(myMapObj.frameName, myMapObj.elementName+"_copyright", str_c);
+
+	// Add event listeners to disable and enable featureInfo
+    var copyrightElement = document.getElementById(myMapObj.elementName+"_copyright");
+    copyrightElement.addEventListener('mouseover', function(event) {
+        Mapbender.disableFeatureInfo();
+    });
+    copyrightElement.addEventListener('mouseout', function(event) {
+        Mapbender.enableFeatureInfo();
+    });
 }

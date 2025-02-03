@@ -312,10 +312,15 @@ var ChangeEpsg = function () {
 	this.setSrs = function (val) {
 		var srsArray = compileSrsArray();
 		$.ajaxSetup({async:false});
+		Mapbender.disableFeatureInfo();
 		var req = new Mapbender.Ajax.Request({
 			method: "changeEpsg",
 			url: "../php/mod_changeEPSG_server.php",
-			callback: setSrsCallback,
+			callback: function(obj, success, message) {
+            	setSrsCallback(obj, success, message);
+            	// Aktivieren Sie die featureInfo-Funktion wieder
+            	Mapbender.enableFeatureInfo();
+        	},
 			parameters:{
 				srs: srsArray,
 				newSrs: val

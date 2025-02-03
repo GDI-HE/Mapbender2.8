@@ -64,10 +64,35 @@ ul.kmlTree li.kml ul li{
 	margin-left:  0.2em;
 }
 
-ul.kmlTree li.kml > button.add,#kml-load-tabs .add {
+#kml-load-tabs .add {
 	background-image:  url("../img/add.png");
 	background-repeat: no-repeat;
 	background-position: 50% 50%;
+}
+.icon-select-geodata, .icon-add-geodata {
+    margin-right: 5px;
+}
+
+.icon-add-geodata {
+	background-image: url('../img/add.png');
+	background-repeat: no-repeat;
+	background-position: 50% 50%;
+	width: 20px;
+    height: 20px;
+    display: inline-block;
+}
+
+ul.kmlTree button.add, #toggle-select-features {
+	outline: unset;
+    display: flex;
+    width: 100%;
+    margin-bottom: 5px;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid transparent;
+    background-color: #e3e3e3;
+    font-size: 10px;
+    padding: 12px;
 }
 
 ul.kmlTree li.open.kml > button.toggle{
@@ -147,10 +172,12 @@ ul.kmlTree  ul ul li {
 	padding: 0;
 	border: 1px solid transparent;
 }
-ul.kmlTree  ul ul li:hover {
+ul.kmlTree ul ul li:hover, li.feature-container:hover{
 	border: 1px dotted gray;
 }
-
+ul.kmlTree ul ul li, li.feature-container{
+	border: 1px dotted transparent;
+}
 ul.kmlTree li.kmltree-selected {
     background-color: yellow;
 }

@@ -13,8 +13,7 @@ var MeasureApi = function (o) {
 			"<div class='mb-measure-text'><?php 
 				echo nl2br(htmlentities("Klicken Sie in die Karte, um eine Strecke zu zeichnen, mit Doppelklick beim letzten Punkt wird ein Hoehendiagramm erzeugt.", ENT_QUOTES, "UTF-8"));
 			?></div></div>",
-		informationHtml =
-                        "<canvas id='can' width='660' height='250'></canvas>";
+		informationHtml = "<canvas id='can' width='660' height='250'></canvas>";
 
 	var jsonarray = [];		  
         
@@ -23,14 +22,12 @@ var MeasureApi = function (o) {
 		measureDialog.find(".mb-measure-current-point").parent().hide();
 		measureDialog.find(".mb-measure-distance-last").parent().hide();
 		measureDialog.find(".mb-measure-distance-total").parent().hide();
-                measureDialog.find(".mb-measure-angle").parent().hide();
-
+        measureDialog.find(".mb-measure-angle").parent().hide();
 	};
 
 	var changeDialogContent = function () {
 		measureDialog.html(informationHtml);
 		hideMeasureData();
-
 		o.$target.unbind("click", changeDialogContent);
 	};
 
@@ -38,7 +35,6 @@ var MeasureApi = function (o) {
 		//
 		// Initialise measure dialog
 		//
-                //alert(o.$target.offset().left + ' ' + o.$target.offset().top);
 		measureDialog = $(informationHtml);
 		measureDialog.dialog({
 			dialogClass: "ownSuperClass",
@@ -50,7 +46,9 @@ var MeasureApi = function (o) {
             buttons: [
                 {
                     text: "Neu",
+                    id: "hoheNewButton",
                     click: function() {
+                        Mapbender.unbindPanEvents();
                         resetII();
                     }
                 }
@@ -58,18 +56,25 @@ var MeasureApi = function (o) {
             open: function() {
                 $('#toolsContainer').hide();
                 $('a.toggleToolsContainer').removeClass('activeToggle');
+                Mapbender.disableFeatureInfo();
             },
             close: function() {
                 $('#altitudeProfile').removeClass("myOnClass");
                 button.stop();
+                
+                Mapbender.enableFeatureInfo();
+                mb_enableButton('pan1');
+                Mapbender.bindPanEvents();
             }
                         
-		}).bind("dialogclose", function () {
-			button.stop();
-			that.destroy();
-		}).bind("mousedown", function (e) {
-			testButton(e.offsetX,e.offsetY);
-        });
+        }).bind("dialogclose", function () {
+            button.stop();
+            that.destroy();
+            mb_enableButton('pan1');
+            Mapbender.bindPanEvents();
+            Mapbender.enableFeatureInfo();
+            
+		});
 
 		//
 		// Initialise button
@@ -86,59 +91,37 @@ var MeasureApi = function (o) {
 	};
 
 
-        var clearJsonArray  = function(evt,data) {
-           
-           
-
-           jsonarray = [];
-           points = [];
-
-
-        };
-        var updateJsonArray = function (evt, data) {
-            
-          jsonarray.push(data); 
-   
-        };
-
+    var clearJsonArray  = function(evt,data) {
+        jsonarray = [];
+        points = [];
+    };
+    var updateJsonArray = function (evt, data) {
+        jsonarray.push(data); 
+    };
 
 	var updateView = function (evt, data) {
-                
-                 
-                 if(data == -1)
-                 {
-                   ctx.clearRect(0, 0, 660, 250);
-                   prep_json(jsonarray);
-                   
-                   draw_lineII();
-                   draw_Points(data);
-                   draw_stuetzpunkte();
-                   koordinaten_system_zeichnen(hoehe_min,hoehe_max,gesamt_laenge);
-                 }
-                 else if (data == -2)
-                 {
-                   
-                   ctx.clearRect(0, 0, 660, 250);
-                   draw_lineII();
-                   draw_Points(data);
-                   draw_stuetzpunkte();
-                   koordinaten_system_zeichnen(hoehe_min,hoehe_max,gesamt_laenge);
-
-
-                 }
-                 else
-                 {
-                   if(data == -5) data = 0;
-                   ctx.clearRect(0, 0, 660, 250);
-                   draw_lineII();
-                   draw_Points(data);
-                   draw_stuetzpunkte();
-                   koordinaten_system_zeichnen(hoehe_min,hoehe_max,gesamt_laenge);
-
-                 }
-
-
-	};
+        if(data == -1) {
+            ctx.clearRect(0, 0, 660, 250);
+            prep_json(jsonarray);
+            draw_lineII();
+            draw_Points(data);
+            draw_stuetzpunkte();
+            koordinaten_system_zeichnen(hoehe_min,hoehe_max,gesamt_laenge);
+        } else if (data == -2) {
+            ctx.clearRect(0, 0, 660, 250);
+            draw_lineII();
+            draw_Points(data);
+            draw_stuetzpunkte();
+            koordinaten_system_zeichnen(hoehe_min,hoehe_max,gesamt_laenge);
+        } else {
+            if(data == -5) data = 0;
+            ctx.clearRect(0, 0, 660, 250);
+            draw_lineII();
+            draw_Points(data);
+            draw_stuetzpunkte();
+            koordinaten_system_zeichnen(hoehe_min,hoehe_max,gesamt_laenge);
+        }
+    };
 
 	var finishMeasure = function () {
 		inProgress = false;
@@ -157,7 +140,7 @@ var MeasureApi = function (o) {
 		        switch (event.which) {
                     case 1:
                     //alert('Left Mouse button pressed.');
-			            resetII();
+			            //resetII();
                     break;
                     case 2:
 		            //alert('Middle Mouse button pressed.');
@@ -261,38 +244,32 @@ var MeasureApi = function (o) {
 		}
 	};
 
-
 	create();
 
-
-
-
-
-
-var gesamt_laenge = 0;
-var hoehe_min = 700;
-var hoehe_max = 100;
-var points = [];
-var points_count =0;
-var width = 600;
-var height = 250;
-var y_0 = height -30;
-var y_oben = 20;
-var font = "12px Arial"
-var color_coord ='#99BF86';
-var color_coord_halb = '#A3C1A7';//#838A87
-var color_coord_garnicht = '#A3ABA7';
-var line_100 = '#333333';
-var c = document.getElementById("can");
-var ctx = c.getContext("2d");
-ctx.width = 500;
-var testButton = function(x,y) {
-    if ((620 <= x) && (x <= 620 + 70) &&  (220 <= y )&& (y <= 220 + 20)){
-        resetII();
-        return true;
-        }
-    else return false;
-};
+    var gesamt_laenge = 0;
+    var hoehe_min = 700;
+    var hoehe_max = 100;
+    var points = [];
+    var points_count =0;
+    var width = 600;
+    var height = 250;
+    var y_0 = height -30;
+    var y_oben = 20;
+    var font = "12px Arial"
+    var color_coord ='#99BF86';
+    var color_coord_halb = '#A3C1A7';//#838A87
+    var color_coord_garnicht = '#A3ABA7';
+    var line_100 = '#333333';
+    var c = document.getElementById("can");
+    var ctx = c.getContext("2d");
+    ctx.width = 500;
+    var testButton = function(x,y) {
+        if ((620 <= x) && (x <= 620 + 70) &&  (220 <= y )&& (y <= 220 + 20)){
+            resetII();
+            return true;
+            }
+        else return false;
+    };
 
 /*
  
@@ -349,10 +326,6 @@ hoehe_min, hoehe_max werden ermittelt.
             points.push(daten);
         }
     };
-
-
-
-
 
 
     var koordinaten_system_zeichnen = function (start, stop, stop_meter) {
@@ -436,11 +409,6 @@ l dient als Ausgabe von Text
         }
     };
 
-
-
-
-
-
 /*
 Anpassung der Einheit der x - Achse des Diagramms
 */
@@ -496,8 +464,6 @@ am Schluss zur Grundlinie hinunterheichnen und mit 0 Punkt verbinden -> cosePath
 */
 
     var draw_line = function() {
-    
-
         ctx.beginPath();
         ctx.moveTo(30,height-20);
         ctx.lineTo(30,points[0].y);
@@ -512,7 +478,7 @@ am Schluss zur Grundlinie hinunterheichnen und mit 0 Punkt verbinden -> cosePath
         ctx.lineWidth = 0.1;
         ctx.strokeStyle = color_coord;
         ctx.stroke(); 
-};
+    };
 /*
 neu 27.01.2020
 der geschlossen Linienpfad ist hier die Fläche unterhalb 2 Punkten
@@ -576,15 +542,16 @@ er wird farblich gezeichnet je nach dem ob die zwei Punkte in der BBox sind oder
 		}
     };
 
-    var setText = function() {
-        ctx.font = "12px Arial";
+        var setText = function() {
+            ctx.font = "12px Arial";
 
-        ctx.clearRect(0, 0, 600, 250);
-        ctx.fillText("1. Sie koennen mit Klicken eine Strecke in die Kartei zeichnen. Beim letzten Punkt bitte einen Doppelklick.",9,15);
-        ctx.fillText("2. Fahren Sie mit dem Mauszeiger ueber die Strecke - die Hoehe im Diagramm wird angezeigt.",9,45);
-        ctx.fillText("3. Ein Klick in die Karte oder auf <Neu> setzt das Diagramm zurück",9,75);
-        draw_stuetzpunkte();
-    }
+            ctx.clearRect(0, 0, 600, 250);
+            ctx.fillText("1. Sie koennen mit Klicken eine Strecke in die Kartei zeichnen. Beim letzten Punkt bitte einen Doppelklick.",9,15);
+            ctx.fillText("2. Fahren Sie mit dem Mauszeiger ueber die Strecke - die Hoehe im Diagramm wird angezeigt.",9,45);
+            ctx.fillText("3. Ein Klick in die Karte oder auf <Neu> setzt das Diagramm zurück",9,75);
+            draw_stuetzpunkte();
+        }
 
 };
+
 $measure.mapbender(new MeasureApi(options));

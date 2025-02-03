@@ -711,21 +711,23 @@ function showMenu(strData, img, event){
 	jst_cm.style.left = (offX + event.clientX) + "px";
 	jst_cm.style.visibility = ""
 	
+	document.body.addEventListener('click', hideMenu);
+
 	event.cancelBubble = true
 }
 
 function hideMenu(){
 	jst_cm.style.visibility = "hidden"
+	document.body.removeEventListener('click', hideMenu);
 }
 
 function renderTree(){
-//	TestDate = new Date();TestStartZeit=TestDate.getTime();
+	//	TestDate = new Date();TestStartZeit=TestDate.getTime();
 	eval(jst_container).innerHTML = '<table cellspacing="0" cellpadding="0" border="0"><tr id="'+eval(jst_data + "[0][0]")+'"><td colspan="2"><span id="rootFolder"></span></td></tr></table><div style="position:absolute;top:-100;left:-100" id="contextMenu"></div>'
 	renderNode(jst_data, document.getElementById("rootFolder"))
 	renderNode(jst_data + "[0][2]", document.getElementById("rootImage"))
 	
 	jst_cm = document.getElementById("contextMenu")
-	document.body.onclick = hideMenu
 	jst_loaded = true
-//	TestDate=new Date();TestStopZeit=TestDate.getTime();alert(TestStopZeit-TestStartZeit);
+	//	TestDate=new Date();TestStopZeit=TestDate.getTime();alert(TestStopZeit-TestStartZeit);
 }

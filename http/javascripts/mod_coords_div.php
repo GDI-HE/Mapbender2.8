@@ -173,11 +173,15 @@ function mod_showCoord_write(x,y){
 
 //erweiterung close-button
 		$(document.createElement('span')).attr({'id':'closeDivButton'}).appendTo(".actualcoords");
-		$("#closeDivButton").attr({'style':'position:absolute;top:1px;right:1px;border:1px solid transparent;cursor:pointer;'});
+		$("#closeDivButton").attr({'style':'position:absolute;top:5px;right:5px;border:1px solid transparent;cursor:pointer;'});
 		$("#closeDivButton").attr({'class':'ui-icon ui-icon-closethick'});
-		$("#closeDivButton").bind("click", mod_showCoords_div_disable) && $("#showCoords_div").removeClass('myOnClass');
-//		$("#closeDivButton").onclick = function(){
- //       writeTag("",displayTarget, "")};
+		$("#closeDivButton").bind("click", function() {
+            mod_showCoords_div_disable();
+            mb_enableButton('pan1');
+            Mapbender.enableFeatureInfo();
+            Mapbender.bindPanEvents();
+            $("#showCoords_div").removeClass('myOnClass');
+        });
 	}
 }
 

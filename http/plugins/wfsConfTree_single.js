@@ -49,6 +49,23 @@ var ConfTree = function(o){
 			}
 		});
 	}
+
+	// Funktion zum Erstellen des Overlays für einen Dialog
+    function createOverlayForDialog(dialog) {
+        var overlay = $('<div class="dialog-overlay"></div>').css({
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'transparent',
+            zIndex: 9999,
+            display: 'none'
+        }).appendTo(dialog.parent());
+
+        return overlay;
+    }
+
 	var $wfsConfDialog = $("<div></div>").dialog({
 		title: "WFS-Suchmodul",
 		dialogClass: "dialog_flst",
@@ -59,6 +76,10 @@ var ConfTree = function(o){
 		close: function() {
           $("#menuitem_flst").removeClass("menuitem_flst_on");
           $("#mod_gaz_drawstandingHighlightWFS0").remove();
+        },
+		open: function() {
+            // Overlay-Div erstellen und hinzufügen
+            var overlay = createOverlayForDialog($(this));
         }
 	});
 	$("button.toggle",$confTree).live('click', function(){

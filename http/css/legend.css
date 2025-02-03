@@ -1,5 +1,4 @@
 body{
-	//background-color: #ffffff;
 	margin-left: 0px;
 	margin-top: 0px;
 }
@@ -18,41 +17,31 @@ body{
 	font-weight: bold;
 	font-size: 11px;
 }
-
 a:link{
 	text-decoration : none;
 	font-family : Arial, Helvetica, sans-serif;
 	font-size : 12px;
-
 	color: #ffffff;
-	//background-color:#ffffff;
 }
-	a:visited{
-		text-decoration : none;
-		font-family : Arial, Helvetica, sans-serif;
-		font-size : 12px;
-
-		color: #ffffff;
-        //background-color:#ffffff;
-	}
-	a:hover{
-		font-family : Arial, Helvetica, sans-serif;
-		color: #ffffff;
-
-		text-decoration : none;
-		//background-color : #ffffff;
-	}
-	a:active{
-		font-family : Arial, Helvetica, sans-serif;
-		color: #ffffff;
-
-		text-decoration : none;
-        //background-color:#ffffff;
-	}
+a:visited{
+	text-decoration : none;
+	font-family : Arial, Helvetica, sans-serif;
+	font-size : 12px;
+	color: #ffffff;
+}
+a:hover{
+	font-family : Arial, Helvetica, sans-serif;
+	color: #ffffff;
+	text-decoration : none;
+}
+a:active{
+	font-family : Arial, Helvetica, sans-serif;
+	color: #ffffff;
+	text-decoration : none;
+}
 .legendlink{
 	text-decoration : none;
 	color:#ffffff;
-        border: 0;
-        border-width:0px;
-	//background-color: #ffffff;
+    border: 0;
+    border-width:0px;
 }
