@@ -365,39 +365,42 @@ XML;
 			//First check if MD_Identifier is set, then check if RS_Identifier is used!
 			//Initialize datasetid
 			$this->datasetId = 'undefined';
-			$code = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:citation/gmd:CI_Citation/gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString');
-			if (isset($code[0]) && $code[0] != '') {
-				//new implementation:
-				//http://inspire.ec.europa.eu/file/1705/download?token=iSTwpRWd&usg=AOvVaw18y1aTdkoMCBxpIz7tOOgu
-				//from 2017-03-02 - the MD_Identifier - see C.2.5 Unique resource identifier - it is separated with a slash - the codespace should be everything after the last slash 
-				//now try to check if a single slash is available and if the md_identifier is a url
-				$parsedUrl = parse_url($code[0]);
+			//look only for dataset ids, if not service!
+			if (!in_array($this->hierarchyLevel, array('service', 'application'))) {
+				$code = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:citation/gmd:CI_Citation/gmd:identifier/gmd:MD_Identifier/gmd:code/gco:CharacterString');
+				if (isset($code[0]) && $code[0] != '') {
+					//new implementation:
+					//http://inspire.ec.europa.eu/file/1705/download?token=iSTwpRWd&usg=AOvVaw18y1aTdkoMCBxpIz7tOOgu
+					//from 2017-03-02 - the MD_Identifier - see C.2.5 Unique resource identifier - it is separated with a slash - the codespace should be everything after the last slash 
+					//now try to check if a single slash is available and if the md_identifier is a url
+					$parsedUrl = parse_url($code[0]);
 
-				if (($parsedUrl['scheme'] == 'http' || $parsedUrl['scheme'] == 'https') && strpos($parsedUrl['path'],'/') !== false) {
-					$explodedUrl = explode('/', $code[0]);
-					$this->datasetId = $explodedUrl[count($explodedUrl) - 1];
-					$this->datasetIdCodeSpace = rtrim($code[0], $this->datasetId);	
-                    //$e = new mb_exception("datasetId: ".$this->datasetId." - datasetIdCodeSpace: ".$this->datasetIdCodeSpace);
-				} else {
-					if (($parsedUrl['scheme'] == 'http' || $parsedUrl['scheme'] == 'https') && strpos($code[0],'#') !== false) {
-						//$e = new mb_exception($code[0]);
-						$explodedUrl = explode('#', $code[0]);
-						$this->datasetId = $explodedUrl[1];
-						$this->datasetIdCodeSpace = $explodedUrl[0];
+					if (($parsedUrl['scheme'] == 'http' || $parsedUrl['scheme'] == 'https') && strpos($parsedUrl['path'],'/') !== false) {
+						$explodedUrl = explode('/', $code[0]);
+						$this->datasetId = $explodedUrl[count($explodedUrl) - 1];
+						$this->datasetIdCodeSpace = rtrim($code[0], $this->datasetId);	
+						//$e = new mb_exception("datasetId: ".$this->datasetId." - datasetIdCodeSpace: ".$this->datasetIdCodeSpace);
 					} else {
-						$this->datasetId = $code[0];
-						$this->datasetIdCodeSpace = "";	
+						if (($parsedUrl['scheme'] == 'http' || $parsedUrl['scheme'] == 'https') && strpos($code[0],'#') !== false) {
+							//$e = new mb_exception($code[0]);
+							$explodedUrl = explode('#', $code[0]);
+							$this->datasetId = $explodedUrl[1];
+							$this->datasetIdCodeSpace = $explodedUrl[0];
+						} else {
+							$this->datasetId = $code[0];
+							$this->datasetIdCodeSpace = "";	
+						}
 					}
-				}
-			} else { //try to read code from RS_Identifier 		
-				$code = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:citation/gmd:CI_Citation/gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString');
-				$codeSpace = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:citation/gmd:CI_Citation/gmd:identifier/gmd:RS_Identifier/gmd:codeSpace/gco:CharacterString');
-				if (isset($codeSpace[0]) && isset($code[0]) && $codeSpace[0] != '' && $code[0] != '') {
-					$this->datasetId = $code[0];
-					$this->datasetIdCodeSpace = $codeSpace[0];
-				} else {
-					//neither MD_Identifier nor RS_Identifier are defined in a right way
-					$e = new mb_exception("class_iso19139.php: No datasetId found in metadata record!");
+				} else { //try to read code from RS_Identifier 		
+					$code = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:citation/gmd:CI_Citation/gmd:identifier/gmd:RS_Identifier/gmd:code/gco:CharacterString');
+					$codeSpace = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:citation/gmd:CI_Citation/gmd:identifier/gmd:RS_Identifier/gmd:codeSpace/gco:CharacterString');
+					if (isset($codeSpace[0]) && isset($code[0]) && $codeSpace[0] != '' && $code[0] != '') {
+						$this->datasetId = $code[0];
+						$this->datasetIdCodeSpace = $codeSpace[0];
+					} else {
+						//neither MD_Identifier nor RS_Identifier are defined in a right way
+						$e = new mb_exception("class_iso19139.php: No datasetId found in metadata record " . $this->fileIdentifier . " - with hierachylevel: " . $this->hierarchyLevel ." and title: " . $this->title );
+					}
 				}
 			}
 			//try another approach - if datasetId == undefined
@@ -457,8 +460,8 @@ XML;
 				unset($thesaurusName);
 				$iKeyword++;
 			}
-			$e = new mb_exception("classes/class_iso19139.php - this->keywordsThesaurusName: " . json_encode($this->keywordsThesaurusName));
-			$e = new mb_exception("classes/class_iso19139.php - this->keywords: " . json_encode($this->keywords));
+			//$e = new mb_exception("classes/class_iso19139.php - this->keywordsThesaurusName: " . json_encode($this->keywordsThesaurusName));
+			//$e = new mb_exception("classes/class_iso19139.php - this->keywords: " . json_encode($this->keywords));
 			//solve problem with identical keywords for areas:
 			if ($this->inspireWholeArea == 0 && $this->inspireActualCoverage !== 0) {
 					$this->inspireWholeArea = $this->inspireActualCoverage;
@@ -488,8 +491,8 @@ XML;
 			    //$e = new mb_exception("classes/class_iso19139.php: customCategories: " . json_encode($this->customCategories));
 			    $iKeyword++;
 			}
-			$e = new mb_exception("classes/class_iso19139.php - this->keywordsThesaurusName: " . json_encode($this->keywordsThesaurusName));
-			$e = new mb_exception("classes/class_iso19139.php - this->keywords: " . json_encode($this->keywords));
+			//$e = new mb_exception("classes/class_iso19139.php - this->keywordsThesaurusName: " . json_encode($this->keywordsThesaurusName));
+			//$e = new mb_exception("classes/class_iso19139.php - this->keywords: " . json_encode($this->keywords));
 			$iKeyword = 0;
 			$this->isoCategoryKeys = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:topicCategory/gmd:MD_TopicCategoryCode');
 			//create mapbenders internal category objects
@@ -612,15 +615,15 @@ XML;
 			$this->refSystem = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:referenceSystemInfo/gmd:MD_ReferenceSystem/gmd:referenceSystemIdentifier/gmd:RS_Identifier/gmd:code/gco:CharacterString');
 			$this->refSystem = $this->refSystem[0];
 			if ($this->refSystem == '' || !isset($this->refSystem)) {
-			    //try to find it in anchor tag instead
+			    //try to find it in anchor tag instead - use xlink:href attribute instead of text
 			    //$e  = new mb_exception("classes/class_iso19139.php: try to search epsg in gmx:Anchor tag: ".json_encode($this->refSystem));
-			    $this->refSystem = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:referenceSystemInfo/gmd:MD_ReferenceSystem/gmd:referenceSystemIdentifier/gmd:RS_Identifier/gmd:code/gmx:Anchor');
+			    $this->refSystem = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:referenceSystemInfo/gmd:MD_ReferenceSystem/gmd:referenceSystemIdentifier/gmd:RS_Identifier/gmd:code/gmx:Anchor/@xlink:href');
 			    $this->refSystem = $this->refSystem[0];
 			}
 			//parse codes to get EPSG:XXXXX TODO use other function to support other codes
 			//get last part of string separated by the colon symbol
 			if ($this->hierarchyLevel != 'service' && $this->hierarchyLevel != '') {
-				//$e = new mb_exception("classes/class_iso19139.php: epsg to lookup:".$this->refSystem);
+				$e = new mb_notice("classes/class_iso19139.php: epsg to lookup:".$this->refSystem);
 				try {
 			            $crsObject = new Crs($this->refSystem);
 				} catch (Exception $e) {
@@ -629,9 +632,9 @@ XML;
 			            $crsObject = false;
 				}
 				if ($crsObject != false) {
-				    //$e = new mb_exception("classes/class_iso19139.php: resolved epsg id:".$crsObject->identifierCode);
-			            $epsgId = $crsObject->identifierCode;
-			            $this->refSystem = "EPSG:".$epsgId;
+				    $e = new mb_notice("classes/class_iso19139.php: resolved epsg id:".$crsObject->identifierCode);
+				    $epsgId = $crsObject->identifierCode;
+				    $this->refSystem = "EPSG:".$epsgId;
 				} 
 			}
 			//debug output of keywords:
@@ -1418,12 +1421,17 @@ XML;
 			//$html .= '<p>';
 			$html .= '<fieldset><legend>'._mb("Online access").'</legend>';
 			$html .= $tableBegin;
-			$html .= $t_a."<b>".$iso19139Hash[4]['html']."</b>: ".$t_b."<a property=\"url\" href='".$iso19139Hash[4]['value']."' target='_blank'>".$iso19139Hash[4]['value']."</a>".$t_c;
+			$html .= $t_a."<b>".$iso19139Hash[4]['html']."</b>: ".$t_b;
+			//use array instead of string - 2025-02-17
+			foreach ($iso19139Hash[4]['value'] as $resourceLocator) {
+				$html .= "<a property=\"url\" href='".$resourceLocator."' target='_blank'>".$resourceLocator."</a><br>";
+			}
+			$html .= $t_c;
 			if ($iso19139Hash[3]['value'] == 'service' && $iso19139Hash[10]['value'] == 'download') {
 					//show link to own atom feed download client
 					//push ATOM Service feed url to client	
-					if (defined("MAPBENDER_PATH") && MAPBENDER_PATH != '' && parse_url($iso19139Hash[4]['value'])) {	
-						$html .= $t_a."<b>"._mb("ATOM Feed client")."</b>: ".$t_b."<a href='".MAPBENDER_PATH."/plugins/mb_downloadFeedClient.php?url=".urlencode($iso19139Hash[4]['value'])."' target='_blank'>"._mb("Download")."</a>".$t_c;
+					if (defined("MAPBENDER_PATH") && MAPBENDER_PATH != '' && parse_url($iso19139Hash[4]['value'][0])) {	
+						$html .= $t_a."<b>"._mb("ATOM Feed client")."</b>: ".$t_b."<a href='".MAPBENDER_PATH."/plugins/mb_downloadFeedClient.php?url=".urlencode($iso19139Hash[4]['value'][0])."' target='_blank'>"._mb("Download")."</a>".$t_c;
 					}
 					
 			}

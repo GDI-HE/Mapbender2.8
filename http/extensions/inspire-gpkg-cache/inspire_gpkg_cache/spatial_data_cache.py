@@ -5,6 +5,7 @@ import os
 import shutil
 import time
 import uuid
+import json
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
@@ -123,6 +124,16 @@ class SpatialDataCache():
                     inverse=True,
                     outputType=gdal.GDT_Byte)
         ds = None
+
+    def store_data_configuration(self):
+        """
+        Store data configuration to tmp folder to allow debugging afterwards, if problems occur
+        """
+        data_conf_file_name = "data_configuration.json" 
+        open_option = "w"
+        data_conf_file = open(self.tmp_output_folder +  data_conf_file_name, open_option)
+        data_conf_file.write(json.dumps(self.data_configuration))
+        data_conf_file.close()
 
     def resolve_dataset_metadata(self, fileidentifier):
         """Method that load the dataset metadata from the configured CSW by using the GetRecordById
@@ -613,13 +624,13 @@ class SpatialDataCache():
             # add bbox value, limit, and format
             # first get only 10 objects to check the number of objects in the bbox of the area of interest
             download_url = ogc_api_features_base_url + "?f=json&limit=10&bbox=" + str(polygon_box[0]) + "," + str(polygon_box[1]) + "," + str(polygon_box[2]) + "," + str(polygon_box[3])
-            # log.info(download_url)
+            log.info(download_url)
             r = requests.get(download_url)
             json_result = json.loads(r.text)
-            #if 'numberMatched' in json_result.keys():
-            #    log.info('numberMatched: ' + str(json_result['numberMatched']))
-            #if 'numberReturned' in json_result.keys():
-            #    log.info('numberReturned:' + str(json_result['numberReturned']))
+            if 'numberMatched' in json_result.keys():
+                log.info('numberMatched: ' + str(json_result['numberMatched']))
+            if 'numberReturned' in json_result.keys():
+                log.info('numberReturned:' + str(json_result['numberReturned']))
             bboxes = []
             # if number of matched is greater then number returned - build bboxes
             if 'numberMatched' in json_result.keys() and 'numberReturned' in json_result.keys():
@@ -654,7 +665,9 @@ class SpatialDataCache():
                     bboxes_new.append(geom_box)
             else:
                 geom_box = box(polygon_box[0], polygon_box[1], polygon_box[2], polygon_box[3])
-                bboxes_new.append(geom_box)
+                bboxes.append(geom_box)
+            if 'boxes_new' in locals():
+                bboxes = bboxes_new
             # write bbox as geojson ti tmp folder
             #geom_boxes_multipolygon = multipolygons(bboxes_new)
             #geojson_boxes = to_geojson(geom_boxes_multipolygon)
@@ -666,7 +679,7 @@ class SpatialDataCache():
             #bboxes_file.write(geojson_boxes)
             #bboxes_file.close()    
             inc_bboxes = 0 
-            for bbox in bboxes_new:
+            for bbox in bboxes:
                 #TODO invoke tiling of bboxes recursively if number of features in box is bigger than maxfeatures!
                 download_url = ogc_api_features_base_url + "?f=json&limit=1000&bbox=" + str(bbox.bounds[0]) + "," + str(bbox.bounds[1]) + "," + str(bbox.bounds[2]) + "," + str(bbox.bounds[3])
                 r = requests.get(download_url)
@@ -1003,6 +1016,7 @@ class SpatialDataCache():
         # https://towardsdatascience.com/use-python-to-convert-polygons-to-raster-with-gdal-rasterizelayer-b0de1ec3267
         # https://www.programcreek.com/python/example/101827/gdal.RasterizeLayer
         self.create_initial_mask()
+        self.store_data_configuration()
         gpkg.add_tif_layer('area_of_interest_mask_tif', self.tmp_output_folder + 'area_of_interest.tif')
         gpkg.add_geojson_layer( "area_of_interest_geojson", self.tmp_output_folder + "area_of_interest.geojson")
         downloadable_datasets = []

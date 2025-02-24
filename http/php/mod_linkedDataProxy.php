@@ -244,6 +244,20 @@ function gdalCountFeatures($features, $format, $layername){
     return $ogr->ogrCountFeatures($features, $format, $layername);
 }
 
+//Checks for problems that are not necessarily causing an error but returning wrong results when using GDAL
+function checkValidForGDAL($xmlString){
+	$xml = simplexml_load_string($xmlString);
+	if($xml){
+		if ($xml->getName() !== 'FeatureCollection') {
+			return false;
+		}
+	}else{
+		return false;
+	}
+	//Further checks could be implemented here
+	return true;
+}
+
 function gdalGml2geojson($features) {
     $ogr = new Ogr();
     //$ogr->logRuntime = true;
@@ -1193,6 +1207,37 @@ if (isset ( $_REQUEST ["bbox"] ) & $_REQUEST ["bbox"] != "") {
 			die ();
 		}
 	}
+	//check minx, miny, maxx, maxy - depends on crs
+	$insideGlobalBbox = true;
+	if ((float)$testMatchArray[0] > 180.0 || (float)$testMatchArray[0] < -180.0 || (float)$testMatchArray[2] > 180.0 || (float)$testMatchArray[2] < -180.0) {
+		$insideGlobalBbox = false;
+	}
+	if ((float)$testMatchArray[1] > 90.0 || (float)$testMatchArray[1] < -90.0 || (float)$testMatchArray[3] > 90.0 || (float)$testMatchArray[3] < -90.0) {
+		$insideGlobalBbox = false;
+	}
+	#  WGS 84 longitude, WGS 84 latitude
+	if ($insideGlobalBbox == false) {
+		switch( $f ) {
+			case "json":
+				header("HTTP/1.1 400 Bad Request");
+				header ( "Content-type: application/json" );
+				echo '{
+						"error": "Bad Request", 
+						"message": "Parameter bbox not inside global WGS84 bbox." 
+				}';
+				break;	
+			case "xml":
+				header("HTTP/1.1 400 Bad Request");
+				header ( "Content-type: application/xml" );
+				echo '<result><error>Bad Request</error><message>Parameter bbox not inside global WGS84 bbox.</message></result>';
+				break;
+			default:
+				header("HTTP/1.1 400 Bad Request");
+				echo "Bad Request: Parameter bbox not inside global WGS84 bbox.";
+				break;
+		}
+		die();
+	}
 	$bbox = $testMatch;
 	$testMatch = NULL;
 }
@@ -2032,7 +2077,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 							$numberOfObjects = $wfs->countFeatures ( $collection, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
 						}
 						// $numberOfObjects = 1000;
-						// $e = new mb_exception("counted features: ".$numberOfObjects);
+						//$e = new mb_exception("counted features: ".$numberOfObjects);
 						if ($numberOfObjects == 0 || $numberOfObjects == false) {
 							$returnObject->success = false;
 							$returnObject->message = "No results found or an error occured - see server logs - please try it again! Use the back button!";
@@ -2533,8 +2578,9 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 					    //$testformat = "text/xml; subtype=gml/2.1";
 					    //$e = new mb_exception("php/mod_linkedDataProxy.php item:". $item);
 					    //request with registrated wfs version - don't force wfs 2.0.0
-					    $features = $wfs->getFeatureById ( $collection, $forcedOutputFormat, $item, false, "EPSG:4326" );
+					    $features = $wfs->getFeatureById ( $collection, $forcedOutputFormat, $item, false, "EPSG:4326", true );
 					    $gmlFeatureCache = $features;
+					    $useGdal = $useGdal === false ? false : checkValidForGDAL($features);
 					    if ($useGdal) {
 					        //FIX for mapserver wfs 1.1.0 (e.g. 7.6.2) - if srs "urn:ogc:def:crs:EPSG::4326" is requested, it answers with "EPSG:4326" in returned gml. 
 					        if ($wfsVersion == "1.1.0") {

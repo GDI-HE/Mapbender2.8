@@ -782,7 +782,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
     			}
     			$postData .="<wfs:Query ";
     			if($destSrs) {
-    				$postData .= "srsName=\"" . $srsName . "\" ";
+    				$postData .= "srsName=\"" . $destSrs . "\" ";
     			}
     			//add namespace
     			if (strpos($featureTypeName, ":") !== false) {
@@ -793,7 +793,8 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
     			}
     			$postData .= $typeNameParameterName."=\"" . $featureTypeName . "\"  >";
     			$postData .= $filter ."</wfs:Query>";
-    			$postData .= "</wfs:GetFeature>";		
+    			$postData .= "</wfs:GetFeature>";	
+				#$e = new mb_exception("POST for count: " . $postData);	
     			$resultOfCount = $this->post($this->getFeature, $postData); //from class_ows!
                 	break;
 		    case "GET":
@@ -811,9 +812,11 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 					$namespaces = "";
 				}
     			$url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."service=WFS&request=GetFeature&version=".$version."&".strtolower($typeNameParameterName)."=".$featureTypeName."&resultType=hits".$namespaces;
-    			if ($filter != null) {
+    			
+				if ($filter != null) {
     			    $url .= "&FILTER=".urlencode($filter);
     			}
+				#$e = new mb_exception("URL for count by GET: " . $url);
     			//auth is already integrated in ows class
     			//do request
     			$resultOfCount = $this->get($url); //from class_ows!
@@ -825,11 +828,19 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 			$exceptionTest =  new SimpleXMLElement($resultOfCount);
 			if ($exceptionTest == false) {
 				throw new Exception('Cannot parse WFS number of hits request!');
-				return false;
 			}
 		}
 		catch (Exception $e) {
     			$e = new mb_exception($e->getMessage());
+				if ($method == "GET") {
+					$e = new mb_exception("request for count: " . $url);
+				}
+				if ($method == "POST") {
+					$e = new mb_exception("post url: " . $this->getFeature);
+					$e = new mb_exception("post data: " . $postData);
+				}
+	
+				$e = new mb_exception("returned result: " . $resultOfCount);
 		}
 		switch ($version) {
 			case "2.0.0":
@@ -1018,81 +1029,136 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 				"</wfs:Update>";
 	}
 	
-	public function getFeatureById ($featureTypeName, $outputFormat=false, $id, $version=false, $srsName=false) {
+	public function getFeatureById($featureTypeName, $outputFormat = false, $id, $version = false, $srsName = false, $prioritizeResourceId = false) {
+
 		if ($version == false) {
 			$version = $this->getVersion();
 		} else {
 			$e = new mb_notice("classes/class_wfs.php: wfs version forced to " . $version . "!");
 			$version = $version;
 		}
+	
 		$getFeatureByIdName = false;
-		//$e = new mb_exception(json_encode($this->storedQueriesArray));
+	
 		switch ($version) {
 			case "2.0.2":
 				$typeNameParameterName = "typeNames";
 				$maxFeaturesParameterName = "COUNT";
-				$featureIdParameterName = "featureID";
+				$featureIdParameterName = $prioritizeResourceId ? "resourceID" : "featureID";
+	
 				if (in_array("GetFeatureById", $this->storedQueriesArray)) {
-				    $getFeatureByIdName = "GetFeatureById";
+					$getFeatureByIdName = "GetFeatureById";
 				}
+	
 				if (in_array("urn:ogc:def:query:OGC-WFS::GetFeatureById", $this->storedQueriesArray)) {
-				    $getFeatureByIdName = "urn:ogc:def:query:OGC-WFS::GetFeatureById";
+					$getFeatureByIdName = "urn:ogc:def:query:OGC-WFS::GetFeatureById";
 				}
+	
 				break;
+	
 			case "2.0.0":
 				$typeNameParameterName = "typeNames";
 				$maxFeaturesParameterName = "COUNT";
-				$featureIdParameterName = "featureID";
+				$featureIdParameterName = $prioritizeResourceId ? "resourceID" : "featureID";
+	
 				if (in_array("GetFeatureById", $this->storedQueriesArray)) {
-				    $getFeatureByIdName = "GetFeatureById";
+					$getFeatureByIdName = "GetFeatureById";
 				}
+	
 				if (in_array("urn:ogc:def:query:OGC-WFS::GetFeatureById", $this->storedQueriesArray)) {
-				    $getFeatureByIdName = "urn:ogc:def:query:OGC-WFS::GetFeatureById";
+					$getFeatureByIdName = "urn:ogc:def:query:OGC-WFS::GetFeatureById";
 				}
+	
 				break;
+	
 			default:
 				$typeNameParameterName = "typeName";
 				$maxFeaturesParameterName = "MAXFEATURES";
 				$featureIdParameterName = "featureID";
 				break;
 		}
-		if ($getFeatureByIdName != false) {
-		    $getRequest = $this->getFeature .
-		    $this->getConjunctionCharacter($this->getFeature) .
-		    "service=WFS&request=GetFeature&version=" .
-		    $this->getVersion() . "&".strtolower($typeNameParameterName)."=" . $featureTypeName."&STOREDQUERY_ID=".$getFeatureByIdName."&ID=".$id;
-		} else {		    
-		    $getRequest = $this->getFeature .
-			$this->getConjunctionCharacter($this->getFeature) . 
-			"service=WFS&request=GetFeature&version=" . 
-			$version . "&".strtolower($typeNameParameterName)."=" . $featureTypeName."&".$featureIdParameterName."=".$id;
-		}
+	
+		$getRequest = $this->getFeature .
+			$this->getConjunctionCharacter($this->getFeature) .
+			"service=WFS&request=GetFeature&version=" .
+			$version;
+	
 		if ($outputFormat != false) {
-			$getRequest .= "&outputFormat=".$outputFormat;
+			$getRequest .= "&outputFormat=" . $outputFormat;
 		}
+	
 		if ($srsName != false) {
-		//check crs representation
 			$crs = new Crs($srsName);
-			$alterAxisOrder = $crs->alterAxisOrder("wfs_".$version);
+			$alterAxisOrder = $crs->alterAxisOrder("wfs_" . $version);
 			$srsId = $crs->identifierCode;
-			//add srs to request
+	
 			switch ($version) {
 				case "2.0.2":
-					$getRequest .= "&SRSNAME="."http://www.opengis.net/def/crs/EPSG/0/".$srsId;
+					$getRequest .= "&SRSNAME=http://www.opengis.net/def/crs/EPSG/0/" . $srsId;
 					break;
 				case "2.0.0":
-					$getRequest .= "&SRSNAME="."urn:ogc:def:crs:EPSG::".$srsId;	
+					$getRequest .= "&SRSNAME=urn:ogc:def:crs:EPSG::" . $srsId;
 					break;
 				case "1.1.0":
-					$getRequest .= "&SRSNAME="."urn:ogc:def:crs:EPSG::".$srsId;
+					$getRequest .= "&SRSNAME=urn:ogc:def:crs:EPSG::" . $srsId;
 					break;
 				case "1.0.0":
-					$getRequest .= "&SRSNAME="."EPSG:".$srsId;
+					$getRequest .= "&SRSNAME=EPSG:" . $srsId;
 					break;
 			}
 		}
-		$e = new mb_exception("classes/class_wfs.php - getfeaturebyid - request: ".$getRequest);
+	
+		if ($prioritizeResourceId) {
+			//Make sure max. 2 Features are requested (avoiding long execution time if ID-Parameter is not working)
+			
+			$getRequestPrioritized = $getRequest . "&" . strtolower($typeNameParameterName) . "=" . $featureTypeName .
+			"&" . $featureIdParameterName . "=" . $id ."&". $maxFeaturesParameterName ."=2";
+
+			// Execute the request with resourceId prioritization
+			$xmlResponse = $this->get($getRequestPrioritized);
+	
+			if ($this->validateSingleFeature($xmlResponse)) {
+				return $xmlResponse;
+			} else {
+				$e = new mb_notice("classes/class_wfs.php - getfeaturebyid - request: " . $getRequest ." - Validation failed, try falling back to stored query logic if possible.");
+			}
+		}
+	
+		if ($getFeatureByIdName != false) {
+			$getRequest .= "&STOREDQUERY_ID=" . $getFeatureByIdName . "&ID=" . $id;
+		}else{
+			//Former Logic - If Switch is not used.
+			$getRequest .= "&" . strtolower($typeNameParameterName) . "=" . $featureTypeName .
+			"&" . $featureIdParameterName . "=" . $id ."&". $maxFeaturesParameterName ."=2";
+		}
+	
+		$e = new mb_exception("classes/class_wfs.php - getfeaturebyid - request: " . $getRequest);
+	
 		return $this->get($getRequest); //from class_ows!
+	}
+	
+	/**
+	 * Validates if exactly one feature is returned in the response (namespace independent).
+	 * @param string $xmlResponse
+	 * @return bool
+	 */
+	private function validateSingleFeature($xmlResponse) {
+		try {
+			$xml = new SimpleXMLElement($xmlResponse);
+	
+			// Count the number of member elements regardless of namespaces
+			$featureCount = 0;
+			foreach ($xml->xpath("//*[local-name()='member']") as $feature) {
+				$featureCount++;
+				if($featureCount > 1) return false;
+			}
+	
+			return $featureCount === 1;
+		} catch (Exception $e) {
+			$e = new mb_exception("Validation failed: " . $e->getMessage());
+		}
+	
+		return false;
 	}
 	
 	protected function transactionDelete ($feature, $featureType, $authWfsConfElement) {
