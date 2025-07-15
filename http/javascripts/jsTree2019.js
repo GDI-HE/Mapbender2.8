@@ -625,9 +625,9 @@ function renderChildren(strData, tblCls, menu){
 		code.push('<tr class="treeGDE3_tr" id="' + n0[0] + '"><td><img' + (strData == jst_data ? ' style="display:none" id="rootImage"' : '') + ' src="' + jst_image_folder + '/')
 
 		if(n1){
-			code.push((n == nodes.length - 1 ? "last_closed" : "closed") + '.png" onClick="renderNode(' + "'" + strData + "[" + n + "][2]" + "'" + ',this,event)" class="action"')
+			code.push('roundplus.svg" onClick="renderNode(' + "'" + strData + "[" + n + "][2]" + "'" + ',this,event)" class="action"')
 		}else{
-			code.push((n == nodes.length - 1 ? "branch_empty" : "branch_empty") + '.png"')
+			code.push('branch_empty.png"')
 		}
 		
 		if(jst_context_menu && !n0[1][5] && !menu)
