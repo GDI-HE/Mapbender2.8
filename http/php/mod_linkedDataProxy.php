@@ -1569,16 +1569,29 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 			// get contraints
 			$constraints = new OwsConstraints ();
 			$constraints->languageCode = "de";
-			$constraints->asTable = true;
+			$constraints->asTable = false; //true 20250718
 			$constraints->id = $wfsid;
 			$constraints->type = "wfs";
-			$constraints->returnDirect = false;
+			$constraints->returnDirect = false; //false 20250718
+			$tou2 = $constraints->getLicenseData();
+			if ($tou2['success'] && $tou2['has_license']) {
+    			$licenseUrl = $tou2['license']['url'];     // https://www.govdata.de/dl-de/by-2-0
+    			$licenseName = $tou2['license']['name'];   // Datenlizenz Deutschland - Namensnennung - Version 2.0
+				$licenseSourceNote = $tou2['license']['source_note']; // Quellenvermerk
+				// Create license object for template use
+				$license2Obj = new stdClass();
+				$license2Obj->licenceUrl = $licenseUrl;
+				$license2Obj->licenceName = $licenseName;
+				$license2Obj->licenceSourceNote = $licenseSourceNote;
+				$tou2 = $license2Obj;
+			}
 			$tou = $constraints->getDisclaimer (); // TODO encoding problems may occur!
 			if (isset ( $imagePathReplace )) {
 				$tou = str_replace ( "../img/", $imagePathReplace, $tou );
 			}
 			if ($f == "html") {
 				$returnObject->license = $tou; // - generate license info in json for json format!!!!!
+				$returnObject->license2 = $tou2;
 			}
 			$returnObject->accessUrl = $wfs->getCapabilities;
 			// uri to test openapi description:
@@ -3088,8 +3101,8 @@ switch ($f) {
 				$html .= '        <h1 itemprop="name">' . $returnObject->title . '</h1>' . $newline;
 				$html .= '        <span itemprop="description">' . $returnObject->description . '</span>' . $newline;
 				$html .= '        <p itemprop="url" class="d-none">' . get2Rest ( $_SERVER ['REQUEST_URI'] ) . '</p>' . $newline; // TODO canonical url
-				$html .= '        <div itemprop="includedInDataCatalog" itemscope itemtype="http://schema.org/Datacatalog" class="d-none">' . $newline;
-				$html .= '            <div itemprop="url">https://www.ldproxy.nrw.de/' . get2Rest ( $_SERVER ['REQUEST_URI'] ) . '</div>' . $newline; // TODO canonical url
+				$html .= '        <div itemprop="includedInDataCatalog" itemscope itemtype="http://schema.org/DataCatalog" class="d-none"><!-- DataCatalog vs Datacatalog-->' . $newline;
+				$html .= '            <div itemprop="url">' . get2Rest ( $_SERVER ['REQUEST_URI'] ) . '</div>' . $newline; // TODO canonical url
 				$html .= '        </div>' . $newline;
 				// ul 0 for keywords ...
 				// ul 1..n for distribution - each a download url to a wfs featuretype in different formats!
@@ -3111,6 +3124,7 @@ switch ($f) {
 					$html .= '                        <a href="' . $collectionHtmlUrl . '">' . $collection->title . '</a>' . $newline;
 					$html .= '                    </li>' . $newline;
 				}
+				$html .= '                </ul><!-- inserted ul-->' . $newline;
 				$html .= '            </div>' . $newline;
 				$html .= '        </div>' . $newline;
 				// further information about the service API TODO
@@ -3131,24 +3145,30 @@ switch ($f) {
 				$html .= '        <div class="row my-3">' . $newline;
 				$html .= '            <div class="col-md-2 font-weight-bold">' . _mb ( 'Provider' ) . '</div>' . $newline;
 				$html .= '            <div class="col-md-10">' . $newline;
-				$html .= '                <ul class="list-unstyled" itemprop="creator" itemscope itemtype="http://schema.org/Organization">' . $newline;
-				$html .= '                    <li itemprop="name">' . $returnObject->provider . '</li>' . $newline;
-				$html .= '                    <li itemprop="url"><a href="' . $returnObject->providerHomepage . '" target="_blank">' . $returnObject->providerHomepage . '</a></li>' . $newline;
-				$html .= '                    <li itemprop="contactPoint" itemscope itemtype="http://schema.org/ContactPoint">' . $newline;
-				$html .= '                        <span class="d-none" itemprop="contactType">technical support</span>' . $newline;
-				$html .= '                        <ul class="list-unstyled">' . $newline;
-				$html .= '                            <li itemprop="email">' . $returnObject->providerEmail . '</li>' . $newline;
-				$html .= '                            <li itemprop="url" class="d-none">' . $returnObject->providerHomepage . '</li>' . $newline;
-				$html .= '                        </ul>' . $newline;
-				$html .= '                    </li>' . $newline;
-				$html .= '                </ul>' . $newline;
+				$html .= '                <div itemprop="creator" itemscope itemtype="http://schema.org/Organization">' . $newline;
+				$html .= '                    <div itemprop="name">' . $returnObject->provider . '</div>' . $newline;
+				$html .= '                    <div itemprop="url"><a href="' . $returnObject->providerHomepage . '" target="_blank">' . $returnObject->providerHomepage . '</a></div>' . $newline;
+				$html .= '                    <div itemprop="contactPoint" itemscope itemtype="http://schema.org/ContactPoint">' . $newline;
+				$html .= '                        <meta itemprop="contactType" content="technical support">' . $newline;
+				$html .= '                        <div itemprop="email">' . $returnObject->providerEmail . '</div>' . $newline;
+				$html .= '                        <meta itemprop="url" content="' . $returnObject->providerHomepage . '">' . $newline;
+				$html .= '                    </div>' . $newline;
+				$html .= '                </div>' . $newline;
 				$html .= '            </div>' . $newline;
 				$html .= '        </div>' . $newline;
 				// further information about the service LICENSE TODO
 				$html .= '        <div class="row my-3">' . $newline;
-				$html .= '        <div class="col-md-2 font-weight-bold">' . _mb ( 'License' ) . '</div>' . $newline;
-				$html .= '         <div class="col-md-10">' . $newline;
-				$html .= '        <div itemprop="license">' . $returnObject->license . '</div>' . $newline;
+				$html .= '            <div class="col-md-2 font-weight-bold">' . _mb ( 'License' ) . '</div>' . $newline;
+				$html .= '            <div class="col-md-10">' . $newline;
+				$html .= '                <div itemprop="license" itemscope="" itemtype="http://schema.org/CreativeWork">' . $newline;
+				$html .= '                    <div itemprop="name">' . $returnObject->license2->licenceName . '</div>' . $newline;
+				$html .= '                    <div itemprop="url"><a href="' . $returnObject->license2->licenceUrl . '">' . $returnObject->license2->licenceUrl . '</a></div>' . $newline;
+				if (isset($returnObject->license2->licenceSourceNote) && !empty($returnObject->license2->licenceSourceNote)) {
+					$html .= '                    <div itemprop="copyrightNotice"><strong>' . _mb('Source note') . ':</strong> ' . htmlspecialchars($returnObject->license2->licenceSourceNote) . '</div>' . $newline;
+				}
+				$html .= '                    <div></div>' . $newline;
+				$html .= '                </div>' . $newline;
+				//$html .= '        <div class="mt-3">' . $returnObject->license . '</div>' . $newline;
 				$html .= '        </div>' . $newline;
 				$html .= '        </div>' . $newline;
 				$html .= '        <div itemprop="temporalCoverage" class="d-none">2018-05-18T14:45:11.573Z/2019-08-05T06:27:56.536Z</div>' . $newline; // TODO
