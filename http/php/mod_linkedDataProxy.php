@@ -1898,7 +1898,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 			// test if collection is available in service
 			$ftNameInWfs = false;
 			foreach ( $wfs->featureTypeArray as $featureType ) {
-				if ($featureType->name == $collection) {
+				if ($featureType->name == $collection || $featureType->title == $collection) {
 					// requested ft found!
 					$ftNameInWfs = true;
 					$ftTitle = $featureType->title;
@@ -2076,7 +2076,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						if ($cache->isActive) {
 							// if (false) {
 							if ($cache->cachedVariableExists ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ) ) == false) {
-								$numberOfObjects = $wfs->countFeatures ( $collection, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
+								$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
 								$cache->cachedVariableAdd ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ), $numberOfObjects );
 							} else {
 								// $e = new mb_exception("read count from cache!");
@@ -2087,7 +2087,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						} else {
 							// TODO - define post/get central
 							// $numberOfObjects = $wfs->countFeatures($collection, $filter, "2.0.0");
-							$numberOfObjects = $wfs->countFeatures ( $collection, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
+							$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
 						}
 						// $numberOfObjects = 1000;
 						//$e = new mb_exception("counted features: ".$numberOfObjects);
