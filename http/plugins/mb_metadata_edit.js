@@ -78,8 +78,26 @@ var MetadataEditApi = function (o) {
 				$metadataForm.easyform("reset");
 				$metadataForm.easyform("fill", obj);
 				$('#license_source').css("display","none");
+				// Fix: Ensure correct termsofuse selection after easyform fill
+				// Required due to potential ID gaps in termsofuse table
+				var finalTermsofuseValue = obj.wms_termsofuse;
+				if (obj.wms_termsofuse) {
+					var termsofuseSelect = document.getElementById('wms_termsofuse');
+					if (termsofuseSelect && termsofuseSelect.value != obj.wms_termsofuse) {
+						// Find and select the correct option
+						for (var i = 0; i < termsofuseSelect.options.length; i++) {
+							if (termsofuseSelect.options[i].value == obj.wms_termsofuse) {
+								termsofuseSelect.selectedIndex = i;
+								break;
+							}
+						}
+					}
+					// Use the actually selected value for licence info
+					finalTermsofuseValue = termsofuseSelect ? termsofuseSelect.value : obj.wms_termsofuse;
+				}
+				
 				//check if obj.wms_termsofuse not null
-				that.fillLicence(obj.wms_termsofuse);
+				that.fillLicence(finalTermsofuseValue);
                 // select mdContact option
                 var select = document.getElementById('fkey_mb_group_id');
                 select.childNodes.forEach(function(option) {
