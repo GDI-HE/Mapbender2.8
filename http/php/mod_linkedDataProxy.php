@@ -2932,7 +2932,42 @@ switch ($f) {
 		$html .= '<link rel="stylesheet" href="/mapbender/extensions/leaflet-1.5.1/leaflet.css"/>' . $newline;
 		$html .= '<script src="/mapbender/extensions/leaflet-1.5.1/leaflet.js"></script>' . $newline;
 		
-		
+		// count of entries
+		$html .= '<script>' . $newline;
+		$html .= 'document.addEventListener("DOMContentLoaded", function() {' . $newline;
+		$html .= '  const container = document.querySelector(\'[itemtype="http://schema.org/DataCatalog"]\');' . $newline;
+		$html .= '  if (!container) return;' . $newline;
+		$html .= '  const h2CountElem = document.getElementById("h2-count");' . $newline;
+		$html .= '  const filterInput = document.getElementById("filter-linked-data-input");' . $newline;
+		$html .= '  const listElem = document.querySelector(".my-filterable-list");' . $newline;
+		$html .= '  const statusElem = document.getElementById("filter-status");' . $newline;
+		$html .= '  if (!h2CountElem || !filterInput || !listElem) return;' . $newline;
+		$html .= '  const allItems = listElem.querySelectorAll("li");' . $newline;
+		$html .= '  const totalCount = allItems.length;' . $newline;
+		$html .= '  const updateCountDisplay = (visibleCount) => {' . $newline;
+		$html .= '    if (visibleCount === totalCount) {' . $newline;
+		$html .= '      h2CountElem.textContent = " (" + totalCount + ")";' . $newline;
+		$html .= '    } else {' . $newline;
+		$html .= '      h2CountElem.textContent = " (* " + visibleCount + "/" + totalCount + ")";' . $newline;
+		$html .= '    }' . $newline;
+		$html .= '    if (statusElem) {' . $newline;
+		$html .= '      statusElem.textContent = visibleCount + " Einträge sichtbar.";' . $newline;
+		$html .= '    }' . $newline;
+		$html .= '  };' . $newline;
+		$html .= '  updateCountDisplay(totalCount);' . $newline;
+		$html .= '  filterInput.addEventListener("input", function() {' . $newline;
+		$html .= '    const filterText = this.value.toLowerCase();' . $newline;
+		$html .= '    let visibleCount = 0;' . $newline;
+		$html .= '    allItems.forEach(item => {' . $newline;
+		$html .= '      const match = item.textContent.toLowerCase().includes(filterText);' . $newline;
+		$html .= '      item.style.display = match ? "" : "none";' . $newline;
+		$html .= '      if (match) visibleCount++;' . $newline;
+		$html .= '    });' . $newline;
+		$html .= '    updateCountDisplay(visibleCount);' . $newline;
+		$html .= '  });' . $newline;
+		$html .= '});' . $newline;
+		$html .= '</script>' . $newline;
+	
 		// bootstrap
 		if ($useInternalBootstrap == true) {
 			if ($behindRewrite == true) {
@@ -3071,13 +3106,15 @@ switch ($f) {
 			$html .= "";
 			$html .= '<div class="container py-4">' . $newline;
 			$html .= '    <div itemscope itemtype="http://schema.org/DataCatalog">' . $newline;
-			$html .= '        <h1 itemprop="name">' . $title . '</h1>' . $newline;
+			$html .= '        <h1 itemprop="name">' . $title . '<span id="h2-count"> (0)</span></h1>' . $newline;
 			$html .= '        <p itemprop="description">' . $description . '</p>' . $newline;
 			$html .= '        <p itemprop="url" class="d-none">' . $datasource_url . '</p>' . $newline;
-			$html .= '        <br/>' . $newline;
-			$html .= '        <br/>' . $newline;
-			$html .= '        <br/>' . $newline;
-			$html .= '        <ul class="list-unstyled space-after">' . $newline;
+			$html .= '        <div class="form-group">' . $newline;
+			$html .= '            <label for="filter-linked-data-input">Liste durchsuchen</label>' . $newline;
+			$html .= '            <input class="form-control" type="search" id="filter-linked-data-input" placeholder="Suchbegriff eingeben" aria-label="Liste durchsuchen">' . $newline;
+			$html .= '        </div>' . $newline;
+			$html .= '        <div id="filter-status" class="sr-only" aria-live="polite"></div>' . $newline;			
+			$html .= '        <ul class="my-filterable-list list-unstyled space-after">' . $newline;
 			foreach ( $returnObject->service as $service ) {
 				$html .= '            <li itemprop="dataset" itemscope itemtype="http://schema.org/Dataset">' . $newline;
 				$html .= '                <h2>' . $newline;
