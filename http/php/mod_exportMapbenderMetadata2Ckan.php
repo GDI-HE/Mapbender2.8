@@ -352,15 +352,16 @@ $topicCkanCategoryMap = array(
 );
 
 $license_map = array(
+    "cc-by-nc-de/3.0" => "http://dcat-ap.de/def/licenses/cc-by-nc-de/3.0",
+    "cc-by-de/3.0" => "http://dcat-ap.de/def/licenses/cc-by-de/3.0",
+    "dl-by-de/1.0" => "http://dcat-ap.de/def/licenses/dl-by-de/1.0",
+    "dl-by-nc-de/1.0" => "http://dcat-ap.de/def/licenses/dl-by-nc-de/1.0",
+    "dl-zero-de/2.0" => "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
+    "dl-by-de/2.0" => "http://dcat-ap.de/def/licenses/dl-by-de/2.0",
+    "odbl" => "http://dcat-ap.de/def/licenses/odbl",
+    "cc-by/4.0" => "http://dcat-ap.de/def/licenses/cc-by/4.0",
     "cc-zero" => "http://dcat-ap.de/def/licenses/cc-zero",
-    "dl-de-by-2.0" => "http://dcat-ap.de/def/licenses/dl-by-de/2.0",
-    "dl-de-by-nc-1.0" => "http://dcat-ap.de/def/licenses/dl-by-nc-de/1.0",
-    "odc-odbl-1.0" => "http://dcat-ap.de/def/licenses/odbl",
-    "dl-de-zero-2.0" => "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
-    "cc-by-sa-4.0" => "http://dcat-ap.de/def/licenses/cc-by-sa/4.0",
-    "cc-by-3.0" => "http://dcat-ap.de/def/licenses/cc-by-de/3.0",
-    "dl-de-by-1.0" => "http://dcat-ap.de/def/licenses/dl-by-de/1.0",
-    "cc-nc-3.0" => "http://dcat-ap.de/def/licenses/cc-by-nc-de/3.0"
+    "other-closed" => "http://dcat-ap.de/def/licenses/other-closed"
 );
 
 //TODO add crontributor id? - test for ogdp 
@@ -500,15 +501,15 @@ if (isset($_REQUEST["outputFormat"]) & $_REQUEST["outputFormat"] != "") {
 
 function createDistributionElement($rdfXmlDoc, $uri, $title, $description=false, $format, $accessUrl, $originalAccessUrl=false, $license_id, $license_source_note, $format_mapping, $is_hvd) {
     $license_map = array(
+        "cc-by-nc-de/3.0" => "http://dcat-ap.de/def/licenses/cc-by-nc-de/3.0",
+        "cc-by-de/3.0" => "http://dcat-ap.de/def/licenses/cc-by-de/3.0",
+        "dl-by-de/1.0" => "http://dcat-ap.de/def/licenses/dl-by-de/1.0",
+        "dl-by-nc-de/1.0" => "http://dcat-ap.de/def/licenses/dl-by-nc-de/1.0",
+        "dl-zero-de/2.0" => "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
+        "dl-by-de/2.0" => "http://dcat-ap.de/def/licenses/dl-by-de/2.0",
+        "odbl" => "http://dcat-ap.de/def/licenses/odbl",
+        "cc-by/4.0" => "http://dcat-ap.de/def/licenses/cc-by/4.0",
         "cc-zero" => "http://dcat-ap.de/def/licenses/cc-zero",
-        "dl-de-by-2.0" => "http://dcat-ap.de/def/licenses/dl-by-de/2.0",
-        "dl-de-by-nc-1.0" => "http://dcat-ap.de/def/licenses/dl-by-nc-de/1.0",
-        "odc-odbl-1.0" => "http://dcat-ap.de/def/licenses/odbl",
-        "dl-de-zero-2.0" => "http://dcat-ap.de/def/licenses/dl-zero-de/2.0",
-        "cc-by-sa-4.0" => "http://dcat-ap.de/def/licenses/cc-by-sa/4.0",
-        "cc-by-3.0" => "http://dcat-ap.de/def/licenses/cc-by-de/3.0",
-        "dl-de-by-1.0" => "http://dcat-ap.de/def/licenses/dl-by-de/1.0",
-        "cc-nc-3.0" => "http://dcat-ap.de/def/licenses/cc-by-nc-de/3.0",
         "other-closed" => "http://dcat-ap.de/def/licenses/other-closed"
     );
     $Distribution = $rdfXmlDoc->createElement ( "dcat:Distribution" );
