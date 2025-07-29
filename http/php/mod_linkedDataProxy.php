@@ -1569,16 +1569,29 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 			// get contraints
 			$constraints = new OwsConstraints ();
 			$constraints->languageCode = "de";
-			$constraints->asTable = true;
+			$constraints->asTable = false; //true 20250718
 			$constraints->id = $wfsid;
 			$constraints->type = "wfs";
-			$constraints->returnDirect = false;
+			$constraints->returnDirect = false; //false 20250718
+			$tou2 = $constraints->getLicenseData();
+			if ($tou2['success'] && $tou2['has_license']) {
+    			$licenseUrl = $tou2['license']['url'];     // https://www.govdata.de/dl-de/by-2-0
+    			$licenseName = $tou2['license']['name'];   // Datenlizenz Deutschland - Namensnennung - Version 2.0
+				$licenseSourceNote = $tou2['license']['source_note']; // Quellenvermerk
+				// Create license object for template use
+				$license2Obj = new stdClass();
+				$license2Obj->licenceUrl = $licenseUrl;
+				$license2Obj->licenceName = $licenseName;
+				$license2Obj->licenceSourceNote = $licenseSourceNote;
+				$tou2 = $license2Obj;
+			}
 			$tou = $constraints->getDisclaimer (); // TODO encoding problems may occur!
 			if (isset ( $imagePathReplace )) {
 				$tou = str_replace ( "../img/", $imagePathReplace, $tou );
 			}
 			if ($f == "html") {
 				$returnObject->license = $tou; // - generate license info in json for json format!!!!!
+				$returnObject->license2 = $tou2;
 			}
 			$returnObject->accessUrl = $wfs->getCapabilities;
 			// uri to test openapi description:
@@ -1885,7 +1898,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 			// test if collection is available in service
 			$ftNameInWfs = false;
 			foreach ( $wfs->featureTypeArray as $featureType ) {
-				if ($featureType->name == $collection) {
+				if ($featureType->name == $collection || $featureType->title == $collection) {
 					// requested ft found!
 					$ftNameInWfs = true;
 					$ftTitle = $featureType->title;
@@ -2063,7 +2076,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						if ($cache->isActive) {
 							// if (false) {
 							if ($cache->cachedVariableExists ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ) ) == false) {
-								$numberOfObjects = $wfs->countFeatures ( $collection, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
+								$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
 								$cache->cachedVariableAdd ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ), $numberOfObjects );
 							} else {
 								// $e = new mb_exception("read count from cache!");
@@ -2074,7 +2087,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						} else {
 							// TODO - define post/get central
 							// $numberOfObjects = $wfs->countFeatures($collection, $filter, "2.0.0");
-							$numberOfObjects = $wfs->countFeatures ( $collection, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
+							$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
 						}
 						// $numberOfObjects = 1000;
 						//$e = new mb_exception("counted features: ".$numberOfObjects);
@@ -2919,7 +2932,42 @@ switch ($f) {
 		$html .= '<link rel="stylesheet" href="/mapbender/extensions/leaflet-1.5.1/leaflet.css"/>' . $newline;
 		$html .= '<script src="/mapbender/extensions/leaflet-1.5.1/leaflet.js"></script>' . $newline;
 		
-		
+		// count of entries
+		$html .= '<script>' . $newline;
+		$html .= 'document.addEventListener("DOMContentLoaded", function() {' . $newline;
+		$html .= '  const container = document.querySelector(\'[itemtype="http://schema.org/DataCatalog"]\');' . $newline;
+		$html .= '  if (!container) return;' . $newline;
+		$html .= '  const h2CountElem = document.getElementById("h2-count");' . $newline;
+		$html .= '  const filterInput = document.getElementById("filter-linked-data-input");' . $newline;
+		$html .= '  const listElem = document.querySelector(".my-filterable-list");' . $newline;
+		$html .= '  const statusElem = document.getElementById("filter-status");' . $newline;
+		$html .= '  if (!h2CountElem || !filterInput || !listElem) return;' . $newline;
+		$html .= '  const allItems = listElem.querySelectorAll("li");' . $newline;
+		$html .= '  const totalCount = allItems.length;' . $newline;
+		$html .= '  const updateCountDisplay = (visibleCount) => {' . $newline;
+		$html .= '    if (visibleCount === totalCount) {' . $newline;
+		$html .= '      h2CountElem.textContent = " (" + totalCount + ")";' . $newline;
+		$html .= '    } else {' . $newline;
+		$html .= '      h2CountElem.textContent = " (* " + visibleCount + "/" + totalCount + ")";' . $newline;
+		$html .= '    }' . $newline;
+		$html .= '    if (statusElem) {' . $newline;
+		$html .= '      statusElem.textContent = visibleCount + " Einträge sichtbar.";' . $newline;
+		$html .= '    }' . $newline;
+		$html .= '  };' . $newline;
+		$html .= '  updateCountDisplay(totalCount);' . $newline;
+		$html .= '  filterInput.addEventListener("input", function() {' . $newline;
+		$html .= '    const filterText = this.value.toLowerCase();' . $newline;
+		$html .= '    let visibleCount = 0;' . $newline;
+		$html .= '    allItems.forEach(item => {' . $newline;
+		$html .= '      const match = item.textContent.toLowerCase().includes(filterText);' . $newline;
+		$html .= '      item.style.display = match ? "" : "none";' . $newline;
+		$html .= '      if (match) visibleCount++;' . $newline;
+		$html .= '    });' . $newline;
+		$html .= '    updateCountDisplay(visibleCount);' . $newline;
+		$html .= '  });' . $newline;
+		$html .= '});' . $newline;
+		$html .= '</script>' . $newline;
+	
 		// bootstrap
 		if ($useInternalBootstrap == true) {
 			if ($behindRewrite == true) {
@@ -3058,13 +3106,15 @@ switch ($f) {
 			$html .= "";
 			$html .= '<div class="container py-4">' . $newline;
 			$html .= '    <div itemscope itemtype="http://schema.org/DataCatalog">' . $newline;
-			$html .= '        <h1 itemprop="name">' . $title . '</h1>' . $newline;
+			$html .= '        <h1 itemprop="name">' . $title . '<span id="h2-count"> (0)</span></h1>' . $newline;
 			$html .= '        <p itemprop="description">' . $description . '</p>' . $newline;
 			$html .= '        <p itemprop="url" class="d-none">' . $datasource_url . '</p>' . $newline;
-			$html .= '        <br/>' . $newline;
-			$html .= '        <br/>' . $newline;
-			$html .= '        <br/>' . $newline;
-			$html .= '        <ul class="list-unstyled space-after">' . $newline;
+			$html .= '        <div class="form-group">' . $newline;
+			$html .= '            <label for="filter-linked-data-input">Liste durchsuchen</label>' . $newline;
+			$html .= '            <input class="form-control" type="search" id="filter-linked-data-input" placeholder="Suchbegriff eingeben" aria-label="Liste durchsuchen">' . $newline;
+			$html .= '        </div>' . $newline;
+			$html .= '        <div id="filter-status" class="sr-only" aria-live="polite"></div>' . $newline;			
+			$html .= '        <ul class="my-filterable-list list-unstyled space-after">' . $newline;
 			foreach ( $returnObject->service as $service ) {
 				$html .= '            <li itemprop="dataset" itemscope itemtype="http://schema.org/Dataset">' . $newline;
 				$html .= '                <h2>' . $newline;
@@ -3088,8 +3138,8 @@ switch ($f) {
 				$html .= '        <h1 itemprop="name">' . $returnObject->title . '</h1>' . $newline;
 				$html .= '        <span itemprop="description">' . $returnObject->description . '</span>' . $newline;
 				$html .= '        <p itemprop="url" class="d-none">' . get2Rest ( $_SERVER ['REQUEST_URI'] ) . '</p>' . $newline; // TODO canonical url
-				$html .= '        <div itemprop="includedInDataCatalog" itemscope itemtype="http://schema.org/Datacatalog" class="d-none">' . $newline;
-				$html .= '            <div itemprop="url">https://www.ldproxy.nrw.de/' . get2Rest ( $_SERVER ['REQUEST_URI'] ) . '</div>' . $newline; // TODO canonical url
+				$html .= '        <div itemprop="includedInDataCatalog" itemscope itemtype="http://schema.org/DataCatalog" class="d-none"><!-- DataCatalog vs Datacatalog-->' . $newline;
+				$html .= '            <div itemprop="url">' . get2Rest ( $_SERVER ['REQUEST_URI'] ) . '</div>' . $newline; // TODO canonical url
 				$html .= '        </div>' . $newline;
 				// ul 0 for keywords ...
 				// ul 1..n for distribution - each a download url to a wfs featuretype in different formats!
@@ -3111,6 +3161,7 @@ switch ($f) {
 					$html .= '                        <a href="' . $collectionHtmlUrl . '">' . $collection->title . '</a>' . $newline;
 					$html .= '                    </li>' . $newline;
 				}
+				$html .= '                </ul><!-- inserted ul-->' . $newline;
 				$html .= '            </div>' . $newline;
 				$html .= '        </div>' . $newline;
 				// further information about the service API TODO
@@ -3131,24 +3182,30 @@ switch ($f) {
 				$html .= '        <div class="row my-3">' . $newline;
 				$html .= '            <div class="col-md-2 font-weight-bold">' . _mb ( 'Provider' ) . '</div>' . $newline;
 				$html .= '            <div class="col-md-10">' . $newline;
-				$html .= '                <ul class="list-unstyled" itemprop="creator" itemscope itemtype="http://schema.org/Organization">' . $newline;
-				$html .= '                    <li itemprop="name">' . $returnObject->provider . '</li>' . $newline;
-				$html .= '                    <li itemprop="url"><a href="' . $returnObject->providerHomepage . '" target="_blank">' . $returnObject->providerHomepage . '</a></li>' . $newline;
-				$html .= '                    <li itemprop="contactPoint" itemscope itemtype="http://schema.org/ContactPoint">' . $newline;
-				$html .= '                        <span class="d-none" itemprop="contactType">technical support</span>' . $newline;
-				$html .= '                        <ul class="list-unstyled">' . $newline;
-				$html .= '                            <li itemprop="email">' . $returnObject->providerEmail . '</li>' . $newline;
-				$html .= '                            <li itemprop="url" class="d-none">' . $returnObject->providerHomepage . '</li>' . $newline;
-				$html .= '                        </ul>' . $newline;
-				$html .= '                    </li>' . $newline;
-				$html .= '                </ul>' . $newline;
+				$html .= '                <div itemprop="creator" itemscope itemtype="http://schema.org/Organization">' . $newline;
+				$html .= '                    <div itemprop="name">' . $returnObject->provider . '</div>' . $newline;
+				$html .= '                    <div itemprop="url"><a href="' . $returnObject->providerHomepage . '" target="_blank">' . $returnObject->providerHomepage . '</a></div>' . $newline;
+				$html .= '                    <div itemprop="contactPoint" itemscope itemtype="http://schema.org/ContactPoint">' . $newline;
+				$html .= '                        <meta itemprop="contactType" content="technical support">' . $newline;
+				$html .= '                        <div itemprop="email">' . $returnObject->providerEmail . '</div>' . $newline;
+				$html .= '                        <meta itemprop="url" content="' . $returnObject->providerHomepage . '">' . $newline;
+				$html .= '                    </div>' . $newline;
+				$html .= '                </div>' . $newline;
 				$html .= '            </div>' . $newline;
 				$html .= '        </div>' . $newline;
 				// further information about the service LICENSE TODO
 				$html .= '        <div class="row my-3">' . $newline;
-				$html .= '        <div class="col-md-2 font-weight-bold">' . _mb ( 'License' ) . '</div>' . $newline;
-				$html .= '         <div class="col-md-10">' . $newline;
-				$html .= '        <div itemprop="license">' . $returnObject->license . '</div>' . $newline;
+				$html .= '            <div class="col-md-2 font-weight-bold">' . _mb ( 'License' ) . '</div>' . $newline;
+				$html .= '            <div class="col-md-10">' . $newline;
+				$html .= '                <div itemprop="license" itemscope="" itemtype="http://schema.org/CreativeWork">' . $newline;
+				$html .= '                    <div itemprop="name">' . $returnObject->license2->licenceName . '</div>' . $newline;
+				$html .= '                    <div itemprop="url"><a href="' . $returnObject->license2->licenceUrl . '">' . $returnObject->license2->licenceUrl . '</a></div>' . $newline;
+				if (isset($returnObject->license2->licenceSourceNote) && !empty($returnObject->license2->licenceSourceNote)) {
+					$html .= '                    <div itemprop="copyrightNotice"><strong>' . _mb('Source note') . ':</strong> ' . htmlspecialchars($returnObject->license2->licenceSourceNote) . '</div>' . $newline;
+				}
+				$html .= '                    <div></div>' . $newline;
+				$html .= '                </div>' . $newline;
+				//$html .= '        <div class="mt-3">' . $returnObject->license . '</div>' . $newline;
 				$html .= '        </div>' . $newline;
 				$html .= '        </div>' . $newline;
 				$html .= '        <div itemprop="temporalCoverage" class="d-none">2018-05-18T14:45:11.573Z/2019-08-05T06:27:56.536Z</div>' . $newline; // TODO

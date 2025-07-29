@@ -835,5 +835,68 @@ MD_ClassificationCode");
 			die();
 		}
 	}
+
+	/**
+	 * Get structured license data for templates
+	 * Returns an array with license information (url, name, etc.)
+	 * @return array License information with keys: url, name, id, description, source_note, etc.
+	 */
+	function getLicenseData() {
+		$licenseData = array();
+		
+		if ($this->type == "wms") {
+			$sql = "SELECT wms_id, wms_id as resource_id, wms.accessconstraints, wms.fees, wms.wms_network_access, wms.wms_pricevolume, wms_license_source_note as source_note, wms.wms_proxylog, termsofuse.name,";
+			$sql .= " termsofuse.termsofuse_id, termsofuse.symbollink, termsofuse.description,termsofuse.descriptionlink, termsofuse.isopen, source_required from wms LEFT OUTER JOIN";
+			$sql .= "  wms_termsofuse ON  (wms.wms_id = wms_termsofuse.fkey_wms_id) LEFT OUTER JOIN termsofuse ON";
+			$sql .= " (wms_termsofuse.fkey_termsofuse_id=termsofuse.termsofuse_id) where wms.wms_id = $1";
+		}
+		if ($this->type == "wfs") {
+			$sql = "SELECT wfs_id, wfs_id as resource_id, accessconstraints, fees, wfs_network_access, wfs_proxylog, wfs_pricevolume, wfs_license_source_note as source_note, termsofuse.name,";
+			$sql .= " termsofuse.termsofuse_id ,termsofuse.symbollink, termsofuse.description,termsofuse.descriptionlink, termsofuse.isopen, source_required  from wfs LEFT OUTER JOIN";
+			$sql .= "  wfs_termsofuse ON  (wfs.wfs_id = wfs_termsofuse.fkey_wfs_id) LEFT OUTER JOIN termsofuse ON";
+			$sql .= " (wfs_termsofuse.fkey_termsofuse_id=termsofuse.termsofuse_id) where wfs.wfs_id = $1";	
+		}
+		if ($this->type == "metadata") {
+			$sql = "SELECT metadata_id, metadata_id as resource_id, constraints as accessconstraints, md_license_source_note as source_note, fees, termsofuse.name,";
+			$sql .= " termsofuse.termsofuse_id ,termsofuse.symbollink, termsofuse.description,termsofuse.descriptionlink, termsofuse.isopen, source_required  from mb_metadata LEFT OUTER JOIN";
+			$sql .= "  md_termsofuse ON  (mb_metadata.metadata_id = md_termsofuse.fkey_metadata_id) LEFT OUTER JOIN termsofuse ON";
+			$sql .= " (md_termsofuse.fkey_termsofuse_id=termsofuse.termsofuse_id) where mb_metadata.metadata_id = $1";	
+		}
+		
+		$v = array();
+		$t = array();
+		array_push($t, "i");
+		array_push($v, $this->id);
+		$res = db_prep_query($sql,$v,$t);
+		$row = db_fetch_array($res);
+		
+		if (!isset($row['resource_id'])) {
+			$licenseData['success'] = false;
+			$licenseData['message'] = $this->type."-resource with this id is not known!";
+			return $licenseData;
+		}
+		
+		// Initialize return data
+		$licenseData['success'] = true;
+		$licenseData['has_license'] = false;
+		$licenseData['fees'] = isset($row['fees']) ? $row['fees'] : '';
+		$licenseData['access_constraints'] = isset($row['accessconstraints']) ? $row['accessconstraints'] : '';
+		
+		// Check if a predefined license exists
+		if (isset($row['termsofuse_id']) && $row['termsofuse_id'] != '') {
+			$licenseData['has_license'] = true;
+			$licenseData['license'] = array(
+				'id' => isset($row['name']) ? $row['name'] : '',
+				'name' => isset($row['description']) ? $row['description'] : '',
+				'url' => isset($row['descriptionlink']) ? $row['descriptionlink'] : '',
+				'symbol_url' => isset($row['symbollink']) ? $row['symbollink'] : '',
+				'is_open' => isset($row['isopen']) && $row['isopen'] == '1',
+				'source_required' => isset($row['source_required']) && $row['source_required'] == 't',
+				'source_note' => isset($row['source_note']) ? $row['source_note'] : ''
+			);
+		}
+		
+		return $licenseData;
+	}
 }
 ?>
