@@ -2997,7 +2997,7 @@ switch ($f) {
 		// ************************************************************************************************************************************
 		// navbar
 		$html .= '<nav class="navbar navbar-light bg-light navbar-expand-sm">' . $newline;
-		$html .= '<div class="container">' . $newline;
+		$html .= '<div class="container-lg px-3">' . $newline;
 		$html .= '<div id="navbar" class="navbar-collapse collapse d-flex justify-content-between align-items-center">' . $newline;
 		$html .= '<ol class="breadcrumb bg-light my-0 pl-0">' . $newline;
 		//
@@ -3104,14 +3104,18 @@ switch ($f) {
 		if (! isset ( $wfsid )) {
 			// header for proxy
 			$html .= "";
-			$html .= '<div class="container py-4">' . $newline;
+			$html .= '<div class="container-lg py-4 px-3">' . $newline;
 			$html .= '    <div itemscope itemtype="http://schema.org/DataCatalog">' . $newline;
 			$html .= '        <h1 itemprop="name">' . $title . '<span id="h2-count"> (0)</span></h1>' . $newline;
 			$html .= '        <p itemprop="description">' . $description . '</p>' . $newline;
 			$html .= '        <p itemprop="url" class="d-none">' . $datasource_url . '</p>' . $newline;
 			$html .= '        <div class="form-group">' . $newline;
 			$html .= '            <label for="filter-linked-data-input">Liste durchsuchen</label>' . $newline;
-			$html .= '            <input class="form-control" type="search" id="filter-linked-data-input" placeholder="Suchbegriff eingeben" aria-label="Liste durchsuchen">' . $newline;
+			$html .= '            <div class="input-group">' . $newline;
+			$html .= '            	<input class="form-control" type="search" id="filter-linked-data-input" placeholder="Suchbegriff eingeben" aria-label="Liste durchsuchen">' . $newline;
+			$html .= '              <button id="clear-filter-linked-data-input" class="btn btn-danger" type="button" title="Eingabe löschen" aria-label="Eingabe löschen" style="display:none;">leeren' . $newline;
+			$html .= '              </button>' . $newline;
+			$html .= '            </div>' . $newline;
 			$html .= '        </div>' . $newline;
 			$html .= '        <div id="filter-status" class="sr-only" aria-live="polite"></div>' . $newline;			
 			$html .= '        <ul class="my-filterable-list list-unstyled space-after">' . $newline;
@@ -3133,7 +3137,7 @@ switch ($f) {
 				// show service and collection info
 				// service
 				$html .= "";
-				$html .= '<div class="container py-4">' . $newline;
+				$html .= '<div class="container-lg py-4 px-3">' . $newline;
 				$html .= '    <div itemscope itemtype="http://schema.org/Dataset">' . $newline;
 				$html .= '        <h1 itemprop="name">' . $returnObject->title . '</h1>' . $newline;
 				$html .= '        <span itemprop="description">' . $returnObject->description . '</span>' . $newline;
@@ -3218,7 +3222,7 @@ switch ($f) {
 				// collection is selected - show items
 				// if (!isset($item) || $items == 'all') { //new for items and itemlists!
 				
-				$html .= '<div class="container py-4">' . $newline;
+				$html .= '<div class="container-lg py-4 px-3">' . $newline;
 				if (! isset ( $item ) || $items == "all") {
 					$html .= '    <div>' . $newline;
 					$html .= '        <h1>' . $returnObject->collectionTitle . ' (' . $numberOfObjects . ')' . '</h1>' . $newline;
@@ -3398,9 +3402,9 @@ switch ($f) {
 						$html .= '<div id="map"></div>' . $newline;
 					}
 				}
-				// Navigation elements
+				// Navigation, elements
 				$html .= '    <div class="row">' . $newline;
-				$html .= '        <div class="col-md-6">' . $newline;
+				$html .= '        <div class="col-md-12">' . $newline;
 				if (! isset ( $item ) || $items == 'all') {
 					// generate page navigation**********************************************************************************************************************************************************
 					$nav = "";
@@ -3477,7 +3481,7 @@ switch ($f) {
 							// inject semantic context if ldObject given
 							
 							$html .= '                        <div class="row my-1">' . $newline;
-							$html .= '                            <div class="col-md-6 font-weight-bold text-truncate" title="' . $attributeDescription . '">' . $attributeTitle . '</div>' . $newline;
+							$html .= '                            <div class="col-md-4 font-weight-bold text-truncate" title="' . $attributeDescription . '">' . $attributeTitle . '</div>' . $newline;
 							// semantic annotations
 							if (isset ( $ldObject->{'@context'}->{$key} )) {
 								$uri = $ldObject->{'@context'}->{$key};
@@ -3490,9 +3494,9 @@ switch ($f) {
 								$semAttribution = "";
 							}
 							if (gettype ( $value ) == "string") {
-								$html .= '                            <div class="col-md-6" ' . $semAttribution . '>' . string2html ( $value ) . '</div>' . $newline;
+								$html .= '                            <div class="col-md-8" ' . $semAttribution . '>' . string2html ( $value ) . '</div>' . $newline;
 							} else {
-								$html .= '                            <div class="col-md-6" ' . $semAttribution . '>' . json_encode ( $value ) . '</div>' . $newline;
+								$html .= '                            <div class="col-md-8" ' . $semAttribution . '>' . json_encode ( $value ) . '</div>' . $newline;
 							}
 							$html .= '                        </div>' . $newline;
 						}
@@ -3542,7 +3546,7 @@ switch ($f) {
 							$attributeDescription = $attributeTitle;
 						}
 						$html .= '                        <div class="row my-1">' . $newline;
-						$html .= '                            <div class="col-md-6 font-weight-bold text-truncate" title="' . $attributeDescription . '">' . $attributeTitle . '</div>' . $newline;
+						$html .= '                            <div class="col-md-3 font-weight-bold text-truncate" title="' . $attributeDescription . '">' . $attributeTitle . '</div>' . $newline;
 						// semantic annotations - if json-ld is will not be evaluated!
 						/*if (isset ( $ldObject->{'@context'}->{$key} )) {
 							$uri = $ldObject->{'@context'}->{$key};
@@ -3556,9 +3560,9 @@ switch ($f) {
 						}*/
 						$semAttribution = "";
 						if (gettype ( $value ) == "string") {
-							$html .= '                            <div class="col-md-6" ' . $semAttribution . '>' . string2html ( $value ) . '</div>' . $newline;
+							$html .= '                            <div class="col-md-9" ' . $semAttribution . '>' . string2html ( $value ) . '</div>' . $newline;
 						} else {
-							$html .= '                            <div class="col-md-6" ' . $semAttribution . '>' . json_encode ( $value ) . '</div>' . $newline;
+							$html .= '                            <div class="col-md-9" ' . $semAttribution . '>' . json_encode ( $value ) . '</div>' . $newline;
 						}
 						$html .= '                        </div>' . $newline;
 					}
@@ -3724,7 +3728,7 @@ switch ($f) {
 		// ************************************************************************************************************************************
 		// footer
 		$html .= '<footer class="footer bg-light py-4 d-flex flex-column justify-content-around align-items-center">' . $newline;
-		$html .= '    <div class="container d-flex flex-row justify-content-between align-items-center w-100">' . $newline;
+		$html .= '    <div class="container-lg px-3 d-flex flex-row justify-content-between align-items-center w-100">' . $newline;
 		$html .= '        <span>' . $newline;
 		$html .= '            <span class="text-muted small mr-2">powered by</span>' . $newline;
 		$html .= '            <a class="navbar-brand" href="https://github.com/GDI-HE" target="_blank">Geoportal-Hessen</a>' . $newline;
@@ -3738,6 +3742,79 @@ switch ($f) {
 		$html .= '    </div>' . $newline;
 		$html .= '</footer>' . $newline;
 		// ************************************************************************************************************************************
+		// send iframe height to parent so the parent can resize the iframe dynamically
+		$jsPostMessage = <<<'JSP'
+<script>
+(function(){
+        function getParentOrigin(){
+                try{ if(document.referrer){ return (new URL(document.referrer)).origin; } }catch(e){}
+                return "*"; // fallback - parent should validate origin
+        }
+        var __ldp_last_sent = 0;
+        function sendHeight(){
+                try{
+                        var bodyScroll = document.body.scrollHeight || 0;
+                        var docScroll = document.documentElement.scrollHeight || 0;
+                        var clientH = document.documentElement.clientHeight || 0;
+                        var rectH = (document.body.getBoundingClientRect && document.body.getBoundingClientRect().height) || 0;
+                        // Prefer body/rect measurements which typically reflect the rendered content height
+                        var h = Math.max(bodyScroll, rectH);
+                        // If that yields nothing sensible, fall back to client or doc heights
+                        if(!h || isNaN(h) || h < 50){ h = Math.max(clientH, docScroll, bodyScroll, rectH); }
+                        h = Math.round(h);
+                        // only send when height changed significantly to avoid resize feedback loops
+                        if(Math.abs(h - __ldp_last_sent) < 20) return;
+                        __ldp_last_sent = h;
+                        parent.postMessage({type: "linkedDataProxyHeight", height: h}, getParentOrigin());
+                }catch(e){}
+        }
+        var __ldp_timer = null;
+        function debounceSend(){ clearTimeout(__ldp_timer); __ldp_timer = setTimeout(sendHeight, 150); }
+        // send initial height as soon as DOM is ready
+        if(document.readyState === "complete" || document.readyState === "interactive"){ sendHeight(); } else { document.addEventListener("DOMContentLoaded", sendHeight); }
+        // observe layout changes that affect height
+        try{
+                var ro = new ResizeObserver(debounceSend); ro.observe(document.documentElement); ro.observe(document.body);
+        }catch(e){}
+        try{
+                var __ldp_last_measure_time = 0;
+                function sendMeasurementThrottled(){
+                        try{
+                                var now = Date.now();
+                                if(now - __ldp_last_measure_time < 1000) return; // at most once per second
+                                __ldp_last_measure_time = now;
+                                var h1 = document.body.scrollHeight || 0;
+                                var h2 = document.documentElement.scrollHeight || 0;
+                                var client = document.documentElement.clientHeight || 0;
+                                var offset = document.body.offsetHeight || 0;
+                                var rect = document.body.getBoundingClientRect();
+                                parent.postMessage({type: 'linkedDataProxyMeasurement', measurement: {bodyScroll: h1, docScroll: h2, client: client, offset: offset, rectH: rect.height, timestamp: now}}, getParentOrigin());
+                        }catch(e){}
+                }
+                var mo = new MutationObserver(function(m){ debounceSend(); sendMeasurementThrottled(); });
+                mo.observe(document.body, {childList:true, subtree:true, attributes:true});
+        }catch(e){}
+        window.addEventListener("resize", debounceSend);
+        // also send height after all images/fonts load on window load
+        window.addEventListener("load", function(){ setTimeout(sendHeight, 100); });
+})();
+document.addEventListener("DOMContentLoaded", function() {
+    var input = document.getElementById("filter-linked-data-input");
+    var btn = document.getElementById("clear-filter-linked-data-input");
+    function toggleButton() {
+        btn.style.display = input.value.length > 0 ? "block" : "none";
+    }
+    input.addEventListener("input", toggleButton);
+    btn.addEventListener("click", function() {
+        input.value = "";
+        btn.style.display = "none";
+        input.dispatchEvent(new Event("input")); // optional: trigger event for other listeners
+    });
+    toggleButton();
+});
+</script>
+JSP;
+		$html .= $jsPostMessage;
 		$html .= '</body>' . $newline;
 		$html .= '</html>' . $newline;
 		//
