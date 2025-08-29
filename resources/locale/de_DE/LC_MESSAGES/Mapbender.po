@@ -4456,3 +4456,8 @@ msgstr "Ein Gastnutzer ist nicht berechtigt Daten herunterzuladen!"
 msgid "Dataset not found in catalogue!"
 msgstr "Datensatz wurde nicht im Katalog gefunden!"
 
+msgid "Collection"
+msgstr "Gruppe"
+
+msgid "Open in Mapclient"
+msgstr "Im Kartenclient anzeigen"
