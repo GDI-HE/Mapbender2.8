@@ -36,11 +36,12 @@ class SpatialDataCache():
     :type catalogue_uri: str
     """
 
-    def __init__(self, data_configuration:dict, area_of_interest_geojson:str, catalogue_uris:list, output_filename:str = False, output_folder:str = False):
+    def __init__(self, data_configuration:dict, area_of_interest_geojson:str, catalogue_uris:list, output_filename:str = False, output_folder:str = False, datasets_to_exclude:list = None):
         """Constructor method
         """
         self.data_configuration = data_configuration
         self.area_of_interest_geojson = area_of_interest_geojson
+        self.datasets_to_exclude = datasets_to_exclude
         # initially use first entry of catalogue list
         self.catalogue_uris = catalogue_uris
         self.catalogue_uri = self.catalogue_uris[0]
@@ -649,7 +650,10 @@ class SpatialDataCache():
                         #    log.info('single bbox numberMatched: ' + str(json_result['numberMatched']))
                         #if 'numberReturned' in json_result.keys():
                         #    log.info('single bbox numberReturned:' + str(json_result['numberReturned']))
-                        number_matched = int(json_result['numberMatched'])
+                        if 'numberMatched' in json_result.keys():
+                            number_matched = int(json_result['numberMatched'])
+                        else:
+                            number_matched = 0
                         if number_matched < self.max_features_oaf:
                             bboxes_new.append(bbox)
                         else:
@@ -662,7 +666,7 @@ class SpatialDataCache():
                                 bboxes_new.append(sub_bbox)
                 else:
                     geom_box = box(polygon_box[0], polygon_box[1], polygon_box[2], polygon_box[3])
-                    bboxes_new.append(geom_box)
+                    bboxes.append(geom_box)
             else:
                 geom_box = box(polygon_box[0], polygon_box[1], polygon_box[2], polygon_box[3])
                 bboxes.append(geom_box)
@@ -966,7 +970,10 @@ class SpatialDataCache():
                 services = []
                 if intersects(polygon, bbox_geom):
                     #log.info("Try to download " + metadata_info['title'] + " - type: " + dataset['type'] + " - sdi: " + str(metadata_info['spatial_dataset_identifier']))
-                    services = self.get_coupled_services(str(metadata_info['spatial_dataset_identifier']), str(metadata_info['fileidentifier']))
+                    if self.datasets_to_exclude and dataset['resourceidentifier'] not in self.datasets_to_exclude:
+                        services = self.get_coupled_services(str(metadata_info['spatial_dataset_identifier']), str(metadata_info['fileidentifier']))
+                    else: 
+                        downloadable_dataset['error_messages'].append('Dataset should be excluded from download by configuration!')
                 else :
                     # unset fileidentifier because it does not make sense to download this dataset 
                     # downloadable_dataset['fileidentifier'] = ''
@@ -1052,7 +1059,11 @@ class SpatialDataCache():
                 download_process_metadata = {}
                 start_time_services_metadata = time.time()
                 services = []
-                services = self.get_coupled_services(str(metadata_info['spatial_dataset_identifier']), str(metadata_info['fileidentifier']))
+                # only resolve services, if dataset should not be excluded
+                if self.datasets_to_exclude and dataset['resourceidentifier'] not in self.datasets_to_exclude:
+                    services = self.get_coupled_services(str(metadata_info['spatial_dataset_identifier']), str(metadata_info['fileidentifier']))
+                else: 
+                    downloadable_dataset['error_messages'].append('Dataset should be excluded from download by configuration!')
                 downloadable_dataset['time_to_resolve_services'] = str(time.time() - start_time_services_metadata)
                 log.info("number of found services: " + str(len(services)))
                 # debug - show service information

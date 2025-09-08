@@ -481,6 +481,62 @@ if (DEFINED("SEARCH_LOG") && SEARCH_LOG === true) {
     $admin->logSearchInterfaceUsage ($_SERVER['HTTP_REFERER'], $searchURL, $searchText, $_SERVER['HTTP_USER_AGENT'], $catalogueId);
 }
 
+/*
+Function to get the right service access url from an array of urls which was found in a metdata record
+*/
+function getServiceUrl($mdServiceType, $mdServiceTypeVersion, $accessUrls) {
+	if (is_array($accessUrls)) {
+		if (in_array(strtoupper($mdServiceType), array('VIEW','OGC:WMS','WMS','PREDEFINED ATOM','DOWNLOAD','WFS','ATOM'))) {
+			if (in_array(strtoupper($mdServiceType), array('PREDEFINED ATOM','DOWNLOAD','WFS','ATOM')) || in_array(strtoupper($mdServiceTypeVersion), array('PREDEFINED ATOM','DOWNLOAD','WFS','ATOM'))) {
+				if (in_array(strtoupper($mdServiceType), array('PREDEFINED ATOM','ATOM')) || in_array(strtoupper($mdServiceTypeVersion), array('PREDEFINED ATOM','ATOM'))) {
+					//return first entry as atom feed access url
+					return $accessUrls[0];
+				} else {
+					//check for WFS
+					foreach ($accessUrls as $url) {
+						$pos = strpos(strtolower($url), 'service=wfs');
+						if ($pos !== false) {
+							$accessUrl = $url; 
+							$accessUrlFound = true;
+							break;
+						}
+					}
+					if ($accessUrlFound) {
+						return $accessUrl;
+					} else {
+						return $accessUrls[0];
+					}
+				}
+			} else {
+				//check for WMS
+				foreach ($accessUrls as $url) {
+					$pos = strpos(strtolower($url), 'service=wms');
+					if ($pos !== false) {
+						$accessUrl = $url; 
+						$accessUrlFound = true;
+						break;
+					}
+				}
+				if ($accessUrlFound) {
+					return correctWmsUrl($accessUrl);
+				} else {
+					return correctWmsUrl($accessUrls[0]);
+				}
+			}
+		} else {
+			if ($accessUrls == "" || count($accessUrls) == 0) {
+				return null;
+			} else {
+				return $accessUrls[0];
+			}
+		}
+	} else {
+		//only one option ;-)
+		return (string)$accessUrls;
+	}
+}
+
+
 //************************************************************************************
 //build query - one solution is combining all textfilter with single <And> tags, other solution maybe like filter as "*searchText1*searchText2*searchText3*"
 //single leads to a lower amount of results ! - mmh - how does the filter will be evaluated?
@@ -962,11 +1018,16 @@ foreach ($searchResourcesArray as $searchResource) {
 			//service access url
 			//first read the inspire kind of implementation of the access to capabilities documents
 			$accessUrl = $cswClient->operationResult->xpath('/csw:GetRecordsResponse/csw:SearchResults/gmd:MD_Metadata['.$k.']/gmd:distributionInfo/gmd:MD_Distribution/gmd:transferOptions/gmd:MD_DigitalTransferOptions/gmd:onLine/gmd:CI_OnlineResource/gmd:linkage/gmd:URL');
-			if ($accessUrl[0] == '') {
+			
+			if ($searchResource == 'service') {
+				$accessUrl = getServiceUrl($typeOfService, $typeOfServiceVersion, $accessUrl);
+			}
+			$e = new mb_exception("accessUrl 1: ". json_encode($accessUrl));
+			if ($accessUrl == '' || $accessUrl == null) {
 				//search for another accessUrl - as defined in csw ap iso
 				$accessUrl = $cswClient->operationResult->xpath('/csw:GetRecordsResponse/csw:SearchResults/gmd:MD_Metadata['.$k.']/gmd:identificationInfo/srv:SV_ServiceIdentification/srv:containsOperations/srv:SV_OperationMetadata/srv:connectPoint/gmd:CI_OnlineResource/gmd:linkage/gmd:URL');
+				$accessUrl = getServiceUrl($typeOfService, $typeOfServiceVersion, $accessUrl);
 			}
-			$accessUrl = $accessUrl[0];
 			$isViewService = false;
 			$isDownloadService = false;
 			$typeOfServiceUpper = strtoupper($typeOfService);
@@ -979,26 +1040,11 @@ foreach ($searchResourcesArray as $searchResource) {
 				$isDownloadService = true;
 				//echo "view service identified<br>";
 			}
-			//check if service is view or wms and correct it for wms 1.1.1 capabilities request
-			if ($searchResource == 'service' && $isViewService) {
-				if ($accessUrl != '') {
-					$accessUrl = correctWmsUrl($accessUrl);
-				} else {
-					$accessUrl = '';
-				}
-			} else {
-				//echo "<b>no</b> view service identified<br>";
-				$isViewService = false;
-			}
 			if ($isViewService == true) {
-				/*switch ($typeOfService) {
-					case "":
-						break;
-					case "":
-						break;
-				}*/
 				$resultObject->{$searchResource}->srv[$k-1]->showMapUrl = $accessUrl;
 			}
+			//check accessUrl for dls later
+
 			if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') {
 				$scheme = "https";
 			} else {
