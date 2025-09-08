@@ -1305,9 +1305,7 @@ function createListOfGeometries(){
 function displayPopup(geom){
 	geomArray = geom;
 
-	if(!parent.$("#resultList")){
-		return;
-	}
+	if (parent.$ && parent.$('#resultList') && parent.$('#resultList').length) {
 	var resultList = parent.$('#resultList').mapbender();
 	resultList.clear();
 	resultList.setTitle(global_wfsConfObj[global_selectedWfsConfId].wfs_conf_abstract);
@@ -1315,7 +1313,7 @@ function displayPopup(geom){
 	resultList.addFeatureCollection(geom);
 	resultList.show();
 	return;
-
+	}
 	var contentHtml = "<?php echo _mb("No result"); ?>";
 	if (geomArray != null && geomArray.count() > 0){
 		contentHtml = createListOfGeometries();

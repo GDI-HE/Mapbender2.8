@@ -31,7 +31,7 @@ var ConfTree = function(o){
 		wfsconfs = wfsconfs.concat(getwfsConfIdString.split(','));
 	}
 	wfsConfIdString = wfsconfs.join(',');
-	var currentWFSConf = {};
+	var currentWFSConf = [];
 	if(Mapbender.modules.loadwmc){
 		Mapbender.modules.loadwmc.events.loaded.register(function (obj) {
 			if (obj.extensionData && obj.extensionData.WFSCONFIDSTRING) {
@@ -67,8 +67,8 @@ var ConfTree = function(o){
     }
 
 	var $wfsConfDialog = $("<div></div>").dialog({
-		title: "WFS-Suchmodul",
-		dialogClass: "dialog_flst",
+                title: "WFS-Suchmodul",
+                dialogClass: "dialog_flst",
 		width: 260,
 		height: 390,
 		position: [o.$target.offset().left+20, o.$target.offset().top+80],
@@ -82,6 +82,35 @@ var ConfTree = function(o){
             var overlay = createOverlayForDialog($(this));
         }
 	});
+
+	/**
+	 * Helper: open a wfsConf (shared logic used by dialog links and external buttons)
+	 * @param {Object} wfsConf - configuration object with id and type
+	 * @param {Event} evt - optional event to preventDefault on
+	 */
+	function openWfsConf(wfsConf, evt){
+		if(!wfsConf){ return false; }
+		var querystring = 'wfsConfId=' + wfsConf.id + '&e_id_css=' + o.id + '&e_target=' + o.target;
+		switch (parseInt(wfsConf.type, 10)) {
+			/* search */
+			case 0:
+				$("#menuitem_flst").addClass('menuitem_flst_on');
+				$('#toolsContainer').hide();
+				$('a.toggleToolsContainer').removeClass('activeToggle');
+				/* fall through to download if applicable */
+			case 2:
+				var $iframe = $('<iframe name="' + o.id + '_" style="border:none; width: 100%; height: calc(100% - 3px);" src="../javascripts/mod_wfsGazetteerEditor_client_flst.php?' + querystring + '"></iframe>');
+				$wfsConfDialog.empty();
+				$wfsConfDialog.append($iframe);
+				$wfsConfDialog.dialog("open");
+				break;
+			/* digitize */
+			case 1:
+				break;
+		}
+		if(evt && evt.preventDefault){ evt.preventDefault(); }
+		return false;
+	}
 	$("button.toggle",$confTree).live('click', function(){
 		if($(this).parent().hasClass("open")){
 			$(this).parent().removeClass("open");
@@ -146,31 +175,8 @@ var ConfTree = function(o){
 			})(aWFSConf[i]));
 
 			$wfsconfEntry.find("a.dialogopen").click((function(wfsConf){ 
-				return function(){
-
-				var querystring = 'wfsConfId='+wfsConf.id+'&e_id_css='+o.id+'&e_target='+o.target;
-				switch(parseInt(wfsConf.type,10)){
-
-					/* search */
-					case 0:
-						$("#menuitem_flst").addClass('menuitem_flst_on');
-						$('#toolsContainer').hide() && $('a.toggleToolsContainer').removeClass('activeToggle'); 
-					/* download */
-					case 2: 
-						var $iframe = $('<iframe name="'+o.id+'_" style="border:none; width: 100%; height: calc(100% - 3px);" src="../javascripts/mod_wfsGazetteerEditor_client_flst.php?'+querystring+'"></iframe>');
-						$wfsConfDialog.empty();
-						$wfsConfDialog.append($iframe);	
-						$wfsConfDialog.dialog("open");
-					break;
-
-					/* digitize */
-					case 1:
-					break;
-				}
-
-				event.preventDefault();
-				return false;
-
+				return function(evt){
+					return openWfsConf(wfsConf, evt);
 				};
 			})(aWFSConf[i]));
 			$wfsconfEntry.find("button.remove").click(function(){
@@ -178,12 +184,6 @@ var ConfTree = function(o){
 				
 				var wfsconfId = $(this).parent().data("wfsconfId");
 				// if this was the last entry in the featuregroup, remove it completely	...
-//				if($(this).parent().siblings().size() == 0){
-//					$(this).parent().parent().parent().remove();
-//				}else{
-//					$(this).parent().remove();
-//				}
-				
 				var newWFSConf = [];
 				for (var i in currentWFSConf){
 					if(currentWFSConf[i].id != wfsconfId){
@@ -230,6 +230,44 @@ var ConfTree = function(o){
 			},
 			callback: function(result,success,message){
 				that.reset(result);
+			}
+		});
+		req.send();
+	});
+
+	// Document-level helper: open a specific wfsConf by id
+	// Usage: add class "open-wfsconf-by-id" and data attribute "data-wfsconf-id" to a button/link
+	$(document).delegate('.open-wfsconf-by-id', 'click', function(evt){
+		// sometimes the actual clicked element is a child (svg/text) so try multiple ways to get the id
+		var $elem = $(this);
+		var id = $elem.attr('data-wfsconf-id'); // read raw attribute first
+		if(!id){
+			// fallback: maybe the click was on a child and delegation bound this differently, try closest from event target
+			var $closest = $(evt.target).closest('.open-wfsconf-by-id');
+			if($closest.length){
+				id = $closest.attr('data-wfsconf-id');
+			}
+		}
+		if(!id){ return; }
+		// try to find in currentWFSConf
+		for(var i=0;i<currentWFSConf.length;i++){
+			if(currentWFSConf[i] && String(currentWFSConf[i].id) === String(id)){
+				return openWfsConf(currentWFSConf[i], evt);
+			}
+		}
+		// not found locally: request single config from server
+		var req = Mapbender.Ajax.Request({
+			url: "../php/mod_wfs_conf_server.php",
+			method: "getWfsConfsFromId",
+			parameters: { wfsConfIdString: id },
+			callback: function(result, success, message){
+				if(Array.isArray(result) && result.length>0){
+					// append to currentWFSConf for future reuse
+					currentWFSConf = currentWFSConf.concat(result);
+					openWfsConf(result[0], evt);
+				} else {
+					// no result
+				}
 			}
 		});
 		req.send();
