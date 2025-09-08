@@ -77,10 +77,13 @@ var ConfTree = function(o){
 			$("#menuitem_flst").removeClass("menuitem_flst_on");
 			$("#mod_gaz_drawstandingHighlightWFS0").remove();
 			$(this).parent().find('.dialog-overlay').remove();
+			$("#extraButtonFlstSearch").removeClass("menuitem_flst_on").css("background-image", "");
 		},
 		open: function() {
 			// Overlay-Div erstellen und hinzufügen
 			var overlay = createOverlayForDialog($(this));
+			$("#extraButtonFlstSearch").addClass("menuitem_flst_on");
+			$("#extraButtonFlstSearch")[0].style.setProperty("background-image", "none", "important");
 		}
 	});
 
