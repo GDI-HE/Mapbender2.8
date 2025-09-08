@@ -182,12 +182,16 @@ var JsonAutocompleteGazetteer = function() {
 			$("#symboldForInputId").attr({'src':options.gazetteerFrontImageOn}).hide();
 			$("#symbolForClearInputId").show();
 			$("#symbolForInputCloseId").show();
+			$("#coordsLookUp_Button").css("display", "inline-flex");
+			$("#extraButtonFlstSearch").css("display", "inline-flex");
 		} else {
 			$("#geographicName").hide();
 			$("#helpSymbolId").hide();
 			$("#symboldForInputId").attr({'src':options.gazetteerFrontImageOff}).show();
 			$("#symbolForClearInputId").hide();
 			$("#symbolForInputCloseId").hide();
+			$("#coordsLookUp_Button").hide();
+			$("#extraButtonFlstSearch").hide();
 		}
 	}
 
