@@ -74,13 +74,14 @@ var ConfTree = function(o){
 		position: [o.$target.offset().left+20, o.$target.offset().top+80],
 		autoOpen: false,
 		close: function() {
-          $("#menuitem_flst").removeClass("menuitem_flst_on");
-          $("#mod_gaz_drawstandingHighlightWFS0").remove();
-        },
+			$("#menuitem_flst").removeClass("menuitem_flst_on");
+			$("#mod_gaz_drawstandingHighlightWFS0").remove();
+			$(this).parent().find('.dialog-overlay').remove();
+		},
 		open: function() {
-            // Overlay-Div erstellen und hinzufügen
-            var overlay = createOverlayForDialog($(this));
-        }
+			// Overlay-Div erstellen und hinzufügen
+			var overlay = createOverlayForDialog($(this));
+		}
 	});
 
 	/**
