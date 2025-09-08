@@ -83,7 +83,8 @@ var ConfTree = function(o){
 			// Overlay-Div erstellen und hinzufügen
 			var overlay = createOverlayForDialog($(this));
 			$("#extraButtonFlstSearch").addClass("menuitem_flst_on");
-			$("#extraButtonFlstSearch")[0].style.setProperty("background-image", "none", "important");
+			var btn = $("#extraButtonFlstSearch")[0];
+			btn && btn.style.setProperty("background-image", "none", "important");
 		}
 	});
 
