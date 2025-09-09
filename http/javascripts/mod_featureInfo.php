@@ -299,11 +299,11 @@ function featureInfoDialog(featureInfo, dialogPosition, offset, printInfo) {
     }
     var $iframe = $("<iframe>")
             .attr("frameborder", 0)
-            .attr("height", "100%")
             .attr("width", "100%")
             .attr("id", "featureInfo")
             .attr("title", title)
-            .attr("src", featureInfo.request)
+            .attr("style", "height:calc(100% - 3px);")
+            .attr("src", featureInfo.request);
     return makeDialog($("<div>").append($iframe), title, dialogPosition, offset, printInfo);
 }
 
