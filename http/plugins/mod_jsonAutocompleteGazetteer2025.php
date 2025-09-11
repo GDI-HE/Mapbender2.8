@@ -205,7 +205,7 @@ var JsonAutocompleteGazetteer = function() {
 			//this.formContainer.draggable();//problem with print module
 		}
 		this.symbolForInput = $(document.createElement('a')).appendTo(this.formContainer);
-		this.symbolForInput.text('Adressen');
+		this.symbolForInput.text('Ort suchen?');
 		this.symbolForInput.attr({'id':'symboldForInputId'});
 		this.symbolForInput.attr({'title':'<?php echo _mb('Address'); ?>'});
 		$("#symboldForInputId").click(function() {

@@ -693,7 +693,7 @@ var KmlTree = function(o) {
         if (obj.refreshing) {
             $KMLfolder.find('ul li[title="' + title + '"]').remove();
         }
-        abbrevTitle = title.length < 20 ? title : title.substr(0, 17) + "...";
+        abbrevTitle = title.length < 50 ? title : title.substr(0, 47) + "...";
         $kmlEntry = $('<li title="' + title + '" class="open feature-container"><button class="digitize-menu-arrow"></button><button class="toggle" name="toggle" value="toggle" ></button><input type="checkbox"' + checked + '/><a href="#" style="margin-left:2px;">' + abbrevTitle + '</a></li>');
         $KMLfolder.children("ul").append($kmlEntry);
 
@@ -749,7 +749,7 @@ var KmlTree = function(o) {
             // title = obj.data.features[i].properties.name;
 
 
-            abbrevTitle = title.length < 20 ? title : title.substr(0, 17) + "...";
+            abbrevTitle = title.length < 50 ? title : title.substr(0, 47) + "...";
             var displ = obj.data.features[i].display === true || obj.data.features[i].display === undefined;
             $feature = $('<li idx="' + i + '" title="' + title + '"><button class="digitize-menu-arrow"></button>' + toggle + '<input type="checkbox" ' + (displ ? 'checked="checked"' : '') + '/><div class="style-preview" style="width: 20px; height: 20px; display: inline;"></div><a href="#" >' + abbrevTitle + '</a></li>');
             $featureList.append($feature);
