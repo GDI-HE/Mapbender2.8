@@ -623,6 +623,7 @@ var KmlTree = function(o) {
                 // check the features for properties - old handling!!!!!
                 //data = setFeatureAttr(data);
                 //Ticket #8549: Added support for multipolygons in geojson-files
+                // Extended: also split MultiPoint features into individual Point features
                 if (data && data.type === "FeatureCollection" && Array.isArray(data.features)) {
                     // Collect new features and indices to remove
                     var featuresToAdd = [];
@@ -647,12 +648,32 @@ var KmlTree = function(o) {
                             });
                             indicesToRemove.push(idx);
                         }
+
+                        if (feature.geometry && feature.geometry.type === "MultiPoint") {
+                            feature.geometry.coordinates.forEach(function(pointCoords, i) {
+                                // Deep clone properties to avoid reference issues
+                                var newProperties = $.extend(true, {}, feature.properties);
+                                if (typeof newProperties.title === "string") {
+                                    newProperties.title = newProperties.title + " - Point " + (i + 1);
+                                }
+                                var newFeature = {
+                                    type: "Feature",
+                                    properties: newProperties,
+                                    geometry: {
+                                        type: "Point",
+                                        coordinates: pointCoords
+                                    }
+                                };
+                                featuresToAdd.push(newFeature);
+                            });
+                            indicesToRemove.push(idx);
+                        }
                     });
-                    // Remove MultiPolygon features (from last to first to keep indices valid)
+                    // Remove features we split (from last to first to keep indices valid)
                     indicesToRemove.sort(function(a, b) { return b - a; }).forEach(function(idx) {
                         data.features.splice(idx, 1);
                     });
-                    // Add new Polygon features
+                    // Add newly created features
                     data.features = data.features.concat(featuresToAdd);
                 }
 
