@@ -668,6 +668,25 @@ var KmlTree = function(o) {
                             });
                             indicesToRemove.push(idx);
                         }
+                        if (feature.geometry && feature.geometry.type === "MultiLineString") {
+                            feature.geometry.coordinates.forEach(function(lineCoords, i) {
+                                // Deep clone properties to avoid reference issues
+                                var newProperties = $.extend(true, {}, feature.properties);
+                                if (typeof newProperties.title === "string") {
+                                    newProperties.title = newProperties.title + " - LineString " + (i + 1);
+                                }
+                                var newFeature = {
+                                    type: "Feature",
+                                    properties: newProperties,
+                                    geometry: {
+                                        type: "LineString",
+                                        coordinates: lineCoords
+                                    }
+                                };
+                                featuresToAdd.push(newFeature);
+                            });
+                            indicesToRemove.push(idx);
+                        }
                     });
                     // Remove features we split (from last to first to keep indices valid)
                     indicesToRemove.sort(function(a, b) { return b - a; }).forEach(function(idx) {
