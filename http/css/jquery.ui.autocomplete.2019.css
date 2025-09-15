@@ -61,7 +61,9 @@ text-indent:-9999px}
 #geographicName:focus {
 	border: 1px solid #d62029;
 }
-
+#geographicName:focus-visible {
+	outline: none;
+}
 	/*Have to be edited in mod_jsonAutocompleteGazetteer_light.php*/
   
 #symboldForInputId {

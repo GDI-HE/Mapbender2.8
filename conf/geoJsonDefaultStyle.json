@@ -1,34 +1,42 @@
 {
-	"Polygon": {
+    "Polygon": {
         "stroke": "#555555",
         "stroke-opacity": "1",
-		"stroke-width":"2",
-		"fill":"#555555",
-		"fill-opacity":"0.5",
-		"title": "Polygon default title",
-		"description": "Polygon default description"
+        "stroke-width":"2",
+        "fill":"#555555",
+        "fill-opacity":"0.5",
+        "title": "Polygon default title",
+        "description": "Polygon default description"
     },
     "MultiPolygon": {
         "stroke": "#555555",
         "stroke-opacity": "1",
-		"stroke-width":"2",
-		"fill":"#555555",
-		"fill-opacity":"0.5",
-		"title": "MultiPolygon default title",
-		"description": "MultiPolygon default description"
+        "stroke-width":"2",
+        "fill":"#555555",
+        "fill-opacity":"0.5",
+        "title": "MultiPolygon default title",
+        "description": "MultiPolygon default description"
     },
-	"LineString": {
+    "LineString": {
         "stroke": "#555555",
         "stroke-opacity": "1",
-	    "stroke-width":"2",
-		"title": "LineString default title",
-		"description": "LineString default description"
+        "stroke-width":"2",
+        "title": "LineString default title",
+        "description": "LineString default description"
     },
-	"Point": {
+    "Point": {
         "marker-size":"24",
         "marker-symbol":"marker",
-	    "marker-color":"#7e7e7e",
-		"title": "Point default title",
-		"description": "Point default description"
+        "marker-color":"#7e7e7e",
+        "title": "Point default title",
+        "description": "Point default description"
+    },
+    "MultiPoint": {
+        "marker-size":"24",
+        "marker-symbol":"marker",
+        "marker-color":"#7e7e7e",
+        "title": "Multi Point default title",
+        "description": "Multi Point default description"
     }
 }
+
