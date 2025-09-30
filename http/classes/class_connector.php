@@ -26,6 +26,21 @@ require_once(dirname(__FILE__)."/../../core/globalSettings.php");
  */
 class connector {
 
+	// URL patterns to block and log
+	private static $blockedUrlPatterns = array(
+		'EXCEPTIONS=XML',
+		'version=1.3.0'
+	);
+	
+	// Enable/disable blocking functionality
+	private static $enableBlocking = false;
+	
+	// Enable/disable logging functionality  
+	private static $enableLogging = false;
+	
+	// Enable/disable debug logging of ALL requests (for testing)
+	private static $enableDebugLogging = false;
+
 	var $file;
 	private $connectionType;
 	public  $timeOut = 20;
@@ -64,6 +79,41 @@ class connector {
 	}
 
 	/**
+	 * Configure blocked URL patterns and settings
+	 * @param array $patterns Array of patterns to block
+	 * @param bool $enableBlocking Enable/disable blocking functionality
+	 * @param bool $enableLogging Enable/disable logging functionality
+	 * @param bool $enableDebugLogging Enable/disable debug logging of all requests
+	 */
+	public static function configureBlockedPatterns($patterns = null, $enableBlocking = null, $enableLogging = null, $enableDebugLogging = null) {
+		if ($patterns !== null) {
+			self::$blockedUrlPatterns = is_array($patterns) ? $patterns : array($patterns);
+		}
+		if ($enableBlocking !== null) {
+			self::$enableBlocking = (bool)$enableBlocking;
+		}
+		if ($enableLogging !== null) {
+			self::$enableLogging = (bool)$enableLogging;
+		}
+		if ($enableDebugLogging !== null) {
+			self::$enableDebugLogging = (bool)$enableDebugLogging;
+		}
+	}
+
+	/**
+	 * Get current blocked URL patterns configuration
+	 * @return array Current configuration
+	 */
+	public static function getBlockedPatternsConfig() {
+		return array(
+			'patterns' => self::$blockedUrlPatterns,
+			'blocking_enabled' => self::$enableBlocking,
+			'logging_enabled' => self::$enableLogging,
+			'debug_logging_enabled' => self::$enableDebugLogging
+		);
+	}
+
+	/**
 	 * Loads content from the given URL.
 	 */
 	public function load($url) {
@@ -76,6 +126,11 @@ class connector {
 		//$e = new mb_exception('file://'.str_replace('classes',ltrim(TMPDIR,'../'),dirname(__FILE__)).'/');
  		if (!preg_match($pattern,$testMatch)){
 			$e = new mb_exception('classes/class_connector.php: Access to resource not allowed!');
+			return false;
+		}
+
+		// Check for blocked URL patterns - this will throw exception if blocked
+		if (!$this->checkBlockedUrlPatterns($url)) {
 			return false;
 		}
 		//TODO: check if http is ok for all
@@ -221,6 +276,177 @@ class connector {
 			$e = new mb_exception("class_connector.php: invalid HTTP content type '" . $value . "'");
 			return false;
 		}
+	}
+
+	/**
+	 * Check if URL contains blocked patterns and handle accordingly
+	 * @param string $url The URL to check
+	 * @return bool Returns false if URL should be blocked, true otherwise
+	 */
+	private function checkBlockedUrlPatterns($url) {
+		// Debug logging for ALL requests (if enabled)
+		if (self::$enableDebugLogging) {
+			$backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+			$caller = $this->getCallerInfo($backtrace);
+			$this->logAllUrlAccess($url, $caller);
+		}
+
+		if (!self::$enableBlocking && !self::$enableLogging) {
+			return true;
+		}
+
+		foreach (self::$blockedUrlPatterns as $pattern) {
+			if (strpos($url, $pattern) !== false) {
+				// Get stack trace to identify calling script
+				$backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+				$caller = $this->getCallerInfo($backtrace);
+				
+				if (self::$enableLogging) {
+					$this->logBlockedUrlAccess($url, $pattern, $caller, $backtrace);
+				}
+				
+				if (self::$enableBlocking) {
+					$this->throwBlockedUrlException($url, $pattern, $caller);
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Extract caller information from backtrace
+	 * @param array $backtrace The debug backtrace
+	 * @return array Caller information
+	 */
+	private function getCallerInfo($backtrace) {
+		// Find the first non-connector class in the stack
+		foreach ($backtrace as $trace) {
+			if (isset($trace['file']) && 
+				strpos($trace['file'], 'class_connector.php') === false) {
+				return array(
+					'file' => $trace['file'],
+					'line' => isset($trace['line']) ? $trace['line'] : 'unknown',
+					'function' => isset($trace['function']) ? $trace['function'] : 'unknown',
+					'class' => isset($trace['class']) ? $trace['class'] : 'unknown'
+				);
+			}
+		}
+		return array(
+			'file' => 'unknown',
+			'line' => 'unknown', 
+			'function' => 'unknown',
+			'class' => 'unknown'
+		);
+	}
+
+	/**
+	 * Log blocked URL access attempt
+	 * @param string $url The blocked URL
+	 * @param string $pattern The matched pattern
+	 * @param array $caller Caller information
+	 * @param array $backtrace Full backtrace
+	 */
+	private function logBlockedUrlAccess($url, $pattern, $caller, $backtrace) {
+		$logMessage = "BLOCKED URL ACCESS DETECTED:\n";
+		$logMessage .= "URL: " . $url . "\n";
+		$logMessage .= "Matched Pattern: " . $pattern . "\n";
+		$logMessage .= "Calling Script: " . $caller['file'] . " (Line: " . $caller['line'] . ")\n";
+		$logMessage .= "Calling Function: " . $caller['class'] . "::" . $caller['function'] . "\n";
+		$logMessage .= "Timestamp: " . date('Y-m-d H:i:s') . "\n";
+		$logMessage .= "Stack Trace:\n";
+		
+		foreach ($backtrace as $i => $trace) {
+			if (isset($trace['file'])) {
+				$logMessage .= "#$i " . $trace['file'];
+				if (isset($trace['line'])) {
+					$logMessage .= "(" . $trace['line'] . ")";
+				}
+				if (isset($trace['class']) && isset($trace['function'])) {
+					$logMessage .= ": " . $trace['class'] . "::" . $trace['function'] . "()";
+				} elseif (isset($trace['function'])) {
+					$logMessage .= ": " . $trace['function'] . "()";
+				}
+				$logMessage .= "\n";
+			}
+		}
+		$logMessage .= "----------------------------------------\n";
+		
+		// Log to mb_exception (existing logging mechanism)
+		$e = new mb_exception($logMessage);
+		
+		// Optionally log to separate file
+		$this->writeToLogFile($logMessage);
+	}
+
+	/**
+	 * Write log message to file
+	 * @param string $message The message to log
+	 */
+	private function writeToLogFile($message) {
+		$logFile = dirname(__FILE__) . '/../../log/blocked_urls.log';
+		$logDir = dirname($logFile);
+		
+		// Create log directory if it doesn't exist
+		if (!is_dir($logDir)) {
+			@mkdir($logDir, 0755, true);
+		}
+		
+		// Write to log file
+		@file_put_contents($logFile, $message, FILE_APPEND | LOCK_EX);
+	}
+
+	/**
+	 * Log all URL access for debugging purposes
+	 * @param string $url The requested URL
+	 * @param array $caller Caller information
+	 */
+	private function logAllUrlAccess($url, $caller) {
+		$logMessage = "ALL URL ACCESS LOG:\n";
+		$logMessage .= "URL: " . $url . "\n";
+		$logMessage .= "Calling Script: " . $caller['file'] . " (Line: " . $caller['line'] . ")\n";
+		$logMessage .= "Calling Function: " . $caller['class'] . "::" . $caller['function'] . "\n";
+		$logMessage .= "Timestamp: " . date('Y-m-d H:i:s') . "\n";
+		$logMessage .= "----------------------------------------\n";
+		
+		// Write to separate debug log file
+		$this->writeToDebugLogFile($logMessage);
+	}
+
+	/**
+	 * Write debug log message to separate file
+	 * @param string $message The message to log
+	 */
+	private function writeToDebugLogFile($message) {
+		$logFile = dirname(__FILE__) . '/../../log/all_requests_debug.log';
+		$logDir = dirname($logFile);
+		
+		// Create log directory if it doesn't exist
+		if (!is_dir($logDir) && is_writable(dirname($logDir))) {
+			@mkdir($logDir, 0755, true);
+		}
+		
+		// Write to log file
+		@file_put_contents($logFile, $message, FILE_APPEND | LOCK_EX);
+	}
+
+	/**
+	 * Throw exception for blocked URL access
+	 * @param string $url The blocked URL
+	 * @param string $pattern The matched pattern
+	 * @param array $caller Caller information
+	 */
+	private function throwBlockedUrlException($url, $pattern, $caller) {
+		// Set HTTP status code to 500
+		if (!headers_sent()) {
+			http_response_code(500);
+		}
+		
+		$errorMessage = "URL access blocked by security policy. ";
+		$errorMessage .= "Pattern '$pattern' detected in URL. ";
+		$errorMessage .= "Called from: " . $caller['file'] . " (Line: " . $caller['line'] . ")";
+		
+		throw new Exception($errorMessage, 500);
 	}
 
 	private function getCURL($url){
