@@ -1265,7 +1265,7 @@ SQL;
 			break;
 		}
 		//Pull download options for specific dataset from mapbender database and show them
-		$downloadOptionsConnector = new connector("http://localhost".$_SERVER['SCRIPT_NAME']."/../mod_getDownloadOptions.php?id=".$row["uuid"]);
+		$downloadOptionsConnector = new connector("http://localhost".dirname($_SERVER['SCRIPT_NAME'])."/mod_getDownloadOptions.php?id=".$row["uuid"]);
 		$downloadOptions = json_decode($downloadOptionsConnector->file);
 		//var_dump($downloadOptions);
 		if (defined("MAPBENDER_PATH") && MAPBENDER_PATH != '') { 
@@ -1406,7 +1406,7 @@ if ($resource == 'wfs' or $resource == 'featuretype' or $resource == 'wfs-conf')
 }
 if ($resource == 'wmc' ) {
 	$e = new mb_notice("mod_showMetadata: wmcid for disclaimer: ".$resourceMetadata['contentid']);
-	$touWmcConnector = new connector($mapbenderProtocol."localhost".$_SERVER['SCRIPT_NAME']."/../mod_getWmcDisclaimer.php?&id=".$resourceMetadata['contentid']."&languageCode=".$languageCode."&hostName=".$hostName);
+	$touWmcConnector = new connector($mapbenderProtocol."localhost".dirname($_SERVER['SCRIPT_NAME'])."/mod_getWmcDisclaimer.php?&id=".$resourceMetadata['contentid']."&languageCode=".$languageCode."&hostName=".$hostName);
 	$tou = $touWmcConnector->file;
 	$tou = str_replace("<div style='padding:10px;display:block;text-align:center;'><a href='javascript:window.close()'>Fenster schliessen</a></div>", "", $tou);
 
