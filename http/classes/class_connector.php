@@ -28,15 +28,31 @@ class connector {
 
 	// URL patterns to block and log
 	private static $blockedUrlPatterns = array(
-		'EXCEPTIONS=XML',
-		'version=1.3.0'
+		'version=1.4.0',
+		
+		// Intelligent patterns for malicious URLs
+		'&http://',           // URL injection after parameter
+		'&https://',          // URL injection after parameter
+		'../',  
+		'%2e%2e%2f',         // URL-encoded directory traversal
+		'%2e%2e/',           // Mixed encoded directory traversal
+		
+		// Malicious domain patterns 
+		'xn--',              // IDN-encoded domains (often malicious)
+		'.pw/',              // Suspicious TLD (Palau, often abused)
+		'sul.pw',            // Specific malicious domain
+		'txtpdf.pro',        // Fake PDF service domain
+		'qfkavl.',           // Random subdomain pattern
+		'frbejqcdku',        // Random path pattern
+		'ridfq53ry',         // Random alphanumeric pattern
+		'cuxhorvyw.htm',     // Random filename pattern
 	);
 	
 	// Enable/disable blocking functionality
-	private static $enableBlocking = false;
+	private static $enableBlocking = true;
 	
 	// Enable/disable logging functionality  
-	private static $enableLogging = false;
+	private static $enableLogging = true;
 	
 	// Enable/disable debug logging of ALL requests (for testing)
 	private static $enableDebugLogging = false;
@@ -295,6 +311,21 @@ class connector {
 			return true;
 		}
 
+		// Check for multiple question marks (URL injection pattern)
+		if (substr_count($url, '?') > 1) {
+			$backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+			$caller = $this->getCallerInfo($backtrace);
+			
+			if (self::$enableLogging) {
+				$this->logBlockedUrlAccess($url, 'multiple_question_marks', $caller, $backtrace);
+			}
+			
+			if (self::$enableBlocking) {
+				$this->throwBlockedUrlException($url, 'multiple_question_marks', $caller);
+				return false;
+			}
+		}
+
 		foreach (self::$blockedUrlPatterns as $pattern) {
 			if (strpos($url, $pattern) !== false) {
 				// Get stack trace to identify calling script
@@ -348,9 +379,11 @@ class connector {
 	 * @param array $backtrace Full backtrace
 	 */
 	private function logBlockedUrlAccess($url, $pattern, $caller, $backtrace) {
-		$logMessage = "BLOCKED URL ACCESS DETECTED:\n";
+		$action = self::$enableBlocking ? "BLOCKED" : "DETECTED";
+		$logMessage = "SECURITY PATTERN $action:\n";
 		$logMessage .= "URL: " . $url . "\n";
 		$logMessage .= "Matched Pattern: " . $pattern . "\n";
+		$logMessage .= "Action: " . (self::$enableBlocking ? "Blocked" : "Logged only") . "\n";
 		$logMessage .= "Calling Script: " . $caller['file'] . " (Line: " . $caller['line'] . ")\n";
 		$logMessage .= "Calling Function: " . $caller['class'] . "::" . $caller['function'] . "\n";
 		$logMessage .= "Timestamp: " . date('Y-m-d H:i:s') . "\n";
@@ -372,19 +405,16 @@ class connector {
 		}
 		$logMessage .= "----------------------------------------\n";
 		
-		// Log to mb_exception (existing logging mechanism)
-		$e = new mb_exception($logMessage);
-		
-		// Optionally log to separate file
-		$this->writeToLogFile($logMessage);
+		// Write to unified security log file
+		$this->writeToSecurityLogFile($logMessage);
 	}
 
 	/**
-	 * Write log message to file
+	 * Write security event to unified log file
 	 * @param string $message The message to log
 	 */
-	private function writeToLogFile($message) {
-		$logFile = dirname(__FILE__) . '/../../log/blocked_urls.log';
+	private function writeToSecurityLogFile($message) {
+		$logFile = dirname(__FILE__) . '/../../log/security_patterns.log';
 		$logDir = dirname($logFile);
 		
 		// Create log directory if it doesn't exist
@@ -392,8 +422,9 @@ class connector {
 			@mkdir($logDir, 0755, true);
 		}
 		
-		// Write to log file
+		// Write to log file with secure permissions
 		@file_put_contents($logFile, $message, FILE_APPEND | LOCK_EX);
+		@chmod($logFile, 0640); // Readable only by owner and group
 	}
 
 	/**
@@ -418,7 +449,7 @@ class connector {
 	 * @param string $message The message to log
 	 */
 	private function writeToDebugLogFile($message) {
-		$logFile = dirname(__FILE__) . '/../../log/all_requests_debug.log';
+		$logFile = dirname(__FILE__) . '/../../log/debug_all_requests.log';
 		$logDir = dirname($logFile);
 		
 		// Create log directory if it doesn't exist
@@ -426,8 +457,9 @@ class connector {
 			@mkdir($logDir, 0755, true);
 		}
 		
-		// Write to log file
+		// Write to log file with secure permissions
 		@file_put_contents($logFile, $message, FILE_APPEND | LOCK_EX);
+		@chmod($logFile, 0640); // Readable only by owner and group
 	}
 
 	/**
