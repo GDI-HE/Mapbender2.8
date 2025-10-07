@@ -41,7 +41,7 @@ MAP
 		DRIVER 'AGG/PNG'
 		MIMETYPE 'image/png'
 		EXTENSION PNG
-		IMAGEMODE PC256
+		IMAGEMODE RGBA
 		TRANSPARENT ON
 	END
 
@@ -72,7 +72,7 @@ MAP
 		TYPE POLYGON
 		CONNECTIONTYPE postgis 
 		CONNECTION   "dbname=mapbender user=USERNAME password=PASSWORD port=5432 host=localhost"
-		DATA "the_geom from (select GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258) as the_geom,area2d(GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258)) as area, 1 as oid ) as foo USING UNIQUE oid USING SRID=4258"
+		DATA "the_geom from (select ST_GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258) as the_geom,ST_Area(ST_GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258)) as area, 1 as oid ) as foo USING UNIQUE oid USING SRID=4258"
 
 		METADATA
 			WMS_TITLE "Service Extent"
@@ -114,7 +114,7 @@ MAP
 		LABELMINSCALE 0
 		CONNECTIONTYPE postgis
 		CONNECTION   "dbname=mapbender user=USERNAME password=PASSWORD port=5432 host=localhost"
-		DATA "the_geom from (select centroid(GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258)) as the_geom,area2d(GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258)) as area, 1 as oid ) as foo USING UNIQUE oid USING SRID=4258"
+		DATA "the_geom from (select centroid(ST_GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258)) as the_geom,ST_Area(ST_GeomFromText('POLYGON((%minx% %miny%,%minx% %maxy%,%maxx% %maxy%,%maxx% %miny%, %minx% %miny%))',4258)) as area, 1 as oid ) as foo USING UNIQUE oid USING SRID=4258"
 		LABELCACHE ON
 		METADATA
 			WMS_TITLE "RLP Geo-Services Annotations"
