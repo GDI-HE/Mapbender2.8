@@ -130,10 +130,35 @@ if ($_REQUEST['resultTarget'] != 'web') {
 	//for debugging
 	$callback = $_REQUEST["callback"];
 	//get searchText as a parameter
-	$searchText = $_REQUEST['searchText']; //TODO: filter for insecure texts
+	$searchText = $_REQUEST['searchText']; 
 	if ($forceGeonames) {
 		$searchText = $_REQUEST['name_startsWith'];
 		$maxResults = $maxRows;
+	}
+	
+	// Simple whitelist validation for searchText to prevent spam/crawler attacks
+	if (isset($searchText) && $searchText != "") {
+		$searchText = trim($searchText);
+		
+		// Prevent ReDoS attacks: check length BEFORE regex execution
+		if (strlen($searchText) > 99) {
+			http_response_code(400);
+			header('Content-Type: application/json; charset=utf-8');
+			echo json_encode(['error' => 'Bad Request']);
+			exit;
+		}
+		
+		// Allow German address characters:
+		// - Letters: a-z, A-Z, äöüÄÖÜß
+		// - Numbers: 0-9
+		// - Spaces and punctuation: space, hyphen, dot, comma, slash
+		// - Parentheses: ( ) for abbreviations like "Frankfurt (Main)"
+		if (!preg_match('/^[a-zA-ZäöüÄÖÜß0-9\s\-\.,\/\(\)]+$/', $searchText)) {
+			http_response_code(400);
+			header('Content-Type: application/json; charset=utf-8');
+			echo json_encode(['error' => 'Bad Request']);
+			exit;
+		}
 	}
 	$sstr = $searchText;
 	$epsg = $searchEPSG;
@@ -269,11 +294,23 @@ $returnObject->totalResultsCount = $countGeonames;
 if ($returnObject->totalResultsCount == 0) {
 	$returnObject->geonames = array();
 }
+// Secure JSONP callback validation to prevent XSS attacks
 if (isset($callback) && $callback != '') {
-	$returnJson = $callback."(".json_encode($returnObject).")";
+	// Only allow safe callback names: alphanumeric + underscore, starting with letter
+	// Typical jQuery callbacks: jQuery12345_67890, myCallback, etc.
+	if (preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $callback) && strlen($callback) <= 50) {
+		// Valid callback: JSONP response
+		header('Content-Type: application/javascript; charset=utf-8');
+		$returnJson = $callback."(".json_encode($returnObject).")";
+	} else {
+		// Invalid callback: fallback to normal JSON
+		header('Content-Type: application/json; charset=utf-8');
+		$returnJson = json_encode($returnObject);
+	}
 } else {
+	// No callback: normal JSON response
+	header('Content-Type: application/json; charset=utf-8');
 	$returnJson = json_encode($returnObject);
 }
-header('Content-Type: application/json');
 echo $returnJson;
 ?>
