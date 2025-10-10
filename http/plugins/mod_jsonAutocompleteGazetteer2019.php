@@ -271,6 +271,26 @@ var JsonAutocompleteGazetteer = function() {
 			that.inputAddress.val('');
 		});*/
 		
+		// Block invalid characters on input (using bind for older jQuery compatibility)
+		$("#geographicName").bind('keypress', function(e) {
+			var char = String.fromCharCode(e.which);
+			// Allow only valid German address characters
+			if (!/[a-zA-ZäöüÄÖÜß0-9\s\-\.,\/\(\)]/.test(char)) {
+				e.preventDefault();
+				return false;
+			}
+		});
+		
+		// Validate pasted content (using bind for older jQuery compatibility)
+		$("#geographicName").bind('paste', function(e) {
+			setTimeout(function() {
+				var value = $("#geographicName").val();
+				if (!that.validateSearchTerm(value)) {
+					$("#geographicName").val('');					
+				}
+			}, 50);
+		});
+		
 		this.inputAddress.css('width',options.inputWidth);
                 
                 //options.map_width = mb_mapObj[getMapObjIndexByName(options.target)].width;
@@ -283,11 +303,26 @@ var JsonAutocompleteGazetteer = function() {
 		//$('.ui-autocomplete-loading').css('background','white url("../img/indicator_wheel.gif") right center no-repeat');
 		//http://stackoverflow.com/questions/622122/how-can-i-change-the-css-class-rules-using-jquery
 		//$("<style type='text/css'> .ui-autocomplete { position: absolute; cursor: default; background:black; color:white} </style>").appendTo("head");
+		
+		// Simple whitelist validation for search terms
+		this.validateSearchTerm = function(term) {
+			// Allow German address characters: letters, numbers, spaces, hyphens, dots, commas, slashes, parentheses, umlauts
+			// Maximum length: 99 characters
+			return (term.length <= 99 && /^[a-zA-ZäöüÄÖÜß0-9\s\-\.,\/\(\)]+$/.test(term));
+		};
+
 		$(function() {
 			$( "#geographicName" ).autocomplete({
 				source: function( request, response ) {
                 options.map_width = mb_mapObj[getMapObjIndexByName(options.target)].width;
                 options.map_height = mb_mapObj[getMapObjIndexByName(options.target)].height;
+                
+				// Validate search term before making AJAX request
+				if (!that.validateSearchTerm(request.term)) {
+					// Return empty response for invalid terms
+					response([]);
+					return;
+				}
                 
 					$.ajax({
 						url: options.gazetteerUrl,
