@@ -2,7 +2,7 @@ $(document).ready(function(){
 	if ( self !== top ) { 
 		/* inside iFrame */
 		$('#fullscreenbtn').click(function(){
-		window.open('../../mapbender/frames/index.php?','_parent','');	
+		window.open(window.location.href,'_parent','');	
 		});
 		$('.outsideIframe').css("display", "none");
 		$('#fullscreenbtn').attr('title', 'Vollbild aktivieren');
