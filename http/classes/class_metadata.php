@@ -1387,16 +1387,32 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 		$isTextSearch = "false";
 		$e = new mb_notice("Number of used searchstrings: " . count($searchStringArray));
 		if ($this->searchText != NULL && trim($this->searchText) != '*') {
+			// Check if fuzzy search using pg_trgm is enabled
+			$useTrigram = defined("SEARCH_USE_TRIGRAM") && SEARCH_USE_TRIGRAM === true;
+			$trigramThreshold = defined("SEARCH_TRIGRAM_THRESHOLD") ? SEARCH_TRIGRAM_THRESHOLD : 0.3;
 			for ($i = 0; $i < count($searchStringArray); $i++) {
 				$isTextSearch = "true";
 				if ($i > 0) {
 					$whereStr .= " AND ";
 				}
-				$whereStr .= "searchtext LIKE $" . ($i + 1);
+				if ($useTrigram) {
+					// Use pg_trgm word_similarity for fuzzy matching
+					// Requires: CREATE EXTENSION pg_trgm; in the database
+					$whereStr .= "(word_similarity($" . ($i + 1) . ", searchtext) > " . floatval($trigramThreshold) . ")";
+				} else {
+					// Use standard LIKE for exact pattern matching (default)
+					$whereStr .= "searchtext LIKE $" . ($i + 1);
+				}
 				//output for debugging
 				$e = new mb_notice("Part of string" . $i . ": " . $searchStringArray[$i]);
 				$e = new mb_notice("converted: " . $this->replaceChars_all($searchStringArray[$i]));
-				$va = "%" . trim(strtoupper($this->replaceChars_all($searchStringArray[$i]))) . "%";
+				if ($useTrigram) {
+					// For trigram search, use the search term without wildcards
+					$va = trim(strtoupper($this->replaceChars_all($searchStringArray[$i])));
+				} else {
+					// For LIKE search, wrap with wildcards
+					$va = "%" . trim(strtoupper($this->replaceChars_all($searchStringArray[$i]))) . "%";
+				}
 				$e = new mb_notice($this->searchResources . " Searchtext in SQL: " . $va);
 				array_push($v, $va);
 				array_push($t, "s");
