@@ -1389,7 +1389,9 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 		if ($this->searchText != NULL && trim($this->searchText) != '*') {
 			// Check if fuzzy search using pg_trgm is enabled
 			$useTrigram = defined("SEARCH_USE_TRIGRAM") && SEARCH_USE_TRIGRAM === true;
-			$trigramThreshold = defined("SEARCH_TRIGRAM_THRESHOLD") ? SEARCH_TRIGRAM_THRESHOLD : 0.3;
+			$trigramThreshold = defined("SEARCH_TRIGRAM_THRESHOLD") ? floatval(SEARCH_TRIGRAM_THRESHOLD) : 0.3;
+			// Validate threshold is within valid range (0.0-1.0)
+			$trigramThreshold = max(0.0, min(1.0, $trigramThreshold));
 			for ($i = 0; $i < count($searchStringArray); $i++) {
 				$isTextSearch = "true";
 				if ($i > 0) {
@@ -1398,7 +1400,7 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 				if ($useTrigram) {
 					// Use pg_trgm word_similarity for fuzzy matching
 					// Requires: CREATE EXTENSION pg_trgm; in the database
-					$whereStr .= "(word_similarity($" . ($i + 1) . ", searchtext) > " . floatval($trigramThreshold) . ")";
+					$whereStr .= "(word_similarity($" . ($i + 1) . ", searchtext) > " . $trigramThreshold . ")";
 				} else {
 					// Use standard LIKE for exact pattern matching (default)
 					$whereStr .= "searchtext LIKE $" . ($i + 1);
