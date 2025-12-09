@@ -7,6 +7,7 @@ require_once (dirname ( __FILE__ ) . "/../classes/class_owsConstraints.php");
 require_once (dirname ( __FILE__ ) . "/../classes/class_connector.php"); // for resolving external @context content
 require_once (dirname ( __FILE__ ) . "/../classes/class_user.php");
 require_once (dirname ( __FILE__ ) . "/../classes/class_ogr.php");
+require_once (dirname ( __FILE__ ) . "/../classes/class_wfs_2_0_fallback.php");
 global $rewritePath;
 global $behindRewrite;
 global $linkedDataProxyUrl;
@@ -1945,8 +1946,11 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 					$ftAllowedAttributesArray = array ();
 					foreach ( $ftElementArray as $ftElement ) {
 						// $e = new mb_exception($ftElement->name ." - " .$ftElement->type);
-					    if (in_array((string)$ftElement->type, array("string", "xsd:string", "int", "xsd:decimal", "decimal"))) {
-							$ftAllowedAttributesArray [] = $ftElement->name;
+					    if (in_array((string)$ftElement->type, array("string", "xsd:string", "int", "xsd:decimal", "decimal", "date", "xsd:date"))) {
+							$ftAllowedAttributesArray[] = (object)[
+								'name' => $ftElement->name,
+								'type' => $ftElement->type
+							];
 						}
 					}
 					break;
@@ -1958,6 +1962,50 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 			    	$administration->logOAFUsage ( $_SERVER['HTTP_REFERER'], $wfsid, $ftDbId );
 				$myFeatureType = $wfs->findFeatureTypeByName ( $ftName );
 				$geomColumnName = $wfs->findGeomColumnNameByFeaturetypeId ( $myFeatureType->id );
+				
+				// get other relevant ft information - extract schema - get all elements that are strings and integers
+				$ftElementArray = $featureType->elementArray; // consists of name and type
+				
+				// Fallback if elementArray is empty (broken WFS services like HALE)
+				if (empty($ftElementArray)) {
+					$fallbackElements = Wfs_2_0_Fallback::getAttributesFromGetFeature(
+						$wfs->getFeature,
+						$wfs->describeFeatureType,
+						$ftName,
+						$wfs->auth
+					);
+					if (is_array($fallbackElements) && count($fallbackElements) > 0) {
+						$ftElementArray = $fallbackElements;
+					}
+				}
+				
+				// Rebuild ftAllowedAttributesArray if fallback was used
+				if (!empty($ftElementArray) && (empty($featureType->elementArray) || count($featureType->elementArray) === 0)) {
+					$ftAllowedAttributesArray = array ();
+					foreach ( $ftElementArray as $ftElement ) {
+					    if (in_array((string)$ftElement->type, array("string", "xsd:string", "int", "xsd:decimal", "decimal", "date", "xsd:date"))) {
+							$ftAllowedAttributesArray[] = (object)[
+								'name' => $ftElement->name,
+								'type' => $ftElement->type
+							];
+						}
+					}
+				}
+				
+				// Fallback if DescribeFeatureType fails (e.g., HALE-based WFS services)
+				if (empty($geomColumnName)) {
+					$fallbackGeomNames = array('geometry', 'geom', 'shape', 'msGeometry', 'the_geom', 'wkb_geometry');
+					foreach ($fallbackGeomNames as $fallbackName) {
+						// Try each fallback name in order
+						$geomColumnName = $fallbackName;
+						break; // Use first fallback name
+					}
+					// If still empty, use 'geometry' as ultimate default
+					if (empty($geomColumnName)) {
+						$geomColumnName = 'geometry';
+					}
+				}
+				
 				// check all allowed attributes to may be set by GET param
 				$stringFilterArray = array ();
 				$stringFilterActive = array ();
@@ -1965,17 +2013,17 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 				// $e = new mb_exception("test: count: ".count($ftAllowedAttributesArray));
 				foreach ( $ftAllowedAttributesArray as $ftAllowedAttribute ) {
 					// $e = new mb_exception("search for: ".$ftAllowedAttribute);
-					if (isset ( $_REQUEST [$ftAllowedAttribute] ) && $_REQUEST [$ftAllowedAttribute] != "") {
-						// $e = new mb_exception("found param:".$ftAllowedAttribute.": ".$_REQUEST[$ftAllowedAttribute]);
-						$testMatch = $_REQUEST [$ftAllowedAttribute];
-						$pattern = '/^[0-9a-zA-Z\.\-_:*]*$/';
+					if (isset ( $_REQUEST [$ftAllowedAttribute->name] ) && $_REQUEST [$ftAllowedAttribute->name] != "") {
+						// $e = new mb_exception("found param:".$ftAllowedAttribute.": ".$_REQUEST[$ftAllowedAttribute->name]);
+						$testMatch = $_REQUEST [$ftAllowedAttribute->name];
+						$pattern = '/^[0-9a-zA-Z\.\-_:*\s]*$/';
 						if (! preg_match ( $pattern, $testMatch )) {
-							echo 'Parameter <b>' . $ftAllowedAttribute . '</b> is not valid (allowed string).<br/>';
-							$e = new mb_exception("php/mod_linkedDataProxy.php: Parameter " . $ftAllowedAttribute . " is not valid (allowed string)");
+							echo 'Parameter <b>' . $ftAllowedAttribute->name . '</b> is not valid (allowed string).<br/>';
+							$e = new mb_exception("php/mod_linkedDataProxy.php: Parameter " . $ftAllowedAttribute->name . " is not valid (allowed string)");
 							die ();
 						}
-						$stringFilterActive [] = $ftAllowedAttribute;
-						$stringFilterArray [$stringFilterIndex]->elementName = $ftAllowedAttribute;
+						$stringFilterActive [] = $ftAllowedAttribute->name;
+						$stringFilterArray [$stringFilterIndex]->elementName = $ftAllowedAttribute->name;
 						$stringFilterArray [$stringFilterIndex]->elementFilter = $testMatch;
 						$stringFilterIndex ++;
 						$testMatch = NULL;
@@ -2066,16 +2114,31 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 								$textFilterIndex = 0;
 								$textFilterArray [$textFilterIndex] = "";
 								foreach ( $stringFilterArray as $stringFilter ) {
-									if (strpos ( $stringFilter->elementFilter, "*" ) !== false) {
-										$textFilterArray [$textFilterIndex] .= '<fes:PropertyIsLike wildCard="*" singleChar="." escapeChar="\">';
-										$textFilterArray [$textFilterIndex] .= '<fes:ValueReference>' . $stringFilter->elementName . '</fes:ValueReference>';
-										$textFilterArray [$textFilterIndex] .= '<fes:Literal>' . $stringFilter->elementFilter . '</fes:Literal>';
-										$textFilterArray [$textFilterIndex] .= '</fes:PropertyIsLike>';
+									// Trim whitespace and prepare filter value
+									$filterValue = trim($stringFilter->elementFilter);
+									
+									// Split by whitespace to create AND filter for each word
+									$words = preg_split('/\s+/', $filterValue, -1, PREG_SPLIT_NO_EMPTY);
+									
+									if (count($words) > 1) {
+										// Multiple words - create AND filter
+										$textFilterArray [$textFilterIndex] .= '<fes:And>';
+										foreach ($words as $word) {
+											$textFilterArray [$textFilterIndex] .= '<fes:PropertyIsLike wildCard="*" singleChar="." escapeChar="\" matchCase="false">';
+											$textFilterArray [$textFilterIndex] .= '<fes:ValueReference>' . $stringFilter->elementName . '</fes:ValueReference>';
+											$textFilterArray [$textFilterIndex] .= '<fes:Literal>*' . $word . '*</fes:Literal>';
+											$textFilterArray [$textFilterIndex] .= '</fes:PropertyIsLike>';
+										}
+										$textFilterArray [$textFilterIndex] .= '</fes:And>';
 									} else {
-										$textFilterArray [$textFilterIndex] .= '<fes:PropertyIsEqualTo>';
+										// Single word - simple LIKE filter with wildcards
+										if (strpos ( $filterValue, "*" ) === false) {
+											$filterValue = "*" . $filterValue . "*";
+										}
+										$textFilterArray [$textFilterIndex] .= '<fes:PropertyIsLike wildCard="*" singleChar="." escapeChar="\" matchCase="false">';
 										$textFilterArray [$textFilterIndex] .= '<fes:ValueReference>' . $stringFilter->elementName . '</fes:ValueReference>';
-										$textFilterArray [$textFilterIndex] .= '<fes:Literal>' . $stringFilter->elementFilter . '</fes:Literal>';
-										$textFilterArray [$textFilterIndex] .= '</fes:PropertyIsEqualTo>';
+										$textFilterArray [$textFilterIndex] .= '<fes:Literal>' . $filterValue . '</fes:Literal>';
+										$textFilterArray [$textFilterIndex] .= '</fes:PropertyIsLike>';
 									}
 									$textFilterIndex ++;
 								}
@@ -3265,15 +3328,17 @@ switch ($f) {
 				if (! isset ( $item ) || $items == "all") {
 					$html .= '    <div>' . $newline;
 					$html .= '        <h1>' . $returnObject->collectionTitle . ' (' . $numberOfObjects . ')' . '</h1>' . $newline;
-					$html .= '        <span></span>' . $newline;
-					$html .= '        <br/>' . $newline;
-					$html .= '        <br/>' . $newline;
 					$html .= '    </div>' . $newline;
 					// TODO - further filter options
-					$html .= '<div id="app-wrapper" class="mb-5">' . $newline;
-					$html .= '<div class="row mb-3">' . $newline;
-					$html .= '<div class=" flex-row justify-content-start align-items-center flex-wrap col-md-3">' . $newline;
-					$html .= '<span class="mr-2 font-weight-bold">Filter</span>' . $newline;
+					$html .= '<div id="app-wrapper" class="mb-2 form-control" style="max-width:600px;">' . $newline;
+					$html .= '<div class="row mb-1">' . $newline;
+					$html .= '<div class="pl-6 pr-6 flex-row justify-content-start align-items-center flex-wrap col-12">' . $newline;
+					$html .= '<div class="d-flex align-items-center gap-2">' . $newline;
+					$html .= '<span class="mr-2 font-weight-bold">Filter</span>';
+					$html .= '<button type="button" id="edit_filter_button" class="py-0 btn btn-outline-secondary btn-sm collapse show" onclick="var elements = [\'edit_filter_button\',  \'cancel_filter_button\', \'filter_div\']; elements.forEach(myFunction); function myFunction(item) { var element = document.getElementById(item);element.classList.toggle(\'show\'); };">' . _mb ( 'Edit' ) . '</button>';
+					// $html .= '<button type="button" id="apply_filter_button" class="py-0 btn btn-outline-secondary btn-sm collapse" onclick="">Apply</button>';
+					$html .= '<button type="button" id="cancel_filter_button" class="py-0 btn btn-outline-secondary btn-sm collapse" onclick="var elements = [\'edit_filter_button\', \'cancel_filter_button\', \'filter_div\']; elements.forEach(myFunction); function myFunction(item) { var element = document.getElementById(item);element.classList.toggle(\'show\'); };">' . _mb ( 'Cancel' ) . '</button>';
+					$html .= '</div>' . $newline;
 					if (isset ( $bbox ) && $bbox != "") {
 						$html .= '<div class="mr-1 my-1 btn-group"><button disabled="" style="opacity: 1;" class="py-0 btn btn-primary btn-sm disabled bbox-filter-button">bbox≈' . $bbox . '</button><button type="button" aria-haspopup="true" aria-expanded="false" class="py-0 btn btn-danger btn-sm" onclick="location.href = URL_remove_parameter(URL_remove_parameter(location.href, \'bbox\'), \'offset\');return false;">×</button></div>' . $newline;
 					}
@@ -3288,15 +3353,13 @@ switch ($f) {
 					// $stringFilterArray[$stringFilterIndex]->elementName = $ftAllowedAttribute;
 					// $stringFilterArray[$stringFilterIndex]->elementFilter = $testMatch;
 					// ********************************************************************************
-					$html .= '<button type="button" id="edit_filter_button" class="py-0 btn btn-outline-secondary btn-sm collapse show" onclick="var elements = [\'edit_filter_button\',  \'cancel_filter_button\', \'filter_div\']; elements.forEach(myFunction); function myFunction(item) { var element = document.getElementById(item);element.classList.toggle(\'show\'); };">' . _mb ( 'Edit' ) . '</button>';
-					// $html .= '<button type="button" id="apply_filter_button" class="py-0 btn btn-outline-secondary btn-sm collapse" onclick="">Apply</button>';
-					$html .= '<button type="button" id="cancel_filter_button" class="py-0 btn btn-outline-secondary btn-sm collapse" onclick="var elements = [\'edit_filter_button\', \'cancel_filter_button\', \'filter_div\']; elements.forEach(myFunction); function myFunction(item) { var element = document.getElementById(item);element.classList.toggle(\'show\'); };">' . _mb ( 'Cancel' ) . '</button>' . $newline;
+					
 					// bbox filter part from ldproxy
 					$html .= '<div id="filter_div" class="collapse">' . $newline;
 					// nativeJson Filter - to use if some memory error occur -
 					if (in_array ( 'application/json; subtype=geojson', explode ( ',', $ftOutputFormats ) )) {
-						$html .= '    <form class="">' . $newline;
-						$html .= '        <p class="text-muted text-uppercase" title="Use nativeJson if errors occur - it may also be faster, but the objects don\'t have persistent IDs!">' . _mb ( 'Serverside format' ) . '</p>' . $newline;
+						$html .= '    <form class="" style="background-color: rgb(250,250,250);padding: 1px 1rem 1rem;margin-top: 1rem;border: 1px solid lightgray;border-radius: 4px;">' . $newline;
+						$html .= '        <p class="mb-2 mt-1 text-muted text-uppercase" title="Use nativeJson if errors occur - it may also be faster, but the objects don\'t have persistent IDs!">' . _mb ( 'Serverside format' ) . '</p>' . $newline;
 						$html .= '		    <div class="col-md-2">' . $newline;
 						$html .= '			<button type="button" class="btn btn-primary btn-sm" onclick="location.href = URL_add_parameter(location.href, \'nativeJson\', \'true\');return false;">geoJson</button>' . $newline;
 						$html .= '		    </div>' . $newline;
@@ -3304,8 +3367,8 @@ switch ($f) {
 					}
 					// paging options
 					// allowedLimits
-					$html .= '    <form class="">' . $newline;
-					$html .= '        <p class="text-muted text-uppercase">' . _mb ( 'Results per page' ) . '</p>' . $newline;
+					$html .= '    <form class="" style="background-color: rgb(250,250,250);padding: 1px 1rem 1rem;margin-top: 1rem;border: 1px solid lightgray;border-radius: 4px;">' . $newline;
+					$html .= '        <p class="mb-2 mt-1 text-muted text-uppercase">' . _mb ( 'Results per page' ) . '</p>' . $newline;
 					$html .= '                <select id="rppSelection" name="field" type="select" class="mr-2 text-muted form-control-sm form-control" onchange="location.href = URL_add_parameter(location.href, \'limit\', document.getElementById(\'rppSelection\').value);">' . $newline;
 					$html .= '                    <option value="" class="d-none">' . $limit . '</option>' . $newline;
 					foreach ( $allowedLimits as $rpp ) {
@@ -3314,27 +3377,27 @@ switch ($f) {
 					$html .= '               </select>' . $newline;
 					$html .= '	    </form>' . $newline;
 					//
-					$html .= '    <form class="">' . $newline;
-					$html .= '        <p class="text-muted text-uppercase">bbox</p>' . $newline;
+					$html .= '    <form class="" style="background-color: rgb(250,250,250);padding: 1px 1rem 1rem;margin-top: 1rem;border: 1px solid lightgray;border-radius: 4px;">' . $newline;
+					$html .= '        <p class="mb-2 mt-1 text-muted text-uppercase">bbox</p>' . $newline;
 					$html .= '		<div class="row">' . $newline;
-					$html .= '		    <div class="col-md-5">' . $newline;
+					$html .= '		    <div class="col-md-4">' . $newline;
 					$html .= '		        <div class="form-group">' . $newline;
 					$html .= '			    <input name="minLng" id="minLng" readonly="" class="mr-2 form-control-sm form-control" value="5.767822265625001" type="text">' . $newline;
 					$html .= '			</div>' . $newline;
 					$html .= '		    </div>' . $newline;
-					$html .= '		    <div class="col-md-5">' . $newline;
+					$html .= '		    <div class="col-md-4">' . $newline;
 					$html .= '		        <div class="form-group">' . $newline;
 					$html .= '			    <input name="minLat" id="minLat" readonly="" class="mr-2 form-control-sm form-control" value="50.317408112618715" type="text">' . $newline;
 					$html .= '		        </div>' . $newline;
 					$html .= '		    </div>' . $newline;
 					$html .= '	        </div>' . $newline;
 					$html .= '	        <div class="row">' . $newline;
-					$html .= '		    <div class="col-md-5">' . $newline;
+					$html .= '		    <div class="col-md-4">' . $newline;
 					$html .= '		        <div class="form-group">' . $newline;
 					$html .= '			    <input name="maxLng" id="maxLng" readonly="" class="mr-2 form-control-sm form-control" value="9.459228515625002" type="text">' . $newline;
 					$html .= '		        </div>' . $newline;
 					$html .= '		    </div>' . $newline;
-					$html .= '		    <div class="col-md-5">' . $newline;
+					$html .= '		    <div class="col-md-4">' . $newline;
 					$html .= '		        <div class="form-group">' . $newline;
 					$html .= '  		            <input name="maxLat" id="maxLat" readonly="" class="mr-2 form-control-sm form-control" value="52.52958999943304" type="text">' . $newline;
 					$html .= '		        </div>' . $newline;
@@ -3345,43 +3408,46 @@ switch ($f) {
 					$html .= '          </div>' . $newline;
 					$html .= '	    </form>' . $newline;
 					if (is_array ( $ftAllowedAttributesArray ) && count ( $ftAllowedAttributesArray ) > 0) {
-						$html .= '<form class="">' . $newline;
-						$html .= '    <p class="text-muted text-uppercase">' . _mb ( 'field' ) . '</p>' . $newline;
+						$html .= '<form class="" style="background-color: rgb(250,250,250);padding: 1px 1rem 1rem;margin-top: 1rem;border: 1px solid lightgray;border-radius: 4px;">' . $newline;
+						$html .= '    <p class="mb-2 mt-1 text-muted text-uppercase">' . _mb ( 'field' ) . '</p>' . $newline;
 						$html .= '    <div class="row">' . $newline;
-						$html .= '        <div class="col-md-5">' . $newline;
+						$html .= '        <div class="col-12">' . $newline;
 						$html .= '            <div class="form-group">' . $newline;
 						$html .= '                <select id="attributeSelection" name="field" type="select" class="mr-2 text-muted form-control-sm form-control" onchange="document.getElementById(\'filterValue\').value = \'\';">' . $newline;
 						$html .= '                    <option value="" class="d-none">none</option>' . $newline;
 						foreach ( $ftAllowedAttributesArray as $ftAllowedAttribute ) {
+							$attrName = is_object($ftAllowedAttribute) ? $ftAllowedAttribute->name : $ftAllowedAttribute;
+							$attrType = is_object($ftAllowedAttribute) ? $ftAllowedAttribute->type : '';
+							
 							if (isset($schemaObject)) {
 								//$e = new mb_exception("schemaObject set!");
 								//exchange titles of options with values from schema and maybe add examples	
-								if (isset($schemaObject->properties->{$ftAllowedAttribute}) && $schemaObject->properties->{$ftAllowedAttribute}->title != "" ) {
-									$ftAllowedAttributeTitle = $schemaObject->properties->{$ftAllowedAttribute}->title;
-									$ftAllowedAttributeDescription = $schemaObject->properties->{$ftAllowedAttribute}->description;
-									$ftAllowedAttributeDescription .= " - Attribute: ".$ftAllowedAttribute." - type: [".$schemaObject->properties->{$ftAllowedAttribute}->type."]";
+								if (isset($schemaObject->properties->{$attrName}) && $schemaObject->properties->{$attrName}->title != "" ) {
+									$ftAllowedAttributeTitle = $schemaObject->properties->{$attrName}->title;
+									$ftAllowedAttributeDescription = $schemaObject->properties->{$attrName}->description;
+									$ftAllowedAttributeDescription .= " - Attribute: ".$attrName." - type: [".$schemaObject->properties->{$attrName}->type."]";
 								} else {
-									$ftAllowedAttributeTitle = $ftAllowedAttribute;
-									$ftAllowedAttributeDescription = $ftAllowedAttribute;
+									$ftAllowedAttributeTitle = $attrName;
+									$ftAllowedAttributeDescription = $attrName . (($attrType) ? " [" . $attrType . "]" : "");
 								}
 								
 							} else {
-								$ftAllowedAttributeTitle = $ftAllowedAttribute;
-								$ftAllowedAttributeDescription = $ftAllowedAttribute;
+								$ftAllowedAttributeTitle = $attrName;
+								$ftAllowedAttributeDescription = $attrName . (($attrType) ? " [" . $attrType . "]" : "");
 							}
-							$html .= '                    <option title="'.$ftAllowedAttributeDescription.'" value="' . $ftAllowedAttribute . '">' . $ftAllowedAttributeTitle . '</option>' . $newline;
+							$html .= '                    <option title="'.$ftAllowedAttributeDescription.'" value="' . $attrName . '">' . $ftAllowedAttributeTitle . (($attrType && !isset($schemaObject)) ? ' [' . $attrType . ']' : '') . '</option>' . $newline;
 						}
 						$html .= '               </select>' . $newline;
 						$html .= '            </div>' . $newline;
 						$html .= '        </div>' . $newline;
-						$html .= '        <div class="col-md-5">' . $newline;
+						$html .= '        <div class="col-12">' . $newline;
 						$html .= '            <div class="form-group">' . $newline;
 						$html .= '                <input id="filterValue" name="filterValue" placeholder="filter pattern" class="mr-2 form-control-sm form-control" value="" type="text">' . $newline;
 						$html .= '                    <small class="form-text text-muted">' . _mb ( 'Use * as wildcard' ) . '</small>' . $newline;
 						$html .= '                    <small class="form-text text-muted" id="filterNameErrMsg"></small>' . $newline;
 						$html .= '            </div>' . $newline;
 						$html .= '        </div>' . $newline;
-						$html .= '        <div class="col-md-2">' . $newline;
+						$html .= '        <div class="col-12">' . $newline;
 						$html .= '            <button id="filterValueAddButton" name="filterValueAddButton" type="button" disabled="" class="btn btn-primary btn-sm disabled" onclick="var attributeSelection = document.getElementById(\'attributeSelection\'); var filterValue = document.getElementById(\'filterValue\'); var selectionValue = attributeSelection.options[attributeSelection.selectedIndex].value; location.href = URL_add_parameter(URL_remove_parameter(location.href, \'p\'), selectionValue, filterValue.value );return false;">' . _mb ( 'Add' ) . '</button>' . $newline;
 						$html .= '        </div>' . $newline;
 						$html .= '    </div>' . $newline;
@@ -3401,24 +3467,14 @@ switch ($f) {
 						$html .= '        filterErrMsgHolder.innerHTML =';
 						$html .= '            \'Please enter a text with at least 1 letters\';';
 						$html .= '        return false;';
-						$html .= '    } else if (!(/^\S{1,}$/.test(inputValue))) {';
+						$html .= '    } else if (!(/^[a-zA-Z*0-9\-\s]+$/.test(inputValue))) {';
 						$html .= '        filterErrMsgHolder.innerHTML =';
-						$html .= '            \'Name cannot contain whitespace\';';
+						$html .= '            \'Only alphabets, numbers, *, - and spaces are allowed\';';
 						$html .= '        return false;';
-						$html .= '    } else if(!(/^[a-zA-Z*0-9\-]+$/.test(inputValue)))';
-						$html .= '    {';
-						$html .= '       filterErrMsgHolder.innerHTML=';
-						$html .= '                \'Only alphabets or * are allowed\'';
-						$html .= '    }';
-						// $html .= ' else if(!(/^(?:(\w)(?!\1\1))+$/.test(inputValue)))';
-						// $html .= ' {';
-						// $html .= ' filterErrMsgHolder.innerHTML=';
-						// $html .= ' \'per 3 alphabets allowed\'';
-						// $html .= ' }';
-						$html .= '    else {';
+						$html .= '    } else {';
 						$html .= '        filterErrMsgHolder.innerHTML = \'\';';
 						$html .= '        return true;';
-						$html .= '    }       ';
+						$html .= '    }';
 						$html .= '}';
 						$html .= 'filterValue.addEventListener(\'keyup\', function (event) {';
 						$html .= '    isValidFilter = checkFilterValue();';
@@ -3429,6 +3485,21 @@ switch ($f) {
 						// $html .= ' filterValueAddButton.classList.add("disabled");';
 						$html .= '        filterValueAddButton.disabled = true;';
 						$html .= '   }';
+						$html .= '});';
+						// Add Enter key listener - only active when input has focus
+						$html .= 'function handleEnterKey(event) {';
+						$html .= '    if (event.key === "Enter") {';
+						$html .= '        event.preventDefault();';
+						$html .= '        if (!filterValueAddButton.disabled) {';
+						$html .= '            filterValueAddButton.click();';
+						$html .= '        }';
+						$html .= '    }';
+						$html .= '}';
+						$html .= 'filterValue.addEventListener(\'focus\', function() {';
+						$html .= '    filterValue.addEventListener(\'keypress\', handleEnterKey);';
+						$html .= '});';
+						$html .= 'filterValue.addEventListener(\'blur\', function() {';
+						$html .= '    filterValue.removeEventListener(\'keypress\', handleEnterKey);';
 						$html .= '});';
 						$html .= '</script>';
 						$html .= '</form>' . $newline;
@@ -3840,16 +3911,20 @@ switch ($f) {
 document.addEventListener("DOMContentLoaded", function() {
     var input = document.getElementById("filter-linked-data-input");
     var btn = document.getElementById("clear-filter-linked-data-input");
-    function toggleButton() {
-        btn.style.display = input.value.length > 0 ? "block" : "none";
+    
+    // Only set up event listeners if elements exist (e.g., not on item detail pages)
+    if (input && btn) {
+        function toggleButton() {
+            btn.style.display = input.value.length > 0 ? "block" : "none";
+        }
+        input.addEventListener("input", toggleButton);
+        btn.addEventListener("click", function() {
+            input.value = "";
+            btn.style.display = "none";
+            input.dispatchEvent(new Event("input")); // optional: trigger event for other listeners
+        });
+        toggleButton();
     }
-    input.addEventListener("input", toggleButton);
-    btn.addEventListener("click", function() {
-        input.value = "";
-        btn.style.display = "none";
-        input.dispatchEvent(new Event("input")); // optional: trigger event for other listeners
-    });
-    toggleButton();
 });
 </script>
 JSP;

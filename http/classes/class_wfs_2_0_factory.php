@@ -24,6 +24,7 @@ require_once(dirname(__FILE__)."/../classes/class_wfs_featuretype.php");
 require_once(dirname(__FILE__)."/../classes/class_connector.php");
 require_once(dirname(__FILE__)."/../classes/class_administration.php");
 require_once(dirname(__FILE__)."/../classes/class_xml_parser.php");
+require_once(dirname(__FILE__)."/../classes/class_wfs_2_0_fallback.php");
 
 /**
  * Creates WFS 2.0 objects from a capabilities documents.
@@ -182,6 +183,27 @@ class Wfs_2_0_Factory extends WfsFactory {
 		// for the sake of simplicity we only care about top level elements. Seems to have worked so far
 		$query = sprintf("/xs:schema/xs:element[@name='%s']",$ftLocalname);
 		$elementList = $xpath->query($query);
+		
+		// Fallback if DescribeFeatureType returns wrong FeatureType (e.g., HALE WFS bug)
+		if ($elementList->length === 0) {
+			$e = new mb_notice("classes/class_wfs_2_0_factory.php: DescribeFeatureType returned no matching element for $featureTypeName, trying GetFeature fallback");
+			$fallbackElements = Wfs_2_0_Fallback::getAttributesFromGetFeature(
+				$myWfs->getFeature,
+				$myWfs->describeFeatureType,
+				$featureTypeName,
+				$myWfs->auth
+			);
+			if (is_array($fallbackElements) && count($fallbackElements) > 0) {
+				$newFeatureType->schema_problem = 'f';
+				$newFeatureType->schema = $xml;
+				// Add elements from GetFeature fallback
+				foreach ($fallbackElements as $fallbackElement) {
+					$newFeatureType->addElement($fallbackElement->name, $fallbackElement->type);
+				}
+				return $newFeatureType;
+			}
+		}
+		
 		//parse single elements - if the schema is complex, store only the DescribeFeaturetype response
 		$newFeatureType->schema_problem = 'f';
 		$newFeatureType->schema = $xml;
@@ -626,7 +648,7 @@ class Wfs_2_0_Factory extends WfsFactory {
 			}
 
 			if (!empty($includeUrl)) {
-	
+		
 				// Load the included XML
 				$includedDoc = new DOMDocument();
 				$includeXML = $this->get($includeUrl); //, $aWfs->auth);
@@ -655,7 +677,7 @@ class Wfs_2_0_Factory extends WfsFactory {
 					// Merge attributes and replace target schema node with the merged one
 					$mergedSchemaNode = $this->mergeSchemaNodes($targetSchemaNode, $sourceSchemaNode);
 					//$doc->documentElement->replaceWith($mergedSchemaNode, $targetSchemaNode);
-								 
+									 
 				}
 
 			}
