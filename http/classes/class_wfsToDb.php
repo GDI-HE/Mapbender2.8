@@ -693,13 +693,21 @@ class WfsToDb {
 	 * @param $aWfsFeatureTypeId Integer
 	 * @param $metadataUrl object
 	 */
-	private static function insertFeatureTypeMetadataUrl ($aWfsFeatureTypeId, $metadataUrl, $withParsing = false) {
+	private static function insertFeatureTypeMetadataUrl ($aWfsFeatureTypeId, $metadataUrl, $withParsing = false, $aWfs = null) {
 		//function as defined in class wms!
 		//origin 2 - set by mapbender metadata editor - new record
 		//origin 3 - set by mapbender metadata editor - new linkage
 		//harvest the record if some readable format is given - should this be adoptable?
 		//parse the content if iso19139 is given
 		//TODO: generate temporal uuid for inserting and getting the serial afterwards
+		
+		//Check if harvesting should be skipped based on WFS configuration
+		if ($aWfs !== null && isset($aWfs->harvestCoupledDatasetMetadata) && $aWfs->harvestCoupledDatasetMetadata == false) {
+			$e = new mb_notice("class_wfsToDb.php: MetadataURL harvesting is disabled for this WFS - skipping metadata import completely");
+			//do NOT harvest and do NOT store - just skip
+			return true;
+		}
+		
 		//delete old relations for this resource - only those which are from 'capabilities'
 		$mbMetadata_1 = new Iso19139();
 		$mbMetadata_1->deleteMetadataRelation("featuretype", $aWfsFeatureTypeId,"capabilities");
@@ -1342,7 +1350,7 @@ class WfsToDb {
 		$e = new mb_notice("Number of metadataurls for featuretype ".$aWfsFeatureType->id." : ".count($aWfsFeatureType->metadataUrlArray));
 		for ($i = 0; $i < count($aWfsFeatureType->metadataUrlArray); $i++) {
 			$metadataUrl = $aWfsFeatureType->metadataUrlArray[$i];
-			if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl)) {
+			if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl, false, $aWfsFeatureType->wfs)) {
 				return false;	
 			}
 		}
@@ -1562,7 +1570,7 @@ SQL;
 			for ($i = 0; $i < count($aWfsFeatureType->metadataUrlArray); $i++) {
 				$metadataUrl = $aWfsFeatureType->metadataUrlArray[$i];
 				//$e = new mb_exception("metadataUrl: ".json_encode($aWfsFeatureType->metadataUrlArray[$i]));
-				if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl)) {
+				if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl, false, $aWfsFeatureType->wfs)) {
 					return false;	
 				}
 			}

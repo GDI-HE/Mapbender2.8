@@ -2842,6 +2842,12 @@ SQL;
 				//insert relation
 				$row = db_fetch_assoc($res);
 				$metadataId = $row['metadata_id'];
+				//FIX: Check if metadataId is actually set before inserting relation - prevent NULL entries in ows_relation_metadata
+				if (empty($metadataId) || !isset($metadataId)) {
+					db_rollback();
+					$e = new mb_exception("class_Iso19139:"._mb("Cannot determine metadata_id - relation will NOT be created to avoid NULL entries!"));
+					return false;
+				}
 				if ($resourceType !== 'metadata') {
 					//insert relation to layer/featuretype
 					$sql = "INSERT INTO ows_relation_metadata (fkey_".$resourceType."_id, fkey_metadata_id, relation_type) values ($1, $2, $3);";	

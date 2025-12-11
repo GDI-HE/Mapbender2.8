@@ -41,6 +41,8 @@ abstract class Wfs extends Ows {
 	var $featureTypeArray = array();
 	var $operationsArray = array();
 	var $storedQueriesArray = array();
+	//dataset metadata handling - defaults to true
+	var $harvestCoupledDatasetMetadata = true;
 	
 	/**
 	 * Returns the version of this WFS. Has to be implemented by the subclass.
