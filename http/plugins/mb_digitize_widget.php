@@ -184,7 +184,7 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                         icons = data;
                     }, 1000);
                 },
-                timeout: 1500
+                timeout: 4500
             });
 
             //
