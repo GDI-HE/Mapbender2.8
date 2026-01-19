@@ -52,9 +52,9 @@ var MetadataSelectApi = function (o) {
 				
 				var aoColumns = [];
 				for (var i in obj.header) {
-					if (obj.header[i] === "WMC ID") {
-						continue;
-					}
+					//if (obj.header[i] === "WMC ID") {
+					//	continue;
+					//}
 					aoColumns.push({"sTitle": obj.header[i]});
 				}
 
@@ -69,7 +69,7 @@ var MetadataSelectApi = function (o) {
 				for (var j in obj.data) {
 					var data = obj.data[j];
 					var wmcId = data[0];
-					data.shift();
+					//data.shift();
 					var index = table.fnAddData(data);
 					var rowNode = table.fnGetNodes(index[0]);
 					$(rowNode).data("wmcId", wmcId);
