@@ -44,6 +44,15 @@ if (isset($auth)) {
 	if (isset($myWfs->auth)) {
 		$e = new mb_exception("ows auth set");
 	}
+	//Check if WFS creation failed
+	if (is_null($myWfs)) {
+		echo "WFS could not be uploaded.";
+		die;
+	}
+	//set harvest_dataset_metadata flag
+	if(empty($_POST['harvest_dataset_metadata'])) {
+		$myWfs->harvestCoupledDatasetMetadata = false;
+	}
 	//TODO
 	//$myWfs = $myWfsFactory->createFromUrl($url,$auth);  
 	/*$result = $mywms->createObjFromXML($xml, $auth);	
@@ -54,10 +63,15 @@ if (isset($auth)) {
 		die();
 	}*/
 } else {
-	$myWfs = $myWfsFactory->createFromUrl($url);      
+	$myWfs = $myWfsFactory->createFromUrl($url);
+	//Check if WFS creation failed
 	if (is_null($myWfs)) {
 		echo "WFS could not be uploaded.";
 		die;
+	}
+	//set harvest_dataset_metadata flag
+	if(empty($_POST['harvest_dataset_metadata'])) {
+		$myWfs->harvestCoupledDatasetMetadata = false;
 	}
 	/*$result = $mywms->createObjFromXML($xml);
 	if ($result['success']) {
