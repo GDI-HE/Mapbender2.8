@@ -1,0 +1,48 @@
+name: Generate Changelog from PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_url:
+        description: 'GitHub Pull Request URL'
+        required: true
+        type: string
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Parse PR and Generate Changelog
+        env:
+          PR_URL: ${{ github.event.inputs.pr_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # PR-Nummer aus URL extrahieren
+          PR_NUMBER=$(echo "$PR_URL" | grep -oP 'pull/\K[0-9]+')
+          REPO="${{ github.repository }}"
+          
+          echo "## Changelog for PR #$PR_NUMBER" > changelog_output.md
+          echo "" >> changelog_output.md
+          
+          # Commits abrufen
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/commits" \
+            | jq -r '.[] | "- \(.commit.message | split("\n")[0])"' >> changelog_output.md
+          
+          cat changelog_output.md
+      
+      - name: Upload Changelog as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: changelog
+          path: changelog_output.md
+          retention-days: 30
