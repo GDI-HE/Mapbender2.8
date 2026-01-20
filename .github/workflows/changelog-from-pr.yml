@@ -14,10 +14,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
       
@@ -41,7 +41,7 @@ jobs:
           cat changelog_output.md
       
       - name: Upload Changelog as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: changelog
           path: changelog_output.md
