@@ -24,6 +24,7 @@ require_once(dirname(__FILE__)."/../classes/class_wfs_featuretype.php");
 require_once(dirname(__FILE__)."/../classes/class_connector.php");
 require_once(dirname(__FILE__)."/../classes/class_administration.php");
 require_once(dirname(__FILE__)."/../classes/class_xml_parser.php");
+require_once(dirname(__FILE__)."/../classes/class_wfs_2_0_fallback.php");
 
 /**
  * Creates WFS 2.0 objects from a capabilities documents.
@@ -143,6 +144,9 @@ class Wfs_2_0_Factory extends WfsFactory {
 	protected function createFeatureTypeFromXml ($xml, $myWfs, $featureTypeName) {
 		$newFeatureType = new WfsFeatureType($myWfs);
 
+		//Ticket 7322: At least resolve first level of includes before starting logic to get deegree services working
+		$xml=$this->loadXMLStringWithIncludes($xml); //$myWfs);
+
 		$doc = new DOMDocument();
 		$doc->loadXML($xml);
 		$e = new mb_notice("class_wfs_2_0_factory.php: Got following FeatureType XML: ".$xml);
@@ -179,6 +183,27 @@ class Wfs_2_0_Factory extends WfsFactory {
 		// for the sake of simplicity we only care about top level elements. Seems to have worked so far
 		$query = sprintf("/xs:schema/xs:element[@name='%s']",$ftLocalname);
 		$elementList = $xpath->query($query);
+		
+		// Fallback if DescribeFeatureType returns wrong FeatureType (e.g., HALE WFS bug)
+		if ($elementList->length === 0) {
+			$e = new mb_notice("classes/class_wfs_2_0_factory.php: DescribeFeatureType returned no matching element for $featureTypeName, trying GetFeature fallback");
+			$fallbackElements = Wfs_2_0_Fallback::getAttributesFromGetFeature(
+				$myWfs->getFeature,
+				$myWfs->describeFeatureType,
+				$featureTypeName,
+				$myWfs->auth
+			);
+			if (is_array($fallbackElements) && count($fallbackElements) > 0) {
+				$newFeatureType->schema_problem = 'f';
+				$newFeatureType->schema = $xml;
+				// Add elements from GetFeature fallback
+				foreach ($fallbackElements as $fallbackElement) {
+					$newFeatureType->addElement($fallbackElement->name, $fallbackElement->type);
+				}
+				return $newFeatureType;
+			}
+		}
+		
 		//parse single elements - if the schema is complex, store only the DescribeFeaturetype response
 		$newFeatureType->schema_problem = 'f';
 		$newFeatureType->schema = $xml;
@@ -331,7 +356,8 @@ class Wfs_2_0_Factory extends WfsFactory {
 				$e = new mb_notice("class_wfs_2_0_factory.php - createFromXml - no athentication info given!");
 			}
 			$myWfs->auth = $auth; //always!
-			$featuretype_crsArray = array();
+			//Ticket #8491: Fix for otherCRS-Array declaration
+			//$featuretype_crsArray = array();
 			try {
 //				$xml = str_replace('xlink:href', 'xlinkhref', $xml);
 				#http://forums.devshed.com/php-development-5/simplexml-namespace-attributes-problem-452278.html
@@ -434,6 +460,8 @@ class Wfs_2_0_Factory extends WfsFactory {
 				$capFeatureTypes = $xpath->query('/wfs:WFS_Capabilities/wfs:FeatureTypeList/wfs:FeatureType', $wfs20Cap);
 				$i = 1; //cause index of xml objects begin with 1
 				foreach ($capFeatureTypes as $featureType) {
+					//Ticket #8491: Fix for otherCRS-Array declaration
+					$featuretype_crsArray = array();
 					$featuretype_name = $this->stripEndlineAndCarriageReturn($this->getValue($xpath, './wfs:Name/text()', $featureType));
 					$featuretype_title = $this->stripEndlineAndCarriageReturn($this->getValue($xpath, './wfs:Title/text()', $featureType));
 					$featuretype_abstract = $this->stripEndlineAndCarriageReturn($this->getValue($xpath, './wfs:Abstract/text()', $featureType));
@@ -476,6 +504,7 @@ class Wfs_2_0_Factory extends WfsFactory {
 					$featuretype_latlon_maxy = $upperCorner[1];
 
 					try {
+						//Hm..hier wird srs und crsArray initialisiert..aber später
 						$currentFeatureType = $this->createFeatureTypeFromUrlGet($myWfs, $featuretype_name, $featureTypeNsArray);
 						if ($currentFeatureType !== null) {
 							$currentFeatureType->name = $featuretype_name;
@@ -578,5 +607,93 @@ class Wfs_2_0_Factory extends WfsFactory {
             return null;
         }
     }
+
+
+	private function mergeSchemaNodes($targetSchemaNode, $sourceSchemaNode) {
+		// Get attributes from the source schema node
+		$sourceAttributes = [];
+		foreach ($sourceSchemaNode->attributes as $attr) {
+			$sourceAttributes[$attr->name] = $attr->value;
+		}
+	
+		// Merge attributes into the target schema node
+		foreach ($sourceAttributes as $name => $value) {
+			// Check if the attribute already exists in the target schema node
+			if (!$targetSchemaNode->hasAttribute($name)) {
+				// If not, add the attribute to the target schema node
+				$targetSchemaNode->setAttribute($name, $value);
+			}
+		}
+
+		return $targetSchemaNode;
+	}
+	
+	private function loadXMLStringWithIncludes($xmlString) { //, $aWfs) {
+		$doc = new DOMDocument();
+		$doc->loadXML($xmlString);
+	
+		// Find all include elements
+		$includeNodes = $doc->getElementsByTagName('include');
+	
+		// Iterate include elements
+		foreach ($includeNodes as $includeNode) {
+			// Check if the include node has schemaLocation attribute
+			// Possible TODO: other attributes for URLs?
+			$includeUrl = $includeNode->getAttribute('schemaLocation');
+			
+			// If schemaLocation attribute not found, try using href attribute
+			if (empty($includeUrl)) {
+				$includeUrl = $includeNode->getAttribute('href');
+			}
+
+			// If schemaLocation attribute not found, try using url attribute
+			if (empty($includeUrl)) {
+				$includeUrl = $includeNode->getAttribute('url');
+			}
+
+			if (!empty($includeUrl)) {
+		
+				// Load the included XML
+				$includedDoc = new DOMDocument();
+				$includeXML = $this->get($includeUrl); //, $aWfs->auth);
+				
+				// Check not null
+				if (!is_null($includeXML)) {
+					$includedDoc->loadXML($includeXML);
+				} else {
+					continue;
+				}
+		
+				// Import the nodes of the included XML into the main document
+				foreach ($includedDoc->documentElement->childNodes as $node) {
+					$importedNode = $doc->importNode($node, true);
+					$includeNode->parentNode->insertBefore($importedNode, $includeNode);
+				}
+		
+				// Remove the include element from the main document
+				$includeNode->parentNode->removeChild($includeNode);
+				
+				// Merge schema nodes
+				$targetSchemaNode = $doc->getElementsByTagName('schema')->item(0);
+				//$e = new mb_exception("classes/class_wfs_2_0_factory.php: CSTEST: " . $doc->saveXML());
+				$sourceSchemaNode = $includedDoc->getElementsByTagName('schema')->item(0);
+				if (!is_null($targetSchemaNode) && !is_null($sourceSchemaNode)) {
+					// Merge attributes and replace target schema node with the merged one
+					$mergedSchemaNode = $this->mergeSchemaNodes($targetSchemaNode, $sourceSchemaNode);
+					//$doc->documentElement->replaceWith($mergedSchemaNode, $targetSchemaNode);
+									 
+				}
+
+			}
+		}
+	
+		// Return the final merged XML as a string
+		return $doc->saveXML();
+	}
+	
+
+
+
+
 }
 ?>

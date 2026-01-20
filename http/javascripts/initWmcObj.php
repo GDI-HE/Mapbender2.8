@@ -671,15 +671,17 @@ if(is_array($inputGeojsonArray) && count($inputGeojsonArray) > 0 && !empty($inpu
 		        $geojson = json_decode($styledGeojson);
 		        //add default title for geojson collection, if not given 
 			    if (!empty($geojson->title)) {
-				    $geojsonTitle = $geojson->title . " " ._mb("Group")." ". $i;
+				//Ticket 8549: Changing default title of geojson collection
+				$geojsonTitle = $geojson->title . " " ._mb("Collection")." ". $i;
 			    } else {
-				    $geojsonTitle = "notTitleGivenForCollection " . $i;
+				$geojsonTitle = _mb("Collection") . " " . $i;
 			    }
 			    $kmlOrder[] = $geojsonTitle;
 			    $kmls->{$geojsonTitle}->type = "geojson";
 			    $kmls->{$geojsonTitle}->data = $geojson;
 			    $kmls->{$geojsonTitle}->url = $geojsonTitle;
 			    $kmls->{$geojsonTitle}->display = true;
+
 			//Ticket 8549: In the context of compatibility changes in geojson fileuploads,
 			//this logic was fixed to allow for multiple polygons in a geojson file.
 			//but also deletes the old multipolygon features

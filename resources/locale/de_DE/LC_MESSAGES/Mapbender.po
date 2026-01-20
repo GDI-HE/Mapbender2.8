@@ -1935,10 +1935,6 @@ msgstr "Ungültiges KBS!"
 msgid "Area: "
 msgstr "Fläche: "
 
-#: ../http/plugins/mb_measure_widget.php:98
-msgid "Angle: "
-msgstr "Winkel: "
-
 #: ../http/plugins/mb_print.php:461
 msgid "print document"
 msgstr "Drucke Dokument"
@@ -4460,4 +4456,4 @@ msgid "Collection"
 msgstr "Gruppe"
 
 msgid "Open in Mapclient"
-msgstr "Im Kartenclient anzeigen"
+msgstr "Im Kartenclient zeigen"

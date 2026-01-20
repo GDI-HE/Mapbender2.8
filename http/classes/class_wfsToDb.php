@@ -211,11 +211,12 @@ class WfsToDb {
 		}
 		// update WFS
 		if (!$updateMetadataOnly) {
+			#Ticket 8490: wfs_license_source_note should not be updated by update without "overwrite"-flag (updateMetadaOnly)
 			$e = new mb_notice("classes/class_wfsToDb.php: - function update - not from metadata editor");
 			$sql = "UPDATE wfs SET wfs_version = $1, wfs_name = $2, wfs_getcapabilities = $3, wfs_getcapabilities_doc = $4, ";
 			$sql .= "wfs_upload_url = $5, wfs_describefeaturetype = $6, wfs_getfeature = $7, ";
 			$sql .= "wfs_transaction = $8, wfs_timestamp = $9, wfs_network_access = $10, fkey_mb_group_id = $11, ";
-			$sql .=  "wfs_max_features = $12, inspire_annual_requests = $13, wfs_username = $14, wfs_password = $15, wfs_auth_type = $16, wfs_license_source_note = $18, wfs_alternate_title = $19 ";
+			$sql .=  "wfs_max_features = $12, inspire_annual_requests = $13, wfs_username = $14, wfs_password = $15, wfs_auth_type = $16, wfs_alternate_title = $18 ";
 			$sql .= "WHERE wfs_id = $17";
 			$v = array(
 				$aWfs->getVersion(),
@@ -235,7 +236,6 @@ class WfsToDb {
 				$aWfs->auth['password'],
 				$aWfs->auth['auth_type'],
 				$aWfs->id,
-				$aWfs->wfs_license_source_note,
 			    $aWfs->alternate_title
 			);
 			$t = array('s','s','s','s','s','s','s','s','s','i','i','i','i','s','s','s','i','s','s');
@@ -693,13 +693,21 @@ class WfsToDb {
 	 * @param $aWfsFeatureTypeId Integer
 	 * @param $metadataUrl object
 	 */
-	private static function insertFeatureTypeMetadataUrl ($aWfsFeatureTypeId, $metadataUrl, $withParsing = false) {
+	private static function insertFeatureTypeMetadataUrl ($aWfsFeatureTypeId, $metadataUrl, $withParsing = false, $aWfs = null) {
 		//function as defined in class wms!
 		//origin 2 - set by mapbender metadata editor - new record
 		//origin 3 - set by mapbender metadata editor - new linkage
 		//harvest the record if some readable format is given - should this be adoptable?
 		//parse the content if iso19139 is given
 		//TODO: generate temporal uuid for inserting and getting the serial afterwards
+		
+		//Check if harvesting should be skipped based on WFS configuration
+		if ($aWfs !== null && isset($aWfs->harvestCoupledDatasetMetadata) && $aWfs->harvestCoupledDatasetMetadata == false) {
+			$e = new mb_notice("class_wfsToDb.php: MetadataURL harvesting is disabled for this WFS - skipping metadata import completely");
+			//do NOT harvest and do NOT store - just skip
+			return true;
+		}
+		
 		//delete old relations for this resource - only those which are from 'capabilities'
 		$mbMetadata_1 = new Iso19139();
 		$mbMetadata_1->deleteMetadataRelation("featuretype", $aWfsFeatureTypeId,"capabilities");
@@ -1342,7 +1350,7 @@ class WfsToDb {
 		$e = new mb_notice("Number of metadataurls for featuretype ".$aWfsFeatureType->id." : ".count($aWfsFeatureType->metadataUrlArray));
 		for ($i = 0; $i < count($aWfsFeatureType->metadataUrlArray); $i++) {
 			$metadataUrl = $aWfsFeatureType->metadataUrlArray[$i];
-			if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl)) {
+			if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl, false, $aWfsFeatureType->wfs)) {
 				return false;	
 			}
 		}
@@ -1562,7 +1570,7 @@ SQL;
 			for ($i = 0; $i < count($aWfsFeatureType->metadataUrlArray); $i++) {
 				$metadataUrl = $aWfsFeatureType->metadataUrlArray[$i];
 				//$e = new mb_exception("metadataUrl: ".json_encode($aWfsFeatureType->metadataUrlArray[$i]));
-				if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl)) {
+				if (!WfsToDb::insertFeatureTypeMetadataUrl($aWfsFeatureType->id, $metadataUrl, false, $aWfsFeatureType->wfs)) {
 					return false;	
 				}
 			}
