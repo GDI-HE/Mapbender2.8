@@ -2185,6 +2185,18 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						}
 						// $numberOfObjects = 1000;
 						//$e = new mb_exception("counted features: ".$numberOfObjects);
+						
+						// Check offset: return 404 if offset is beyond available features
+						if (! isset ( $offset )) {
+							$offset = 0;
+						}
+						$offsetExceeded = false;
+							
+						// Return 404 if offset >= numberOfObjects (no data available at this offset)
+						if ($numberOfObjects > 0 && $offset >= $numberOfObjects) {
+							$offsetExceeded = true;
+						}
+	
 						if ($numberOfObjects == 0 || $numberOfObjects == false) {
 							$returnObject->success = false;
 							$returnObject->message = "No results found or an error occured - see server logs - please try it again! Use the back button!";
@@ -2919,18 +2931,36 @@ switch ($f) {
 		} else {
 			header ( "Content-type: application/vnd.geo+json" );
 		}
+		// 404-Header if offset too big
+		if (isset($offsetExceeded) && $offsetExceeded == true) {
+			header("HTTP/1.1 404 Not Found");
+			die();
+		}
 		if ($corsHeader != false) {
 		    header ( "Access-Control-Allow-Origin: " . $corsHeader);
 		}
 		echo json_encode ( $returnObject );
 		break;
 	case "xml" :
+		// 404-Header if offset too big
+		if (isset($offsetExceeded) && $offsetExceeded == true) {
+			header("HTTP/1.1 404 Not Found");
+			die();
+		}
 		header ( "Content-type: application/xml" );
 		//Content-type: application/xhtml+xml; charset=UTF-8
 		//header ( "application/gml+xml; version=3.2; profile=http://www.opengis.net/def/profile/ogc/2.0/gml-sf0" );
-		echo $gmlFeatureCache;
+		if ($gmlFeatureCache != null) {
+			echo $gmlFeatureCache;
+		}
 		break;
 	case "html" :
+		// 404-Header if offset too big
+		if (isset($offsetExceeded) && $offsetExceeded == true) {
+			header("HTTP/1.1 404 Not Found");
+			die();
+		}
+		
 		$js1 = '<script>' . $newline;
 		// https://stackoverflow.com/questions/5997450/append-to-url-and-refresh-page
 		$js1 .= "	function checkActivation() {";
