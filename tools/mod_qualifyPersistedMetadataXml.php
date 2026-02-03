@@ -134,9 +134,10 @@ if ($handle = opendir($metadataDir)) {
 			
 			$metadataXml = exchangeLanguageAndDeletePolygon( $metadataXml );
 			$metadataXml = str_replace('http://www.opengis.net/gml/3.2', 'http://www.opengis.net/gml', $metadataXml);
-		    	$metadataXml = str_replace('http://www.opengis.net/gml', 'http://www.opengis.net/gml/3.2', $metadataXml);
+			$metadataXml = str_replace('http://www.opengis.net/gml', 'http://www.opengis.net/gml/3.2', $metadataXml);
 			//open same file for write and insert xml into the file!
-            		$writeHandle = fopen($metadataDir."/".$file, "w+");
+			$writeHandle = fopen($metadataDir."/".$file, "w+");
+			$metadataXml = replaceOpenDataKeyword($metadataXml);
 			fwrite($writeHandle, $metadataXml);
 			fclose($writeHandle);
 			logMessages("Number of altered file: ".($numberOfFile + 1));
@@ -451,5 +452,16 @@ function logMessages($message) {
     } else {
         $e = new mb_exception(__FILE__.": ".$message);
     }
+}
+
+function replaceOpenDataKeyword($metadataXml) {
+	// Simple string matching for opendata keyword in various forms
+	// Pattern: >opendata< or >open data< (case-insensitive)
+	$count = 0;
+	$metadataXml = preg_replace('/>open\s*data</i', '>deletedKeyword<', $metadataXml, -1, $count);
+	if ($count > 0) {
+		logMessages("replaceOpenDataKeyword: Replaced $count opendata keyword variant(s) with deletedKeyword");
+	}
+	return $metadataXml;
 }
 ?>
