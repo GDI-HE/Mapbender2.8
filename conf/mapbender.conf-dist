@@ -361,6 +361,15 @@ define("TMP_SEARCH_RESULT_STORAGE", "file"); #memcached, memcache, #session - no
 define("TMP_SEARCH_RESULT_MAX_AGE", "2400"); # Max age in seconds for temporal results before they will be deleted by e.g. a cronjob or by memcached / apc itself
 
 # --------------------------------------------
+# Fuzzy search using PostgreSQL pg_trgm extension (optional)
+# Requires: CREATE EXTENSION pg_trgm; in the database
+# When enabled, uses word_similarity() for fuzzy matching instead of LIKE
+# This allows finding results even with typos or partial matches
+# --------------------------------------------
+define("SEARCH_USE_TRIGRAM", false); # Set to true to enable fuzzy search
+define("SEARCH_TRIGRAM_THRESHOLD", 0.3); # Similarity threshold (0.0-1.0), lower = more results
+
+# --------------------------------------------
 # define if csw capabilities documents should be cached for csw client interface - faster when resolving coupled resources!
 # --------------------------------------------
 define("CACHE_CSW_CAPS", false);
