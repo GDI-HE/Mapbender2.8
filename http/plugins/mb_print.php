@@ -945,7 +945,9 @@ var PrintPDF = function (options) {
 
   function fixMapFormValues (printInfo) {
     var map = getMapObjByName(myTarget);
-    var scale = Math.pow(10, Math.floor(Math.log(map.getScale()) / Math.LN10));
+    var rawScale = map.getScale();
+    var magnitude = Math.pow(10, Math.floor(Math.log(rawScale) / Math.LN10));
+    var scale = Math.round(rawScale / magnitude) * magnitude;
     $("#scale").val(scale.toString());
 
     var realWidthInM = scale * getPDFMapSize("width") / 1000;
