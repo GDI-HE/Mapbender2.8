@@ -23,7 +23,7 @@
             "elements" : {
                 "karte" : {
                     "type" : "map",
-                    "res_dpi" : 105,
+                    "res_dpi" : 144,
                     "x_ul" : 18.5,
                     "y_ul" : 22.8,
                     "width" : 179.7,
