@@ -1022,13 +1022,17 @@ Mapbender.Map = function (options) {
 						if (featureInfoObj.inBbox) {
 							featureInfoObj.title += this.wms[i].objLayer[j].gui_layer_title+", ";
 							featureInfoObj.names += this.wms[i].objLayer[j].layer_name+",";
-							//get url to legend
-							if (typeof(this.wms[i].objLayer[j].layer_style[0]) !=='undefined' && typeof(this.wms[i].objLayer[j].layer_style[0].legendurl) !== 'undefined') {
-								featureInfoObj.legendurl += this.wms[i].objLayer[j].layer_style[0].legendurl+",";
+							//get url to legend - use currently selected style
+							var currentLayerStyle = this.wms[i].getCurrentStyleByLayerName(this.wms[i].objLayer[j].layer_name);
+							var currentLegendUrl = this.wms[i].getLegendUrlByGuiLayerStyle(this.wms[i].objLayer[j].layer_name, currentLayerStyle || '');
+							if (currentLegendUrl) {
+								featureInfoObj.legendurl += currentLegendUrl+",";
 							} else {
 								featureInfoObj.legendurl += "empty"+",";
 							}
-							if (typeof(this.wms[i].objLayer[j].layer_style[0]) !=='undefined' && this.wms[i].objLayer[j].layer_style[0].name !== 'undefined') {
+							if (currentLayerStyle) {
+								featureInfoObj.styles += currentLayerStyle+",";
+							} else if (typeof(this.wms[i].objLayer[j].layer_style[0]) !=='undefined' && this.wms[i].objLayer[j].layer_style[0].name !== 'undefined') {
 								featureInfoObj.styles += this.wms[i].objLayer[j].layer_style[0].name+",";
 							} else {
 								featureInfoObj.styles += "default"+",";
@@ -1071,7 +1075,11 @@ Mapbender.Map = function (options) {
 					if (typeof(featureInfoRequest) !== 'undefined' && featureInfoRequest !== "" && featureInfoRequest !== false) {
 						featureInfoRequest = changeURLParameterValue(featureInfoRequest,"LAYERS", this.wms[i].objLayer[j].layer_name);
 						featureInfoRequest = changeURLParameterValue(featureInfoRequest,"QUERY_LAYERS", this.wms[i].objLayer[j].layer_name);
-						if (typeof(this.wms[i].objLayer[j].layer_style[0]) !== 'undefined' && this.wms[i].objLayer[j].layer_style[0].name !== 'undefined') {
+						// Use the currently selected style (gui_layer_style) instead of always layer_style[0]
+						var currentLayerStyle = this.wms[i].getCurrentStyleByLayerName(this.wms[i].objLayer[j].layer_name);
+						if (currentLayerStyle) {
+							featureInfoObj.styles = currentLayerStyle;
+						} else if (typeof(this.wms[i].objLayer[j].layer_style[0]) !== 'undefined' && this.wms[i].objLayer[j].layer_style[0].name !== 'undefined') {
 							featureInfoObj.styles = this.wms[i].objLayer[j].layer_style[0].name;
 						} else {
 							featureInfoObj.styles = "default";
@@ -1090,9 +1098,10 @@ Mapbender.Map = function (options) {
 						featureInfoObj.request = "empty";
 						featureInfoObj.inBbox = false;
 					}
-					//get url to legend
-					if (typeof(this.wms[i].objLayer[j].layer_style[0]) !=='undefined' && typeof(this.wms[i].objLayer[j].layer_style[0].legendurl) !== 'undefined') {
-						featureInfoObj.legendurl = this.wms[i].objLayer[j].layer_style[0].legendurl;
+					//get url to legend - use currently selected style
+					var currentLegendUrl = this.wms[i].getLegendUrlByGuiLayerStyle(this.wms[i].objLayer[j].layer_name, currentLayerStyle || '');
+					if (currentLegendUrl) {
+						featureInfoObj.legendurl = currentLegendUrl;
 					} else {
 						featureInfoObj.legendurl = "empty";
 					}
