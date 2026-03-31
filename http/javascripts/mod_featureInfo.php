@@ -250,7 +250,7 @@ function makeDialog($content, title, dialogPosition, offset, printInfo) {
       position: dialogPosition,
       dialogClass: uniqueClass,
       buttons: {
-        "Ok": function() {
+        "<?php echo _mb("Ok"); ?>": function() {
           if (standingHighlightFeatureInfo !== null) {
             standingHighlightFeatureInfo.clean();
           }
@@ -269,7 +269,7 @@ function makeDialog($content, title, dialogPosition, offset, printInfo) {
       }
     };
     if (featureInfoPrint) {
-      dialogConfig.buttons['Print'] = function () {
+      dialogConfig.buttons['<?php echo _mb("Print"); ?>'] = function () {
         $(featureInfoPrintButton).data('printObj').printFeatureInfo(printInfo, $content)
       }
     }

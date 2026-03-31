@@ -1064,11 +1064,11 @@ var PrintPDF = function (options) {
       $dialog = $dialogDiv.dialog({
         autoOpen: true,
         modal: false,
-        title: "Print FeatureInfo",
+        title: "<?php echo _mb("Print FeatureInfo"); ?>",
         width: 400,
         height: 400,
         buttons: {
-          "Ok": function () {
+          "<?php echo _mb("Ok"); ?>": function () {
             $("#" + myId).bind("load", function () {
               restore();
             });
@@ -1076,7 +1076,7 @@ var PrintPDF = function (options) {
             $("." + myId + "_working_bg").show();
             $('#printPDF_form').submit();
           },
-          "Cancel": restore
+          "<?php echo _mb("Cancel"); ?>": restore
         }
       });
 
