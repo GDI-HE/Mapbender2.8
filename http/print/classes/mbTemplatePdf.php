@@ -219,51 +219,61 @@ class mbTemplatePdf extends mbPdf
             $this->objPdf->addPage();
             $this->objPdf->useTemplate($tplidx);
 
-            // extract specific wms layer from feature info request
+            // extract specific wms layer(s) from feature info request
 
             $matches = array();
             preg_match("/^[^?]*/", $url->request, $matches);
             $host = $matches[0];
             preg_match("/LAYERS=([^&]*)/", $url->request, $matches);
-            $wmsLayer = $matches[1];
+            $queryLayers = explode(",", $matches[1]);
 
-            new mb_notice("print featureinfo: host: $host, layer: $wmsLayer");
+            new mb_notice("print featureinfo: host: $host, layers: " . implode(",", $queryLayers));
 
-            // find wms url in mapUrls that contains the wms layer
+            // find wms url in mapUrls that contains any of the queried layers
 
-            new mb_notice("print featureinfo: pattern: ". "/" . preg_quote($host, '/') . ".*&LAYERS=[^&]*" . preg_quote($wmsLayer, '/') . "/");
+            $matchedMapUrl = null;
+            $matchedLayers = array();
+            $matchedStyles = array();
 
-            $wmsUrls = preg_grep("/" . preg_quote($host, '/') . ".*&LAYERS=[^&]*" . preg_quote($wmsLayer, '/') . "/", $mapUrls);
-            if (count($wmsUrls) > 1) {
-                new mb_exception("print featureinfo: Found more than one fitting layer for feature info request.");
-                continue;
-            } else if (count($wmsUrls) < 1) {
+            foreach ($mapUrls as $candidateUrl) {
+                // Must be from the same host
+                if (strpos($candidateUrl, $host) !== 0) {
+                    continue;
+                }
+                if (!preg_match("/LAYERS=([^&]*)/", $candidateUrl, $lm)) {
+                    continue;
+                }
+                $candidateLayers = explode(",", $lm[1]);
+                // Check if any of our query layers appear in this map URL
+                $found = array_intersect($queryLayers, $candidateLayers);
+                if (!empty($found)) {
+                    $matchedMapUrl = $candidateUrl;
+                    $matchedLayers = $found;
+                    // Extract corresponding styles
+                    if (preg_match("/STYLES=([^&]*)/", $candidateUrl, $sm)) {
+                        $allStyles = explode(",", $sm[1]);
+                        foreach ($found as $layer) {
+                            $pos = array_search($layer, $candidateLayers);
+                            $matchedStyles[] = isset($allStyles[$pos]) ? $allStyles[$pos] : "";
+                        }
+                    }
+                    break;
+                }
+            }
+
+            if (!$matchedMapUrl) {
                 new mb_exception("print featureinfo: Found no fitting layer for feature info request.");
                 continue;
             }
-            $wmsUrl = reset($wmsUrls);
 
-            new mb_notice("print featureinfo: found url: $wmsUrl");
+            new mb_notice("print featureinfo: found url: $matchedMapUrl");
 
-            // find position of the wms layer in the found map url
-
-            preg_match("/LAYERS=([^&]*)/", $wmsUrl, $matches);
-            $allWmsLayers = explode(",", $matches[1]);
-            $layerPosition = array_search($wmsLayer, $allWmsLayers);
-
-            new mb_notice("print featureinfo: layer position: $layerPosition");
-
-            $mapUrl = preg_replace("/LAYERS=[^&]*/", "LAYERS=$wmsLayer", $wmsUrl);
-
-            // find fitting style in map url
-
-            if (preg_match("/STYLES=([^&]*)/", $wmsUrl, $matches)) {
-                $allStyles = explode(",", $matches[1]);
-                $style = $allStyles[$layerPosition];
-
-                new mb_notice("print featureinfo: style: $style");
-
-                $mapUrl = preg_replace("/STYLES=[^&]*/", "STYLES=$style", $mapUrl);
+            // construct new map url with only the matched layers
+            $layersStr = implode(",", $matchedLayers);
+            $mapUrl = preg_replace("/LAYERS=[^&]*/", "LAYERS=$layersStr", $matchedMapUrl);
+            if (!empty($matchedStyles)) {
+                $stylesStr = implode(",", $matchedStyles);
+                $mapUrl = preg_replace("/STYLES=[^&]*/", "STYLES=$stylesStr", $mapUrl);
             }
 
             // construct new map url
@@ -311,6 +321,31 @@ class mbTemplatePdf extends mbPdf
                 $featureInfoResult = nl2br(wordwrap($featureInfoResult, 75, "\n", true));
             }
 
+            // The WMS may return multiple full HTML documents concatenated together
+            // (one per feature). Dompdf only renders the first <html> block and
+            // ignores the rest. Merge all body contents into one valid HTML document.
+            $htmlBlocks = preg_split('/(?=<html[\s>])/i', $featureInfoResult);
+            if (count($htmlBlocks) > 1) {
+                // Extract <head> from first block for styles
+                $headContent = '';
+                if (preg_match('/<head>(.*?)<\/head>/is', $htmlBlocks[0], $headMatch)) {
+                    $headContent = $headMatch[1];
+                } elseif (preg_match('/<head>(.*?)<\/head>/is', $htmlBlocks[1], $headMatch)) {
+                    $headContent = $headMatch[1];
+                }
+                // Extract body content from every block
+                $allBodies = '';
+                foreach ($htmlBlocks as $block) {
+                    if (!trim($block)) continue;
+                    if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $block, $bodyMatch)) {
+                        $allBodies .= $bodyMatch[1];
+                    } elseif (preg_match('/<body[^>]*>(.*)/is', $block, $bodyMatch)) {
+                        $allBodies .= $bodyMatch[1];
+                    }
+                }
+                $featureInfoResult = '<html><head>' . $headContent . '</head><body>' . $allBodies . '</body></html>';
+            }
+
             if (!empty($pageConf->titleHTML)) {
                 if (preg_match("/<body>/i", $featureInfoResult)) {
                     $featureInfoResult = preg_replace("/<body>/i", "$0".$pageConf->titleHTML, $featureInfoResult);
@@ -318,6 +353,21 @@ class mbTemplatePdf extends mbPdf
                     $featureInfoResult = $pageConf->titleHTML . $featureInfoResult;
                 }
             }
+
+            // Hide the red stripe column (.tab1) as Dompdf 0.8.x cannot handle
+            // float-based side-by-side layouts and causes timeouts/rendering issues.
+            $domPdfLayoutFix = '<style type="text/css">'
+                . '.tab1 { display: none !important; }'
+                . '.tab2 { margin-left: 0 !important; }'
+                . '</style>';
+            if (stripos($featureInfoResult, '</head>') !== false) {
+                $featureInfoResult = str_ireplace('</head>', $domPdfLayoutFix . '</head>', $featureInfoResult);
+            } else {
+                $featureInfoResult = $domPdfLayoutFix . $featureInfoResult;
+            }
+
+            // Remove all images - Dompdf 0.8.x cannot reliably load remote images.
+            $featureInfoResult = preg_replace('/<img[^>]*>/i', '', $featureInfoResult);
 
             $dompdf->loadHtml("$featureInfoResult");
             $dompdf->render();
@@ -331,3 +381,4 @@ class mbTemplatePdf extends mbPdf
 }
 
 ?>
+
