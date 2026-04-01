@@ -1064,9 +1064,15 @@ var PrintPDF = function (options) {
       $dialog = $dialogDiv.dialog({
         autoOpen: true,
         modal: false,
+        dialogClass: 'pfi-dialog',
         title: "<?php echo _mb("Print FeatureInfo"); ?>",
-        width: 400,
-        height: 400,
+        width: 420,
+        height: 'auto',
+        maxHeight: 580,
+        position: [20, 80],
+        open: function () {
+          $(this).closest('.ui-dialog').css({ top: '80px', left: '20px' });
+        },
         buttons: {
           "<?php echo _mb("Ok"); ?>": function () {
             $("#" + myId).bind("load", function () {
