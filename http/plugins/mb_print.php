@@ -518,6 +518,27 @@ var PrintPDF = function (options) {
     var legendUrlArrayReverse = [];
     f.overview_url.value = '';
 
+    // Force-include cadastral layers in the printed map image even when unchecked in tree.
+    // We temporarily set gui_layer_visible=1 so getLayers()/getMapUrl() picks them up.
+    var pfiCadMapPatch = [];
+    if (printFeatureInfoData !== null &&
+        printFeatureInfoData.pfiCadastralWmsId &&
+        printFeatureInfoData.pfiCadastralLayerNames &&
+        printFeatureInfoData.pfiCadastralLayerNames.length > 0) {
+      for (var cadWmsI = 0; cadWmsI < mapObj.wms.length; cadWmsI++) {
+        if (mapObj.wms[cadWmsI].wms_id === printFeatureInfoData.pfiCadastralWmsId) {
+          for (var cadLyrI = 0; cadLyrI < mapObj.wms[cadWmsI].objLayer.length; cadLyrI++) {
+            var cadLyrObj = mapObj.wms[cadWmsI].objLayer[cadLyrI];
+            if (printFeatureInfoData.pfiCadastralLayerNames.indexOf(cadLyrObj.layer_name) >= 0) {
+              pfiCadMapPatch.push({ layer: cadLyrObj, orig: cadLyrObj.gui_layer_visible });
+              cadLyrObj.gui_layer_visible = 1;
+            }
+          }
+          break;
+        }
+      }
+    }
+
     if (options.reverseLegend == 'true') {
       for (var i = mapObj.wms.length - 1; i >= 0; i--) {
         var currentWms = mapObj.wms[i];
@@ -616,6 +637,11 @@ var PrintPDF = function (options) {
           }
         }
       }
+    }
+
+    // Restore cadastral layer visibility after map URLs have been collected
+    for (var cadRI = 0; cadRI < pfiCadMapPatch.length; cadRI++) {
+      pfiCadMapPatch[cadRI].layer.gui_layer_visible = pfiCadMapPatch[cadRI].orig;
     }
 
     var legendUrlArrayJson = $.toJSON(legendUrlArray);
@@ -999,6 +1025,17 @@ var PrintPDF = function (options) {
       pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
       pathEl.setAttribute('fill-rule', 'evenodd');
       svgEl.appendChild(pathEl);
+
+      // Red circle marker at the center of the print box
+      var circleEl = document.createElementNS(ns, 'circle');
+      circleEl.setAttribute('r', '4');
+      circleEl.setAttribute('fill', '#ff0000');
+      circleEl.setAttribute('stroke', '#ff0000');
+      circleEl.setAttribute('stroke-width', '2');
+      circleEl.setAttribute('fill-opacity', '0.5');
+      circleEl.setAttribute('style', 'stroke-width: 2px; fill-opacity: 0.5;');
+      svgEl.appendChild(circleEl);
+
       $mapEl[0].appendChild(svgEl);
 
       function updateOverlay() {
@@ -1034,6 +1071,12 @@ var PrintPDF = function (options) {
           ' L' + c1[0] + ' ' + c1[1] +
           ' L' + c0[0] + ' ' + c0[1] + ' Z';
         pathEl.setAttribute('d', d);
+
+        // Pin the red circle to the visual center of the print box rectangle
+        var boxCx = (c0[0] + c1[0] + c2[0] + c3[0]) / 4;
+        var boxCy = (c0[1] + c1[1] + c2[1] + c3[1]) / 4;
+        circleEl.setAttribute('cx', boxCx);
+        circleEl.setAttribute('cy', boxCy);
       }
 
       var intervalId = setInterval(updateOverlay, 80);
@@ -1043,6 +1086,98 @@ var PrintPDF = function (options) {
         clearInterval(intervalId);
         $('#pfi-spotlight-overlay').remove();
       };
+    }
+
+    // Auto-inject Hintergrundkarte/Flurstücke as a permanent Abfragen entry.
+    // Strategy: find the WMS titled "Hintergrundkarte", then find the "Flurstücke" sublayer within it.
+    // This avoids false matches when multiple WMS/layers share the word "Flurstücke".
+    var pfiHintergrundkarteKeyword = /hintergrundkarte/i;
+    var pfiFlurstuckeKeyword = /flurst[uü]c?ke/i;
+    var pfiMapObj = mb_mapObj[getMapObjIndexByName(myTarget)];
+    var pfiUrls = printInfo.urls || [];
+    console.log('[printFeatureInfo] printInfo.urls on entry:', pfiUrls.map(function(u){ return u && u.title; }));
+    console.log('[printFeatureInfo] All WMS + layers in map:', pfiMapObj.wms.map(function(w){
+      var layerTitles = (w.objLayer || []).map(function(l){ return (l.gui_layer_title || l.layer_name || '?') + '(q=' + l.gui_layer_querylayer + ',v=' + l.gui_layer_visible + ')'; }).join(', ');
+      return w.wms_id + ' | ' + w.wms_title + ' | visible=' + w.gui_wms_visible + ' | layers: [' + layerTitles + ']';
+    }));
+
+    // Skip injection if Hintergrundkarte is already represented in the urls list
+    var pfiCadastralAlreadyListed = false;
+    for (var pci = 0; pci < pfiUrls.length; pci++) {
+      if (pfiUrls[pci] && pfiUrls[pci].title && pfiHintergrundkarteKeyword.test(pfiUrls[pci].title)) {
+        pfiCadastralAlreadyListed = true;
+        console.log('[printFeatureInfo] Hintergrundkarte already in urls list:', pfiUrls[pci].title);
+        break;
+      }
+    }
+    if (!pfiCadastralAlreadyListed) {
+      // Step 1: find the Hintergrundkarte WMS
+      var pfiFountCadWms = null;
+      for (var pci = 0; pci < pfiMapObj.wms.length; pci++) {
+        var wmsToTest = pfiMapObj.wms[pci];
+        var wmsTitleToCheck = (wmsToTest.wms_currentTitle || '') + '|' + (wmsToTest.wms_title || '');
+        if (pfiHintergrundkarteKeyword.test(wmsTitleToCheck)) {
+          pfiFountCadWms = wmsToTest;
+          console.log('[printFeatureInfo] Found Hintergrundkarte WMS:', wmsToTest.wms_id, wmsToTest.wms_currentTitle || wmsToTest.wms_title);
+          break;
+        }
+      }
+      if (pfiFountCadWms === null) {
+        console.log('[printFeatureInfo] No Hintergrundkarte WMS found in map.');
+      }
+
+      if (pfiFountCadWms !== null) {
+        // Step 2: find the Flurstücke sublayer within Hintergrundkarte
+        var pfiFlurstuckeLayer = null;
+        if (pfiFountCadWms.objLayer) {
+          for (var plj = 0; plj < pfiFountCadWms.objLayer.length; plj++) {
+            var pfiLayerTitle = pfiFountCadWms.objLayer[plj].gui_layer_title || pfiFountCadWms.objLayer[plj].layer_name || '';
+            if (pfiFlurstuckeKeyword.test(pfiLayerTitle)) {
+              pfiFlurstuckeLayer = pfiFountCadWms.objLayer[plj];
+              console.log('[printFeatureInfo] Found Flurstücke layer "' + pfiLayerTitle + '" (layer_name=' + pfiFlurstuckeLayer.layer_name + ')');
+              break;
+            }
+          }
+        }
+        if (pfiFlurstuckeLayer === null) {
+          console.log('[printFeatureInfo] No Flurstücke sublayer found inside Hintergrundkarte WMS.');
+        }
+
+        if (pfiFlurstuckeLayer !== null) {
+          var pfiPxCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
+
+          // Temporarily force-enable only the Flurstücke layer so getFeatureInfoRequest() includes it
+          var pfiFlurstOrigVisible    = pfiFlurstuckeLayer.gui_layer_visible;
+          var pfiFlurstOrigQuerylayer = pfiFlurstuckeLayer.gui_layer_querylayer;
+          pfiFlurstuckeLayer.gui_layer_visible    = 1;
+          pfiFlurstuckeLayer.gui_layer_querylayer = 1;
+
+          var pfiCadReq = pfiFountCadWms.getFeatureInfoRequest(pfiMapObj, { x: pfiPxCenter[0], y: pfiPxCenter[1] });
+
+          // Restore original layer state immediately
+          pfiFlurstuckeLayer.gui_layer_visible    = pfiFlurstOrigVisible;
+          pfiFlurstuckeLayer.gui_layer_querylayer = pfiFlurstOrigQuerylayer;
+
+          console.log('[printFeatureInfo] getFeatureInfoRequest result:', pfiCadReq ? 'OK (URL length=' + pfiCadReq.length + ')' : 'false/empty');
+          if (pfiCadReq) {
+            var pfiCadTitle = pfiFlurstuckeLayer.gui_layer_title || pfiFlurstuckeLayer.layer_name;
+            var pfiFlurstStyle = pfiFountCadWms.getCurrentStyleByLayerName(pfiFlurstuckeLayer.layer_name);
+            if (pfiFlurstStyle === false || pfiFlurstStyle === '') { pfiFlurstStyle = 'default'; }
+            var pfiFlurstLegendUrl = pfiFountCadWms.getLegendUrlByGuiLayerStyle(pfiFlurstuckeLayer.layer_name, pfiFlurstStyle);
+            pfiUrls.push({
+              title: pfiCadTitle,
+              request: pfiCadReq,
+              legendurl: pfiFlurstLegendUrl || '',
+              inBbox: true
+            });
+            printInfo.urls = pfiUrls;
+            // Store WMS id + Flurstücke layer name so validate() can force it into the GetMap URL
+            printInfo.pfiCadastralWmsId = pfiFountCadWms.wms_id;
+            printInfo.pfiCadastralLayerNames = [pfiFlurstuckeLayer.layer_name];
+            console.log('[printFeatureInfo] Cadastral entry injected:', pfiCadTitle, '| Flurstücke layer:', pfiFlurstuckeLayer.layer_name);
+          }
+        }
+      }
     }
 
     if (!printInfo.originalUrls) {
@@ -1078,11 +1213,11 @@ var PrintPDF = function (options) {
       printInfo.backgroundWMS = $backgroundSelect.val().map(parseInt);
     });
 
-    $backgroundDiv.append("<h3>Hintergrundkarte:</h3>").append($backgroundSelect);
+    $backgroundDiv.append("<h3>Hintergrundkarte für abgefragte Ebene</h3>").append($backgroundSelect);
 
     // feature info ebenen
 
-    $abfragenDiv.append($("<h3>Abfragen:</h3>"));
+    $abfragenDiv.append($("<h3>Abzufragende Ebene:</h3>"));
 
     printInfo.urls.forEach(function (url, i) {
       var $checkBox = $('<input type="checkbox" checked>');
@@ -1120,6 +1255,13 @@ var PrintPDF = function (options) {
         url.request = url.request.replace(htmlRegex, '$1plain');
       });
     });
+
+    // Add input fields for print options (title, dpi, comment, scale)
+   
+ 
+    // Scale field with proportional resize buttons
+   
+  
 
     function restore () {
       if (pfiRestoring) return;
@@ -1174,7 +1316,7 @@ var PrintPDF = function (options) {
           restore();
         },
         buttons: {
-          "<?php echo _mb("Ok"); ?>": function () {
+          "<?php echo _mb("Print"); ?>": function () {
             if (pfiSubmitting) return;
             pfiSubmitting = true;
             // Disable dialog buttons to prevent double-click

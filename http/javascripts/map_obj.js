@@ -1978,3 +1978,4 @@ Mapbender.Map.prototype.getWfsConfIds = function(wfs_config){
     }
     return js_wfs_conf_id;
 };
+

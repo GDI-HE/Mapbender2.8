@@ -23,8 +23,8 @@
             },
             "options" : [
                 {
-                    "value" : "72",
-                    "label" : "72 dpi"
+                    "value" : "144",
+                    "label" : "144 dpi"
                 },
                 {
                     "value" : "144",
