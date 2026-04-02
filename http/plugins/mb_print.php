@@ -142,16 +142,28 @@ var PrintPDF = function (options) {
 
   eventAfterMapRequest.register(function () {
     if (printBox !== null) {
-      printBox.repaint();
-
-      if (!printBox.isVisible()) {
-        //$("#printboxScale").val("");
-        //$("#printboxCoordinates").val("");
-        //$("#printboxAngle").val("");
-
-        $("#printPDF_form #scale").val("");
-        $("#printPDF_form #coordinates").val("");
-        $("#printPDF_form #angle").val("");
+      if (printFeatureInfoData !== null && pfiPixelCenter !== null) {
+        // FeatureInfo mode: box stays at fixed pixel position for both pan and zoom.
+        // Scale is derived from the current map zoom level so that:
+        //   - Pan: map scale unchanged → same scale → box same pixel size
+        //   - Zoom: map scale changes → scale updates → box stays same pixel size
+        var nc = makeClickPos2RealWorldPos(myTarget, pfiPixelCenter[0], pfiPixelCenter[1]);
+        var rawMapScale = getMapObjByName(myTarget).getScale();
+        var magnitude = Math.pow(10, Math.floor(Math.log(rawMapScale) / Math.LN10));
+        var newScale = Math.round(rawMapScale / magnitude) * magnitude;
+        if (newScale > 0) {
+          printBox.setCenterMap({x: nc[0], y: nc[1]});
+          printBox.setScale(newScale);
+          $('#printPDF_form #scale').val(newScale);
+          $('#pfi_scale').val(newScale);
+        }
+      } else {
+        printBox.repaint();
+        if (!printBox.isVisible()) {
+          $("#printPDF_form #scale").val("");
+          $("#printPDF_form #coordinates").val("");
+          $("#printPDF_form #angle").val("");
+        }
       }
     }
   });
@@ -942,6 +954,8 @@ var PrintPDF = function (options) {
   };
 
   var printFeatureInfoData = null;
+  var pfiSubmitting = false;
+  var pfiPixelCenter = null;
 
   function fixMapFormValues (printInfo) {
     var map = getMapObjByName(myTarget);
@@ -967,6 +981,69 @@ var PrintPDF = function (options) {
     var printObj = this;
     var oldConfig = actualConfig;
     var $dialog;
+    var stopSpotlight = null;
+    var pfiRestoring = false;
+
+    function startSpotlightOverlay() {
+      var map = getMapObjByName(myTarget);
+      var $mapEl = $(map.getDomElement());
+      var mapW = $mapEl.width();
+      var mapH = $mapEl.height();
+      var ns = 'http://www.w3.org/2000/svg';
+      var svgEl = document.createElementNS(ns, 'svg');
+      svgEl.id = 'pfi-spotlight-overlay';
+      svgEl.setAttribute('style',
+        'position:absolute;top:0;left:0;width:' + mapW + 'px;height:' + mapH +
+        'px;z-index:999;pointer-events:none;');
+      var pathEl = document.createElementNS(ns, 'path');
+      pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
+      pathEl.setAttribute('fill-rule', 'evenodd');
+      svgEl.appendChild(pathEl);
+      $mapEl[0].appendChild(svgEl);
+
+      function updateOverlay() {
+        var coords = $('#printPDF_form #coordinates').val();
+        if (!coords) return;
+        var parts = coords.split(',');
+        var minx = parseFloat(parts[0]), miny = parseFloat(parts[1]);
+        var maxx = parseFloat(parts[2]), maxy = parseFloat(parts[3]);
+
+        // Convert unrotated map corners to pixel positions
+        var c0 = makeRealWorld2mapPos(myTarget, minx, miny);   // bottom-left
+        var c1 = makeRealWorld2mapPos(myTarget, maxx, miny);   // bottom-right
+        var c2 = makeRealWorld2mapPos(myTarget, maxx, maxy);   // top-right
+        var c3 = makeRealWorld2mapPos(myTarget, minx, maxy);   // top-left
+
+        // Apply rotation (same formula as printbox.js rotate())
+        var angle = parseFloat($('#printPDF_form #angle').val() || '0');
+        if (angle !== 0) {
+          var ctr = makeRealWorld2mapPos(myTarget, (minx + maxx) / 2, (miny + maxy) / 2);
+          var cx = ctr[0], cy = ctr[1];
+          var rad = angle * Math.PI / 180;
+          var cos = Math.cos(rad), sin = Math.sin(rad);
+          function rotPt(p) {
+            var dx = p[0] - cx, dy = p[1] - cy;
+            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
+          }
+          c0 = rotPt(c0); c1 = rotPt(c1); c2 = rotPt(c2); c3 = rotPt(c3);
+        }
+
+        var d = 'M0 0 L' + mapW + ' 0 L' + mapW + ' ' + mapH + ' L0 ' + mapH + ' Z ' +
+          'M' + c3[0] + ' ' + c3[1] +
+          ' L' + c2[0] + ' ' + c2[1] +
+          ' L' + c1[0] + ' ' + c1[1] +
+          ' L' + c0[0] + ' ' + c0[1] + ' Z';
+        pathEl.setAttribute('d', d);
+      }
+
+      var intervalId = setInterval(updateOverlay, 80);
+      updateOverlay();
+
+      return function() {
+        clearInterval(intervalId);
+        $('#pfi-spotlight-overlay').remove();
+      };
+    }
 
     if (!printInfo.originalUrls) {
       printInfo.originalUrls = printInfo.urls.slice();
@@ -1045,6 +1122,15 @@ var PrintPDF = function (options) {
     });
 
     function restore () {
+      if (pfiRestoring) return;
+      pfiRestoring = true;
+      // Re-enable FeatureInfo clicks
+      if (typeof Mapbender !== 'undefined' && Mapbender.enableFeatureInfo) {
+        Mapbender.enableFeatureInfo();
+      }
+      if (stopSpotlight) { stopSpotlight(); stopSpotlight = null; }
+      pfiPixelCenter = null;
+      pfiSubmitting = false;
       $dialog.dialog('close').remove();
       $featureInfoDialog.dialog('open');
       actualConfig = oldConfig;
@@ -1056,15 +1142,26 @@ var PrintPDF = function (options) {
 
     printObj.loadConfig(mbPrintConfigPath + printInfo.config, function () {
       $featureInfoDialog.dialog('close');
-      // printObj.createPrintBox(printInfo.point);
       buildForm();
       fixMapFormValues(printInfo);
+      printObj.createPrintBox(printInfo.point);
+      pfiPixelCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
+      stopSpotlight = startSpotlightOverlay();
+      // Disable FeatureInfo clicks while the print dialog is open
+      if (typeof Mapbender !== 'undefined' && Mapbender.disableFeatureInfo) {
+        Mapbender.disableFeatureInfo();
+      }
       printFeatureInfoData = printInfo;
+      
+      // Set initial scale value in dialog from the calculated scale
+      var initialScale = $('#printPDF_form #scale').val();
+      if (initialScale) {
+        $('#pfi_scale').val(initialScale);
+      }
 
       $dialog = $dialogDiv.dialog({
         autoOpen: true,
         modal: false,
-        dialogClass: 'pfi-dialog',
         title: "<?php echo _mb("Print FeatureInfo"); ?>",
         width: 420,
         height: 'auto',
@@ -1073,8 +1170,26 @@ var PrintPDF = function (options) {
         open: function () {
           $(this).closest('.ui-dialog').css({ top: '80px', left: '20px' });
         },
+        close: function () {
+          restore();
+        },
         buttons: {
           "<?php echo _mb("Ok"); ?>": function () {
+            if (pfiSubmitting) return;
+            pfiSubmitting = true;
+            // Disable dialog buttons to prevent double-click
+            $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
+            // Show processing indicator inside the dialog
+            $dialogDiv.find('#pfi-processing').show();
+            // Copy dialog field values to the actual form fields in #printPDF_form
+            $('#printPDF_form #title').val($dialogDiv.find('#pfi_title').val() || '');
+            $('#printPDF_form #dpi').val($dialogDiv.find('#pfi_dpi').val() || '150');
+            $('#printPDF_form #comment1').val($dialogDiv.find('#pfi_comment1').val() || '');
+            var scaleVal = $dialogDiv.find('#pfi_scale').val();
+            if (scaleVal) {
+              $('#printPDF_form #scale').val(scaleVal);
+            }
+            
             $("#" + myId).bind("load", function () {
               restore();
             });
@@ -1083,6 +1198,34 @@ var PrintPDF = function (options) {
             $('#printPDF_form').submit();
           },
           "<?php echo _mb("Cancel"); ?>": restore
+        }
+      });
+
+      // Proportional resize: ±buttons and direct scale input update the box
+      function applyPfiScale(newScale) {
+        if (isNaN(newScale) || newScale <= 0 || !printBox || !pfiPixelCenter) return;
+        var nc = makeClickPos2RealWorldPos(myTarget, pfiPixelCenter[0], pfiPixelCenter[1]);
+        printBox.setCenterMap({x: nc[0], y: nc[1]});
+        printBox.setScale(newScale);
+        $dialogDiv.find('#pfi_scale').val(newScale);
+        $('#printPDF_form #scale').val(newScale);
+      }
+
+      $dialogDiv.find('#pfi_scale').bind('change', function () {
+        applyPfiScale(parseInt($(this).val(), 10));
+      });
+
+      $dialogDiv.find('#pfi_scale_minus').bind('click', function () {
+        var s = parseInt($dialogDiv.find('#pfi_scale').val(), 10);
+        if (!isNaN(s) && s > 0) {
+          applyPfiScale(Math.max(100, Math.round(s / 1.5 / 100) * 100));
+        }
+      });
+
+      $dialogDiv.find('#pfi_scale_plus').bind('click', function () {
+        var s = parseInt($dialogDiv.find('#pfi_scale').val(), 10);
+        if (!isNaN(s) && s > 0) {
+          applyPfiScale(Math.round(s * 1.5 / 100) * 100);
         }
       });
 
