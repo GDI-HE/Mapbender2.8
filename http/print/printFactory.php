@@ -33,10 +33,13 @@ $pdf = $pf->create($_REQUEST["printPDF_template"]);
 
 new mb_notice("REQUEST:".json_encode($_REQUEST));
 
+// Capture any stray PHP output (notices/warnings) that would corrupt JSON response
+ob_start();
+
 //element vars of print
-$pdf->unlinkFiles = $unlink;
-$pdf->logRequests = $logRequests;
-$pdf->logType = $logType;
+$pdf->unlinkFiles = isset($unlink) ? $unlink : false;
+$pdf->logRequests = isset($logRequests) ? $logRequests : false;
+$pdf->logType = isset($logType) ? $logType : "file";
 
 if (isset($printLegend)){
     $pdf->printLegend = $printLegend;
@@ -54,16 +57,26 @@ if (array_key_exists("featureInfo", $_REQUEST)) {
 	$pdf->featureInfo = json_decode($_REQUEST["featureInfo"]);
 }
 
-$pdf->render();
 try {
+	$pdf->render();
 	$pdf->save();
 }
 catch (Exception $e) {
-	new mb_exception($e->message);
+	new mb_exception("printFactory error: " . $e->getMessage());
+	$strayOutput = ob_get_clean();
+	if ($strayOutput) {
+		new mb_exception("printFactory stray output: " . $strayOutput);
+	}
 	die;
 }
 
-if ($secureProtocol == "true"){
+// Discard any stray output that was captured
+$strayOutput = ob_get_clean();
+if ($strayOutput) {
+	new mb_exception("printFactory stray PHP output captured and discarded: " . $strayOutput);
+}
+
+if (isset($secureProtocol) && $secureProtocol == "true"){
     print $pdf->returnAbsoluteUrl(true);
 }else{
     print $pdf->returnAbsoluteUrl();

@@ -142,16 +142,28 @@ var PrintPDF = function (options) {
 
   eventAfterMapRequest.register(function () {
     if (printBox !== null) {
-      printBox.repaint();
-
-      if (!printBox.isVisible()) {
-        //$("#printboxScale").val("");
-        //$("#printboxCoordinates").val("");
-        //$("#printboxAngle").val("");
-
-        $("#printPDF_form #scale").val("");
-        $("#printPDF_form #coordinates").val("");
-        $("#printPDF_form #angle").val("");
+      if (printFeatureInfoData !== null && pfiPixelCenter !== null) {
+        // FeatureInfo mode: box stays at fixed pixel position for both pan and zoom.
+        // Scale is derived from the current map zoom level so that:
+        //   - Pan: map scale unchanged → same scale → box same pixel size
+        //   - Zoom: map scale changes → scale updates → box stays same pixel size
+        var nc = makeClickPos2RealWorldPos(myTarget, pfiPixelCenter[0], pfiPixelCenter[1]);
+        var rawMapScale = getMapObjByName(myTarget).getScale();
+        var magnitude = Math.pow(10, Math.floor(Math.log(rawMapScale) / Math.LN10));
+        var newScale = Math.round(rawMapScale / magnitude) * magnitude;
+        if (newScale > 0) {
+          printBox.setCenterMap({x: nc[0], y: nc[1]});
+          printBox.setScale(newScale);
+          $('#printPDF_form #scale').val(newScale);
+          $('#pfi_scale').val(newScale);
+        }
+      } else {
+        printBox.repaint();
+        if (!printBox.isVisible()) {
+          $("#printPDF_form #scale").val("");
+          $("#printPDF_form #coordinates").val("");
+          $("#printPDF_form #angle").val("");
+        }
       }
     }
   });
@@ -506,6 +518,27 @@ var PrintPDF = function (options) {
     var legendUrlArrayReverse = [];
     f.overview_url.value = '';
 
+    // Force-include cadastral layers in the printed map image even when unchecked in tree.
+    // We temporarily set gui_layer_visible=1 so getLayers()/getMapUrl() picks them up.
+    var pfiCadMapPatch = [];
+    if (printFeatureInfoData !== null &&
+        printFeatureInfoData.pfiCadastralWmsId &&
+        printFeatureInfoData.pfiCadastralLayerNames &&
+        printFeatureInfoData.pfiCadastralLayerNames.length > 0) {
+      for (var cadWmsI = 0; cadWmsI < mapObj.wms.length; cadWmsI++) {
+        if (mapObj.wms[cadWmsI].wms_id === printFeatureInfoData.pfiCadastralWmsId) {
+          for (var cadLyrI = 0; cadLyrI < mapObj.wms[cadWmsI].objLayer.length; cadLyrI++) {
+            var cadLyrObj = mapObj.wms[cadWmsI].objLayer[cadLyrI];
+            if (printFeatureInfoData.pfiCadastralLayerNames.indexOf(cadLyrObj.layer_name) >= 0) {
+              pfiCadMapPatch.push({ layer: cadLyrObj, orig: cadLyrObj.gui_layer_visible });
+              cadLyrObj.gui_layer_visible = 1;
+            }
+          }
+          break;
+        }
+      }
+    }
+
     if (options.reverseLegend == 'true') {
       for (var i = mapObj.wms.length - 1; i >= 0; i--) {
         var currentWms = mapObj.wms[i];
@@ -604,6 +637,11 @@ var PrintPDF = function (options) {
           }
         }
       }
+    }
+
+    // Restore cadastral layer visibility after map URLs have been collected
+    for (var cadRI = 0; cadRI < pfiCadMapPatch.length; cadRI++) {
+      pfiCadMapPatch[cadRI].layer.gui_layer_visible = pfiCadMapPatch[cadRI].orig;
     }
 
     var legendUrlArrayJson = $.toJSON(legendUrlArray);
@@ -942,10 +980,14 @@ var PrintPDF = function (options) {
   };
 
   var printFeatureInfoData = null;
+  var pfiSubmitting = false;
+  var pfiPixelCenter = null;
 
   function fixMapFormValues (printInfo) {
     var map = getMapObjByName(myTarget);
-    var scale = Math.pow(10, Math.floor(Math.log(map.getScale()) / Math.LN10));
+    var rawScale = map.getScale();
+    var magnitude = Math.pow(10, Math.floor(Math.log(rawScale) / Math.LN10));
+    var scale = Math.round(rawScale / magnitude) * magnitude;
     $("#scale").val(scale.toString());
 
     var realWidthInM = scale * getPDFMapSize("width") / 1000;
@@ -965,6 +1007,169 @@ var PrintPDF = function (options) {
     var printObj = this;
     var oldConfig = actualConfig;
     var $dialog;
+    var stopSpotlight = null;
+    var pfiRestoring = false;
+
+    function startSpotlightOverlay() {
+      var map = getMapObjByName(myTarget);
+      var $mapEl = $(map.getDomElement());
+      var mapW = $mapEl.width();
+      var mapH = $mapEl.height();
+      var ns = 'http://www.w3.org/2000/svg';
+      var svgEl = document.createElementNS(ns, 'svg');
+      svgEl.id = 'pfi-spotlight-overlay';
+      svgEl.setAttribute('style',
+        'position:absolute;top:0;left:0;width:' + mapW + 'px;height:' + mapH +
+        'px;z-index:999;pointer-events:none;');
+      var pathEl = document.createElementNS(ns, 'path');
+      pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
+      pathEl.setAttribute('fill-rule', 'evenodd');
+      svgEl.appendChild(pathEl);
+
+      // Red circle marker at the center of the print box
+      var circleEl = document.createElementNS(ns, 'circle');
+      circleEl.setAttribute('r', '4');
+      circleEl.setAttribute('fill', '#ff0000');
+      circleEl.setAttribute('stroke', '#ff0000');
+      circleEl.setAttribute('stroke-width', '2');
+      circleEl.setAttribute('fill-opacity', '0.5');
+      circleEl.setAttribute('style', 'stroke-width: 2px; fill-opacity: 0.5;');
+      svgEl.appendChild(circleEl);
+
+      $mapEl[0].appendChild(svgEl);
+
+      function updateOverlay() {
+        var coords = $('#printPDF_form #coordinates').val();
+        if (!coords) return;
+        var parts = coords.split(',');
+        var minx = parseFloat(parts[0]), miny = parseFloat(parts[1]);
+        var maxx = parseFloat(parts[2]), maxy = parseFloat(parts[3]);
+
+        // Convert unrotated map corners to pixel positions
+        var c0 = makeRealWorld2mapPos(myTarget, minx, miny);   // bottom-left
+        var c1 = makeRealWorld2mapPos(myTarget, maxx, miny);   // bottom-right
+        var c2 = makeRealWorld2mapPos(myTarget, maxx, maxy);   // top-right
+        var c3 = makeRealWorld2mapPos(myTarget, minx, maxy);   // top-left
+
+        // Apply rotation (same formula as printbox.js rotate())
+        var angle = parseFloat($('#printPDF_form #angle').val() || '0');
+        if (angle !== 0) {
+          var ctr = makeRealWorld2mapPos(myTarget, (minx + maxx) / 2, (miny + maxy) / 2);
+          var cx = ctr[0], cy = ctr[1];
+          var rad = angle * Math.PI / 180;
+          var cos = Math.cos(rad), sin = Math.sin(rad);
+          function rotPt(p) {
+            var dx = p[0] - cx, dy = p[1] - cy;
+            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
+          }
+          c0 = rotPt(c0); c1 = rotPt(c1); c2 = rotPt(c2); c3 = rotPt(c3);
+        }
+
+        var d = 'M0 0 L' + mapW + ' 0 L' + mapW + ' ' + mapH + ' L0 ' + mapH + ' Z ' +
+          'M' + c3[0] + ' ' + c3[1] +
+          ' L' + c2[0] + ' ' + c2[1] +
+          ' L' + c1[0] + ' ' + c1[1] +
+          ' L' + c0[0] + ' ' + c0[1] + ' Z';
+        pathEl.setAttribute('d', d);
+
+        // Pin the red circle to the visual center of the print box rectangle
+        var boxCx = (c0[0] + c1[0] + c2[0] + c3[0]) / 4;
+        var boxCy = (c0[1] + c1[1] + c2[1] + c3[1]) / 4;
+        circleEl.setAttribute('cx', boxCx);
+        circleEl.setAttribute('cy', boxCy);
+      }
+
+      var intervalId = setInterval(updateOverlay, 80);
+      updateOverlay();
+
+      return function() {
+        clearInterval(intervalId);
+        $('#pfi-spotlight-overlay').remove();
+      };
+    }
+
+    // Auto-inject Hintergrundkarte/Flurstücke as a permanent Abfragen entry.
+    // Strategy: find the WMS titled "Hintergrundkarte", then find the "Flurstücke" sublayer within it.
+    // This avoids false matches when multiple WMS/layers share the word "Flurstücke".
+    var pfiHintergrundkarteKeyword = /hintergrundkarte/i;
+    var pfiFlurstuckeKeyword = /flurst[uü]c?ke/i;
+    var pfiMapObj = mb_mapObj[getMapObjIndexByName(myTarget)];
+    var pfiUrls = printInfo.urls || [];
+
+    // Skip injection if Hintergrundkarte is already represented in the urls list
+    var pfiCadastralAlreadyListed = false;
+    for (var pci = 0; pci < pfiUrls.length; pci++) {
+      if (pfiUrls[pci] && pfiUrls[pci].title && pfiHintergrundkarteKeyword.test(pfiUrls[pci].title)) {
+        pfiCadastralAlreadyListed = true;
+        break;
+      }
+    }
+    if (!pfiCadastralAlreadyListed) {
+      // Step 1: find the Hintergrundkarte WMS
+      var pfiFountCadWms = null;
+      for (var pci = 0; pci < pfiMapObj.wms.length; pci++) {
+        var wmsToTest = pfiMapObj.wms[pci];
+        var wmsTitleToCheck = (wmsToTest.wms_currentTitle || '') + '|' + (wmsToTest.wms_title || '');
+        if (pfiHintergrundkarteKeyword.test(wmsTitleToCheck)) {
+          pfiFountCadWms = wmsToTest;
+          break;
+        }
+      }
+      if (pfiFountCadWms !== null) {
+        // Step 2: find the Flurstücke sublayer within Hintergrundkarte
+        var pfiFlurstuckeLayer = null;
+        if (pfiFountCadWms.objLayer) {
+          for (var plj = 0; plj < pfiFountCadWms.objLayer.length; plj++) {
+            var pfiLayerTitle = pfiFountCadWms.objLayer[plj].gui_layer_title || pfiFountCadWms.objLayer[plj].layer_name || '';
+            if (pfiFlurstuckeKeyword.test(pfiLayerTitle)) {
+              pfiFlurstuckeLayer = pfiFountCadWms.objLayer[plj];
+              break;
+            }
+          }
+        }
+        if (pfiFlurstuckeLayer !== null) {
+          // If the layer is already visible and queryable in the tree it will already be in pfiUrls — skip injection to avoid duplicates
+          var pfiLayerAlreadyActive = (pfiFlurstuckeLayer.gui_layer_visible == 1 && pfiFlurstuckeLayer.gui_layer_querylayer == 1);
+          if (pfiLayerAlreadyActive) {
+            // Still store the cadastral WMS/layer references so validate() can force them into the GetMap URL
+            printInfo.pfiCadastralWmsId = pfiFountCadWms.wms_id;
+            printInfo.pfiCadastralLayerNames = [pfiFlurstuckeLayer.layer_name];
+          }
+        }
+        if (pfiFlurstuckeLayer !== null && !pfiLayerAlreadyActive) {
+          var pfiPxCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
+
+          // Temporarily force-enable only the Flurstücke layer so getFeatureInfoRequest() includes it
+          var pfiFlurstOrigVisible    = pfiFlurstuckeLayer.gui_layer_visible;
+          var pfiFlurstOrigQuerylayer = pfiFlurstuckeLayer.gui_layer_querylayer;
+          pfiFlurstuckeLayer.gui_layer_visible    = 1;
+          pfiFlurstuckeLayer.gui_layer_querylayer = 1;
+
+          var pfiCadReq = pfiFountCadWms.getFeatureInfoRequest(pfiMapObj, { x: pfiPxCenter[0], y: pfiPxCenter[1] });
+
+          // Restore original layer state immediately
+          pfiFlurstuckeLayer.gui_layer_visible    = pfiFlurstOrigVisible;
+          pfiFlurstuckeLayer.gui_layer_querylayer = pfiFlurstOrigQuerylayer;
+
+          if (pfiCadReq) {
+            var pfiCadTitle = pfiFlurstuckeLayer.gui_layer_title || pfiFlurstuckeLayer.layer_name;
+            var pfiFlurstStyle = pfiFountCadWms.getCurrentStyleByLayerName(pfiFlurstuckeLayer.layer_name);
+            if (pfiFlurstStyle === false || pfiFlurstStyle === '') { pfiFlurstStyle = 'default'; }
+            var pfiFlurstLegendUrl = pfiFountCadWms.getLegendUrlByGuiLayerStyle(pfiFlurstuckeLayer.layer_name, pfiFlurstStyle);
+            pfiUrls.push({
+              title: pfiCadTitle,
+              request: pfiCadReq,
+              legendurl: pfiFlurstLegendUrl || '',
+              inBbox: true
+            });
+            printInfo.urls = pfiUrls;
+            // Store WMS id + Flurstücke layer name so validate() can force it into the GetMap URL
+            printInfo.pfiCadastralWmsId = pfiFountCadWms.wms_id;
+            printInfo.pfiCadastralLayerNames = [pfiFlurstuckeLayer.layer_name];
+          }
+        }
+      }
+    }
 
     if (!printInfo.originalUrls) {
       printInfo.originalUrls = printInfo.urls.slice();
@@ -999,11 +1204,11 @@ var PrintPDF = function (options) {
       printInfo.backgroundWMS = $backgroundSelect.val().map(parseInt);
     });
 
-    $backgroundDiv.append("<h3>Hintergrundkarte:</h3>").append($backgroundSelect);
+    $backgroundDiv.append("<h3>Hintergrundkarte für abgefragte Ebene</h3>").append($backgroundSelect);
 
     // feature info ebenen
 
-    $abfragenDiv.append($("<h3>Abfragen:</h3>"));
+    $abfragenDiv.append($("<h3>Abzufragende Ebene:</h3>"));
 
     printInfo.urls.forEach(function (url, i) {
       var $checkBox = $('<input type="checkbox" checked>');
@@ -1042,7 +1247,23 @@ var PrintPDF = function (options) {
       });
     });
 
+    // Add input fields for print options (title, dpi, comment, scale)
+   
+ 
+    // Scale field with proportional resize buttons
+   
+  
+
     function restore () {
+      if (pfiRestoring) return;
+      pfiRestoring = true;
+      // Re-enable FeatureInfo clicks
+      if (typeof Mapbender !== 'undefined' && Mapbender.enableFeatureInfo) {
+        Mapbender.enableFeatureInfo();
+      }
+      if (stopSpotlight) { stopSpotlight(); stopSpotlight = null; }
+      pfiPixelCenter = null;
+      pfiSubmitting = false;
       $dialog.dialog('close').remove();
       $featureInfoDialog.dialog('open');
       actualConfig = oldConfig;
@@ -1054,19 +1275,54 @@ var PrintPDF = function (options) {
 
     printObj.loadConfig(mbPrintConfigPath + printInfo.config, function () {
       $featureInfoDialog.dialog('close');
-      // printObj.createPrintBox(printInfo.point);
       buildForm();
       fixMapFormValues(printInfo);
+      printObj.createPrintBox(printInfo.point);
+      pfiPixelCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
+      stopSpotlight = startSpotlightOverlay();
+      // Disable FeatureInfo clicks while the print dialog is open
+      if (typeof Mapbender !== 'undefined' && Mapbender.disableFeatureInfo) {
+        Mapbender.disableFeatureInfo();
+      }
       printFeatureInfoData = printInfo;
+      
+      // Set initial scale value in dialog from the calculated scale
+      var initialScale = $('#printPDF_form #scale').val();
+      if (initialScale) {
+        $('#pfi_scale').val(initialScale);
+      }
 
       $dialog = $dialogDiv.dialog({
         autoOpen: true,
         modal: false,
-        title: "Print FeatureInfo",
-        width: 400,
-        height: 400,
+        title: "<?php echo _mb("Print FeatureInfo"); ?>",
+        width: 420,
+        height: 'auto',
+        maxHeight: 580,
+        position: [20, 80],
+        open: function () {
+          $(this).closest('.ui-dialog').css({ top: '80px', left: '20px' });
+        },
+        close: function () {
+          restore();
+        },
         buttons: {
-          "Ok": function () {
+          "<?php echo _mb("Print"); ?>": function () {
+            if (pfiSubmitting) return;
+            pfiSubmitting = true;
+            // Disable dialog buttons to prevent double-click
+            $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
+            // Show processing indicator inside the dialog
+            $dialogDiv.find('#pfi-processing').show();
+            // Copy dialog field values to the actual form fields in #printPDF_form
+            $('#printPDF_form #title').val($dialogDiv.find('#pfi_title').val() || '');
+            $('#printPDF_form #dpi').val($dialogDiv.find('#pfi_dpi').val() || '150');
+            $('#printPDF_form #comment1').val($dialogDiv.find('#pfi_comment1').val() || '');
+            var scaleVal = $dialogDiv.find('#pfi_scale').val();
+            if (scaleVal) {
+              $('#printPDF_form #scale').val(scaleVal);
+            }
+            
             $("#" + myId).bind("load", function () {
               restore();
             });
@@ -1074,7 +1330,35 @@ var PrintPDF = function (options) {
             $("." + myId + "_working_bg").show();
             $('#printPDF_form').submit();
           },
-          "Cancel": restore
+          "<?php echo _mb("Cancel"); ?>": restore
+        }
+      });
+
+      // Proportional resize: ±buttons and direct scale input update the box
+      function applyPfiScale(newScale) {
+        if (isNaN(newScale) || newScale <= 0 || !printBox || !pfiPixelCenter) return;
+        var nc = makeClickPos2RealWorldPos(myTarget, pfiPixelCenter[0], pfiPixelCenter[1]);
+        printBox.setCenterMap({x: nc[0], y: nc[1]});
+        printBox.setScale(newScale);
+        $dialogDiv.find('#pfi_scale').val(newScale);
+        $('#printPDF_form #scale').val(newScale);
+      }
+
+      $dialogDiv.find('#pfi_scale').bind('change', function () {
+        applyPfiScale(parseInt($(this).val(), 10));
+      });
+
+      $dialogDiv.find('#pfi_scale_minus').bind('click', function () {
+        var s = parseInt($dialogDiv.find('#pfi_scale').val(), 10);
+        if (!isNaN(s) && s > 0) {
+          applyPfiScale(Math.max(100, Math.round(s / 1.5 / 100) * 100));
+        }
+      });
+
+      $dialogDiv.find('#pfi_scale_plus').bind('click', function () {
+        var s = parseInt($dialogDiv.find('#pfi_scale').val(), 10);
+        if (!isNaN(s) && s > 0) {
+          applyPfiScale(Math.round(s * 1.5 / 100) * 100);
         }
       });
 
