@@ -1095,18 +1095,12 @@ var PrintPDF = function (options) {
     var pfiFlurstuckeKeyword = /flurst[uü]c?ke/i;
     var pfiMapObj = mb_mapObj[getMapObjIndexByName(myTarget)];
     var pfiUrls = printInfo.urls || [];
-    console.log('[printFeatureInfo] printInfo.urls on entry:', pfiUrls.map(function(u){ return u && u.title; }));
-    console.log('[printFeatureInfo] All WMS + layers in map:', pfiMapObj.wms.map(function(w){
-      var layerTitles = (w.objLayer || []).map(function(l){ return (l.gui_layer_title || l.layer_name || '?') + '(q=' + l.gui_layer_querylayer + ',v=' + l.gui_layer_visible + ')'; }).join(', ');
-      return w.wms_id + ' | ' + w.wms_title + ' | visible=' + w.gui_wms_visible + ' | layers: [' + layerTitles + ']';
-    }));
 
     // Skip injection if Hintergrundkarte is already represented in the urls list
     var pfiCadastralAlreadyListed = false;
     for (var pci = 0; pci < pfiUrls.length; pci++) {
       if (pfiUrls[pci] && pfiUrls[pci].title && pfiHintergrundkarteKeyword.test(pfiUrls[pci].title)) {
         pfiCadastralAlreadyListed = true;
-        console.log('[printFeatureInfo] Hintergrundkarte already in urls list:', pfiUrls[pci].title);
         break;
       }
     }
@@ -1118,14 +1112,9 @@ var PrintPDF = function (options) {
         var wmsTitleToCheck = (wmsToTest.wms_currentTitle || '') + '|' + (wmsToTest.wms_title || '');
         if (pfiHintergrundkarteKeyword.test(wmsTitleToCheck)) {
           pfiFountCadWms = wmsToTest;
-          console.log('[printFeatureInfo] Found Hintergrundkarte WMS:', wmsToTest.wms_id, wmsToTest.wms_currentTitle || wmsToTest.wms_title);
           break;
         }
       }
-      if (pfiFountCadWms === null) {
-        console.log('[printFeatureInfo] No Hintergrundkarte WMS found in map.');
-      }
-
       if (pfiFountCadWms !== null) {
         // Step 2: find the Flurstücke sublayer within Hintergrundkarte
         var pfiFlurstuckeLayer = null;
@@ -1134,16 +1123,20 @@ var PrintPDF = function (options) {
             var pfiLayerTitle = pfiFountCadWms.objLayer[plj].gui_layer_title || pfiFountCadWms.objLayer[plj].layer_name || '';
             if (pfiFlurstuckeKeyword.test(pfiLayerTitle)) {
               pfiFlurstuckeLayer = pfiFountCadWms.objLayer[plj];
-              console.log('[printFeatureInfo] Found Flurstücke layer "' + pfiLayerTitle + '" (layer_name=' + pfiFlurstuckeLayer.layer_name + ')');
               break;
             }
           }
         }
-        if (pfiFlurstuckeLayer === null) {
-          console.log('[printFeatureInfo] No Flurstücke sublayer found inside Hintergrundkarte WMS.');
-        }
-
         if (pfiFlurstuckeLayer !== null) {
+          // If the layer is already visible and queryable in the tree it will already be in pfiUrls — skip injection to avoid duplicates
+          var pfiLayerAlreadyActive = (pfiFlurstuckeLayer.gui_layer_visible == 1 && pfiFlurstuckeLayer.gui_layer_querylayer == 1);
+          if (pfiLayerAlreadyActive) {
+            // Still store the cadastral WMS/layer references so validate() can force them into the GetMap URL
+            printInfo.pfiCadastralWmsId = pfiFountCadWms.wms_id;
+            printInfo.pfiCadastralLayerNames = [pfiFlurstuckeLayer.layer_name];
+          }
+        }
+        if (pfiFlurstuckeLayer !== null && !pfiLayerAlreadyActive) {
           var pfiPxCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
 
           // Temporarily force-enable only the Flurstücke layer so getFeatureInfoRequest() includes it
@@ -1158,7 +1151,6 @@ var PrintPDF = function (options) {
           pfiFlurstuckeLayer.gui_layer_visible    = pfiFlurstOrigVisible;
           pfiFlurstuckeLayer.gui_layer_querylayer = pfiFlurstOrigQuerylayer;
 
-          console.log('[printFeatureInfo] getFeatureInfoRequest result:', pfiCadReq ? 'OK (URL length=' + pfiCadReq.length + ')' : 'false/empty');
           if (pfiCadReq) {
             var pfiCadTitle = pfiFlurstuckeLayer.gui_layer_title || pfiFlurstuckeLayer.layer_name;
             var pfiFlurstStyle = pfiFountCadWms.getCurrentStyleByLayerName(pfiFlurstuckeLayer.layer_name);
@@ -1174,7 +1166,6 @@ var PrintPDF = function (options) {
             // Store WMS id + Flurstücke layer name so validate() can force it into the GetMap URL
             printInfo.pfiCadastralWmsId = pfiFountCadWms.wms_id;
             printInfo.pfiCadastralLayerNames = [pfiFlurstuckeLayer.layer_name];
-            console.log('[printFeatureInfo] Cadastral entry injected:', pfiCadTitle, '| Flurstücke layer:', pfiFlurstuckeLayer.layer_name);
           }
         }
       }
