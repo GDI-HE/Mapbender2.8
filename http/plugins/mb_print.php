@@ -127,6 +127,12 @@ var PrintPDF = function (options) {
   var actualConfig;
 
   /**
+   * Callback set by printFeatureInfo to intercept AJAX errors (timeout, server error).
+   * When set, the hookForm error handler calls this instead of showing the generic alert.
+   */
+  var pfiErrorCallback = null;
+
+  /**
    * constructor
    */
   eventInit.register(function () {
@@ -398,9 +404,21 @@ var PrintPDF = function (options) {
       beforeSubmit: validate,
       success: showResult,
       timeout: options.timeout ? options.timeout : 90000,
-      error: function () {
+      error: function (xhr, textStatus) {
         showHideWorking("hide");
-        alert("An error occured or timeout of " + Math.round(options.timeout / 1000) + " seconds reached. Print was aborted.");
+        var msg;
+        if (textStatus === 'timeout') {
+          msg = '<?php echo _mb("Zeitüberschreitung: Der Druckvorgang hat zu lange gedauert und wurde abgebrochen. Bitte versuchen Sie es erneut."); ?>';
+        } else {
+          msg = '<?php echo _mb("Serverfehler: Der Druckvorgang konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut."); ?>';
+        }
+        if (pfiErrorCallback) {
+          var cb = pfiErrorCallback;
+          pfiErrorCallback = null;
+          cb(msg);
+        } else {
+          alert(msg);
+        }
       }
     };
     $("#" + myId + "_form").ajaxForm(o);
@@ -1266,6 +1284,11 @@ var PrintPDF = function (options) {
       if (stopSpotlight) { stopSpotlight(); stopSpotlight = null; }
       pfiPixelCenter = null;
       pfiSubmitting = false;
+      pfiErrorCallback = null;
+      // Reset progress bar for next use
+      $dialogDiv.find('#pfi-progress-wrap').hide();
+      $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
+      $dialogDiv.find('#pfi-progress-label').text('');
       $dialog.dialog('close').remove();
       $featureInfoDialog.dialog('open');
       actualConfig = oldConfig;
@@ -1312,10 +1335,18 @@ var PrintPDF = function (options) {
           "<?php echo _mb("Print"); ?>": function () {
             if (pfiSubmitting) return;
             pfiSubmitting = true;
+
+            // Generate a unique progress token for this print job
+            var pfiProgressToken = 'pfi' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+
             // Disable dialog buttons to prevent double-click
             $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
-            // Show processing indicator inside the dialog
-            $dialogDiv.find('#pfi-processing').show();
+
+            // Show real progress bar, hide old spinner
+            $dialogDiv.find('#pfi-progress-wrap').show();
+            $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
+            $dialogDiv.find('#pfi-progress-label').text('Druck wird gestartet...');
+
             // Copy dialog field values to the actual form fields in #printPDF_form
             $('#printPDF_form #title').val($dialogDiv.find('#pfi_title').val() || '');
             $('#printPDF_form #dpi').val($dialogDiv.find('#pfi_dpi').val() || '150');
@@ -1324,8 +1355,39 @@ var PrintPDF = function (options) {
             if (scaleVal) {
               $('#printPDF_form #scale').val(scaleVal);
             }
-            
+
+            // Inject the progress token as a hidden field into the print form
+            $('#printPDF_form').find('[name="pfi_progress_token"]').remove();
+            $('<input type="hidden" name="pfi_progress_token">').val(pfiProgressToken).appendTo('#printPDF_form');
+
+            // Poll the progress endpoint
+            var pfiPollInterval = setInterval(function () {
+              $.getJSON('../print/printProgress.php', { token: pfiProgressToken }, function (data) {
+                var pct = Math.min(100, parseInt(data.percent, 10) || 0);
+                $dialogDiv.find('#pfi-progress-bar').css('width', pct + '%');
+                $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                if (data.error) {
+                  clearInterval(pfiPollInterval);
+                  pfiErrorCallback = null;
+                  alert('<?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?>');
+                  restore();
+                } else if (data.done) {
+                  clearInterval(pfiPollInterval);
+                }
+              });
+            }, 800);
+
+            // Register error handler so hookForm's AJAX error (timeout, server error)
+            // shows a proper message and closes the dialog
+            pfiErrorCallback = function (msg) {
+              clearInterval(pfiPollInterval);
+              alert(msg || '<?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?>');
+              restore();
+            };
+
             $("#" + myId).bind("load", function () {
+              clearInterval(pfiPollInterval);
+              pfiErrorCallback = null;
               restore();
             });
             $("." + myId + "_working").show();
@@ -1364,9 +1426,19 @@ var PrintPDF = function (options) {
         }
       });
 
+      // Append progress bar into the dialog content (hidden until print starts)
+      $dialogDiv.append(
+        '<div id="pfi-progress-wrap" style="display:none;margin:10px 4px 4px 4px;">' +
+          '<div id="pfi-progress-label" style="font-size:12px;margin-bottom:4px;color:#333;">Wird gestartet...</div>' +
+          '<div style="background:#ddd;border-radius:4px;height:18px;overflow:hidden;">' +
+            '<div id="pfi-progress-bar" style="height:100%;width:0%;background:#4a90d9;border-radius:4px;transition:width 0.4s ease;"></div>' +
+          '</div>' +
+        '</div>'
+      );
+
       $dialog
         .append('<div class="' + myId + '_working_bg" style="display: none;"></div>')
-        .append('<div class="' + myId + '_working" style="display: none;"><img src="../img/indicator_wheel.gif" style="padding:10px 0 0 10px">Generating PDF</div>');
+        .append('<div class="' + myId + '_working" style="display: none;"></div>');
     })
   };
 };

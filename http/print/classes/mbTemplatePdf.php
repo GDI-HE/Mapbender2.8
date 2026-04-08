@@ -198,6 +198,15 @@ class mbTemplatePdf extends mbPdf
 
         new mb_notice("print featureinfo: " . json_encode($backgroundUrls));
 
+        // Progress tracking
+        $pfi_token = (isset($_REQUEST['pfi_progress_token']) && preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $_REQUEST['pfi_progress_token']))
+            ? $_REQUEST['pfi_progress_token']
+            : '';
+
+        $urlsInBbox = array_values(array_filter((array)$this->featureInfo->urls, function($u) { return $u->inBbox; }));
+        $totalUrls  = count($urlsInBbox);
+        $urlIndex   = 0;
+
         foreach ($this->featureInfo->urls as $url) {
             if (!$url->inBbox) {
                 continue;
@@ -205,6 +214,16 @@ class mbTemplatePdf extends mbPdf
 
             $featureInfoConnector = new connector();
             $featureInfoConnector->set("timeOut", "10");
+
+            // Update progress: fetching feature info for this layer
+            $urlIndex++;
+            if ($totalUrls > 0 && $pfi_token) {
+                $fetchPercent = 30 + (int)(($urlIndex / ($totalUrls + 1)) * 35);
+                pfi_write_progress($pfi_token, 2,
+                    'Sachdaten werden abgerufen (' . $urlIndex . '/' . $totalUrls . '): ' . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8'),
+                    $fetchPercent);
+            }
+
             $featureInfoConnector->load($url->request);
             $featureInfoResult = $featureInfoConnector->file;
 
@@ -375,10 +394,22 @@ class mbTemplatePdf extends mbPdf
             $dompdf->loadHtml("$featureInfoResult");
             $dompdf->render();
 
+            // Update progress: rendering page
+            if ($totalUrls > 0 && $pfi_token) {
+                $renderPercent = 30 + (int)(($urlIndex / $totalUrls) * 35);
+                pfi_write_progress($pfi_token, 3,
+                    'Seite wird erstellt ' . $urlIndex . '/' . $totalUrls . ': ' . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8'),
+                    $renderPercent);
+            }
+
             $pageNo = $this->objPdf->PageNo();
             $fileName = TMPDIR . "/" . $this->baseOutputFileName() . "-$pageNo-fi.pdf";
             file_put_contents($fileName, $dompdf->output());
             $this->insertPages[$pageNo] = $fileName;
+        }
+
+        if ($pfi_token) {
+            pfi_write_progress($pfi_token, 4, 'PDF-Dateien werden zusammengeführt...', 70);
         }
     }
 }

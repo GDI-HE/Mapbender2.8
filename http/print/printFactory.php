@@ -1,6 +1,21 @@
 <?php
 require_once dirname(__FILE__) . "/../php/mb_validateSession.php";
 require_once dirname(__FILE__) . "/classes/factoryClasses.php";
+
+/**
+ * Write a progress state to the temporary progress file for this print job.
+ */
+function pfi_write_progress($token, $step, $stepLabel, $percent, $done = false, $error = false) {
+    if (empty($token)) return;
+    $progressFile = TMPDIR . '/print_progress_' . $token . '.json';
+    file_put_contents($progressFile, json_encode(array(
+        'step'      => $step,
+        'stepLabel' => $stepLabel,
+        'percent'   => $percent,
+        'done'      => $done,
+        'error'     => $error
+    )));
+}
 $gui_id = Mapbender::session()->get("mb_user_gui");
 //select all element_ids from database, if $_REQUEST['e_id'] is in this list - use this e_id for getting php_var
 $sql = "SELECT e_id FROM gui_element WHERE fkey_gui_id = $1";
@@ -33,6 +48,13 @@ $pdf = $pf->create($_REQUEST["printPDF_template"]);
 
 new mb_notice("REQUEST:".json_encode($_REQUEST));
 
+// Progress token — sent by the frontend to allow polling the progress state
+$pfi_progress_token = (isset($_REQUEST['pfi_progress_token']) && preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $_REQUEST['pfi_progress_token']))
+    ? $_REQUEST['pfi_progress_token']
+    : '';
+
+pfi_write_progress($pfi_progress_token, 1, 'Kartendaten werden gesammelt...', 10);
+
 // Capture any stray PHP output (notices/warnings) that would corrupt JSON response
 ob_start();
 
@@ -57,11 +79,16 @@ if (array_key_exists("featureInfo", $_REQUEST)) {
 	$pdf->featureInfo = json_decode($_REQUEST["featureInfo"]);
 }
 
+pfi_write_progress($pfi_progress_token, 2, 'Kartenseiten werden gerendert...', 30);
+
 try {
 	$pdf->render();
+	pfi_write_progress($pfi_progress_token, 3, 'PDF-Dateien werden zusammengeführt...', 70);
 	$pdf->save();
+	pfi_write_progress($pfi_progress_token, 4, 'Fertig', 100, true);
 }
 catch (Exception $e) {
+	pfi_write_progress($pfi_progress_token, 0, 'Fehler beim Erstellen des PDFs.', 0, false, true);
 	new mb_exception("printFactory error: " . $e->getMessage());
 	$strayOutput = ob_get_clean();
 	if ($strayOutput) {
