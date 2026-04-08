@@ -561,7 +561,8 @@ var PrintPDF = function (options) {
                   layerStyle = "default";
                 }
                 layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
-                if (layerLegendObj.legendUrl !== false) {
+                // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
+                if (layerLegendObj.legendUrl !== false && (layerLegendObj.legendUrl.split('?').length - 1) <= 1) {
                     //if wms id is not excluded from printing
                     if (!array_contains(exclude,currentWms.wms_id)){
                     	//alert("The legend of the WMS with id " + JSON.stringify(currentWms.wms_id) + " should be printed");
@@ -615,7 +616,8 @@ var PrintPDF = function (options) {
                 layerStyle = "default";
               }
               layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
-              if (layerLegendObj.legendUrl !== false) {
+              // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
+              if (layerLegendObj.legendUrl !== false && (layerLegendObj.legendUrl.split('?').length - 1) <= 1) {
                 //if wms id is not excluded from printing
                 if (!array_contains(exclude,currentWms.wms_id)){
                 	//alert("The legend of the WMS with id " + JSON.stringify(currentWms.wms_id) + " should be printed");

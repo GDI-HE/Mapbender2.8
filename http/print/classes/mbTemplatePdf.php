@@ -282,7 +282,10 @@ class mbTemplatePdf extends mbPdf
 
             new mb_notice("print featureinfo: new url: $mapUrl");
 
-            $legendUrl = $url->legendurl !== "empty" ? $url->legendurl : "";
+            // Reject legend URLs that contain more than one '?' — these are malformed parent-layer
+            // URLs where multiple GetLegendGraphic requests are concatenated (e.g. STYLE=...,https://...?...).
+            $rawLegendUrl = ($url->legendurl !== "empty" && !empty($url->legendurl)) ? $url->legendurl : "";
+            $legendUrl = (substr_count($rawLegendUrl, '?') <= 1) ? $rawLegendUrl : "";
 
             $manualValues = array(
                 "title" => $url->title,
@@ -381,4 +384,5 @@ class mbTemplatePdf extends mbPdf
 }
 
 ?>
+
 
