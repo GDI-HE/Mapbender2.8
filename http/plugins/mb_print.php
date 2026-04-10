@@ -403,12 +403,12 @@ var PrintPDF = function (options) {
       dataType: 'json',
       beforeSubmit: validate,
       success: showResult,
-      timeout: options.timeout ? options.timeout : 90000,
+      timeout: options.timeout ? options.timeout : 10000,
       error: function (xhr, textStatus) {
         showHideWorking("hide");
         var msg;
         if (textStatus === 'timeout') {
-          msg = '<?php echo _mb("Zeitüberschreitung: Der Druckvorgang hat zu lange gedauert und wurde abgebrochen. Bitte versuchen Sie es erneut."); ?>';
+          msg = '<?php echo _mb("Zeitüberschreitung: Der Druckvorgang hat zu lange gedauert und wurde abgebrochen."); ?>';
         } else {
           msg = '<?php echo _mb("Serverfehler: Der Druckvorgang konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut."); ?>';
         }
@@ -1360,12 +1360,42 @@ var PrintPDF = function (options) {
             $('#printPDF_form').find('[name="pfi_progress_token"]').remove();
             $('<input type="hidden" name="pfi_progress_token">').val(pfiProgressToken).appendTo('#printPDF_form');
 
+            // Scale AJAX timeout dynamically based on active WMS service count.
+            // map_url is not yet populated (it's filled in validate()), so count
+            // directly from the map object — the same source validate() uses.
+            (function () {
+              var ind = getMapObjIndexByName(myTarget);
+              var mapObj = ind !== undefined ? mb_mapObj[ind] : null;
+              var activeWmsCount = 1;
+              if (mapObj) {
+                activeWmsCount = 0;
+                for (var wi = 0; wi < mapObj.wms.length; wi++) {
+                  var w = mapObj.wms[wi];
+                  if (w.gui_wms_visible > 0 && w.mapURL && w.mapURL !== 'false') {
+                    activeWmsCount++;
+                  }
+                }
+                activeWmsCount = Math.max(1, activeWmsCount);
+              }
+              // Allow 10s per WMS service, minimum 90s
+              options.timeout = Math.max(options.timeout || 90000, activeWmsCount * 10000);
+            }());
+            hookForm();
+
+            // Track last progress to prevent backwards jumps
+            var pfiLastPercent = 0;
+
             // Poll the progress endpoint
             var pfiPollInterval = setInterval(function () {
               $.getJSON('../print/printProgress.php', { token: pfiProgressToken }, function (data) {
                 var pct = Math.min(100, parseInt(data.percent, 10) || 0);
-                $dialogDiv.find('#pfi-progress-bar').css('width', pct + '%');
+                // Update label always (to show latest status)
                 $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                // Only update progress bar if moving forward
+                if (pct >= pfiLastPercent) {
+                  pfiLastPercent = pct;
+                  $dialogDiv.find('#pfi-progress-bar').css('width', pct + '%');
+                }
                 if (data.error) {
                   clearInterval(pfiPollInterval);
                   pfiErrorCallback = null;
@@ -1388,10 +1418,17 @@ var PrintPDF = function (options) {
             $("#" + myId).bind("load", function () {
               clearInterval(pfiPollInterval);
               pfiErrorCallback = null;
-              restore();
+              // Success: keep the dialog and spotlight open so the user can pan and print again.
+              // Just reset the submission state and progress bar.
+              pfiSubmitting = false;
+              $dialogDiv.find('#pfi-progress-wrap').hide();
+              $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
+              $dialogDiv.find('#pfi-progress-label').text('');
+              $dialogDiv.closest('.ui-dialog').find('.ui-dialog-buttonpane button').removeAttr('disabled').css({ opacity: '', cursor: '' });
+              showHideWorking("hide");
             });
-            $("." + myId + "_working").show();
-            $("." + myId + "_working_bg").show();
+            // $("." + myId + "_working").show();
+            // $("." + myId + "_working_bg").show();
             $('#printPDF_form').submit();
           },
           "<?php echo _mb("Cancel"); ?>": restore

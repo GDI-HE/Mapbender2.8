@@ -12,6 +12,7 @@ class mbTemplatePdf extends mbPdf
     public $logType = "file";
     public $featureInfo;
     private $insertPages = array();
+    public $renderingFeatureInfo = false;
 
     public function __construct($jsonConf)
     {
@@ -186,6 +187,12 @@ class mbTemplatePdf extends mbPdf
     {
         new mb_notice("print featureinfo");
 
+        // Flag to prevent decorator progress reporting during featureInfo rendering
+        $this->renderingFeatureInfo = true;
+        if (function_exists('pfi_is_rendering_featureinfo')) {
+            pfi_is_rendering_featureinfo(true);
+        }
+
         $mapUrls = explode("___", $_REQUEST["map_url"]);
 
         new mb_notice("print featureinfo: mapUrls: " . join(", ", $mapUrls));
@@ -218,7 +225,7 @@ class mbTemplatePdf extends mbPdf
             // Update progress: fetching feature info for this layer
             $urlIndex++;
             if ($totalUrls > 0 && $pfi_token) {
-                $fetchPercent = 30 + (int)(($urlIndex / ($totalUrls + 1)) * 35);
+                $fetchPercent = 46 + (int)(($urlIndex / ($totalUrls + 1)) * 14);
                 pfi_write_progress($pfi_token, 2,
                     'Sachdaten werden abgerufen (' . $urlIndex . '/' . $totalUrls . '): ' . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8'),
                     $fetchPercent);
@@ -396,7 +403,7 @@ class mbTemplatePdf extends mbPdf
 
             // Update progress: rendering page
             if ($totalUrls > 0 && $pfi_token) {
-                $renderPercent = 30 + (int)(($urlIndex / $totalUrls) * 35);
+                $renderPercent = 60 + (int)(($urlIndex / $totalUrls) * 10);
                 pfi_write_progress($pfi_token, 3,
                     'Seite wird erstellt ' . $urlIndex . '/' . $totalUrls . ': ' . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8'),
                     $renderPercent);

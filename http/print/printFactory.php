@@ -2,11 +2,41 @@
 require_once dirname(__FILE__) . "/../php/mb_validateSession.php";
 require_once dirname(__FILE__) . "/classes/factoryClasses.php";
 
+// Allow long-running print jobs (many WMS layers) to complete without PHP killing the process.
+// 10 minutes is sufficient for even very large layer stacks while still bounding resource use.
+set_time_limit(600);
+
+/**
+ * Internal flag: marks that featureInfo pages are currently being rendered.
+ * Controlled only by PHP code — never by user input — to prevent external manipulation.
+ */
+function pfi_is_rendering_featureinfo($set = null) {
+    static $flag = false;
+    if ($set !== null) {
+        $flag = (bool)$set;
+    }
+    return $flag;
+}
+
 /**
  * Write a progress state to the temporary progress file for this print job.
  */
 function pfi_write_progress($token, $step, $stepLabel, $percent, $done = false, $error = false) {
     if (empty($token)) return;
+
+    // Track elapsed time since first call; append warning when job is taking too long
+    static $startTime = null;
+    if ($startTime === null) {
+        $startTime = microtime(true);
+    }
+    $elapsed = microtime(true) - $startTime;
+    if (!$done && !$error && $elapsed > 45) {
+        $minutes = (int)($elapsed / 60);
+        $seconds = (int)($elapsed % 60);
+        $timeStr = $minutes > 0 ? $minutes . ' min ' . $seconds . ' s' : $seconds . ' s';
+        $stepLabel .= ' – dauert länger als gewöhnlich (' . $timeStr . ')...';
+    }
+
     $progressFile = TMPDIR . '/print_progress_' . $token . '.json';
     file_put_contents($progressFile, json_encode(array(
         'step'      => $step,
@@ -52,6 +82,14 @@ new mb_notice("REQUEST:".json_encode($_REQUEST));
 $pfi_progress_token = (isset($_REQUEST['pfi_progress_token']) && preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $_REQUEST['pfi_progress_token']))
     ? $_REQUEST['pfi_progress_token']
     : '';
+
+// Clear any stale progress file from a previous print
+if ($pfi_progress_token) {
+    $progressFile = TMPDIR . '/print_progress_' . $pfi_progress_token . '.json';
+    if (file_exists($progressFile)) {
+        @unlink($progressFile);
+    }
+}
 
 pfi_write_progress($pfi_progress_token, 1, 'Kartendaten werden gesammelt...', 10);
 

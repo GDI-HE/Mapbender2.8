@@ -81,6 +81,18 @@ class mbMapDecorator extends mbTemplatePdfDecorator
 
         $this->pdf->logWmsRequests("maps", $array_urls);
 
+        // Report progress before fetching map images (only for normal pages, not featureInfo pages)
+        $pfi_token = (isset($_REQUEST['pfi_progress_token']) && preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $_REQUEST['pfi_progress_token']))
+            ? $_REQUEST['pfi_progress_token']
+            : '';
+        
+        $numWmsServices = count($array_urls);
+        if ($pfi_token && $numWmsServices > 0 && empty($this->pdf->renderingFeatureInfo) && function_exists('pfi_write_progress')) {
+            pfi_write_progress($pfi_token, 2,
+                'Kartenbilder werden geladen: ' . $numWmsServices . ' WMS-Dienst(e)...',
+                32);
+        }
+
         if ($this->angle != 0) {
             if (class_exists('weldMaps2PNG_rotate')) {
                 $i = new weldMaps2PNG_rotate(implode("___", $array_urls), $this->filename, $this->angle, false, $opacity);
@@ -126,3 +138,4 @@ class mbMapDecorator extends mbTemplatePdfDecorator
 }
 
 ?>
+
