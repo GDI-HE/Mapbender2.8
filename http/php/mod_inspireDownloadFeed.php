@@ -1700,7 +1700,7 @@ function generateFeed($feedDoc, $recordId, $generateFrom) {
 					}
 					//Ticket: 7322 - Due to registration issues with complex wfs services
 					//Fallback is populating links with BBOX parameter instead of ogc/fes-Filter
-					if (!strpos($bboxFilter,"fes") && !strpos($bboxFilterr,"ogc")){
+					if (!strpos($bboxFilter,"fes") && !strpos($bboxFilter,"ogc")){
 						$gFLink .= $bboxFilter;
 					}else{
 						
