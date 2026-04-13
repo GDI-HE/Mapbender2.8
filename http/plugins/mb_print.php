@@ -794,6 +794,10 @@ var PrintPDF = function (options) {
    * that triggers a download popup or is displayed in PDF plugin.
    */
   var showResult = function (res, text) {
+    if (pfiCancelled) {
+      showHideWorking("hide");
+      return;
+    }
     if (text == 'success') {
       var $downloadFrame = $("#" + myId + "_frame");
       if ($downloadFrame.size() === 0) {
@@ -802,23 +806,20 @@ var PrintPDF = function (options) {
           myId + "_frame' width='0' height='0' style='display:none'></iframe>"
         ).appendTo("body");
       }
-      if ($.browser.msie) {
-        $('<div></div>')
-          .attr('id', 'ie-print')
-          .append($('<p>Ihr PDF wurde erstellt und kann nun heruntergeladen werden:</p>'))
-          .append($('<a>Zum Herunterladen hier klicken</a>')
-            .attr('href', stripslashes(res.outputFileName))
-            .click(function () {
-              $(this).parent().dialog('destroy');
-            }))
-          .appendTo('body')
-          .dialog({
-            title: 'PDF-Druck'
-          });
-      } else {
-        window.frames[myId + "_frame"].location.href =
-          stripslashes(res.outputFileName);
-      }
+      var pdfUrl = stripslashes(res.outputFileName);
+      // Show a download link in the progress area instead of auto-opening
+      var $progressWrap = $("[id='pfi-progress-wrap']");
+      var $progressLabel = $("[id='pfi-progress-label']");
+      $progressLabel.html(
+        '<?php echo _mb("PDF fertig:"); ?> <a href="' + pdfUrl + '" target="_blank" ' +
+        'style="font-weight:bold;color:#1a5fa8;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;">' +
+          '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>' +
+          '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>' +
+        '</svg>' +
+        '<?php echo _mb("Herunterladen"); ?></a>'
+      );
+      $progressWrap.show();
       showHideWorking("hide");
       $("#" + myId).trigger("load");
       //remove printbox after successful print
@@ -1002,6 +1003,8 @@ var PrintPDF = function (options) {
   var printFeatureInfoData = null;
   var pfiSubmitting = false;
   var pfiPixelCenter = null;
+  var pfiPollInterval = null;
+  var pfiCancelled = false;
 
   function fixMapFormValues (printInfo) {
     var map = getMapObjByName(myTarget);
@@ -1277,6 +1280,10 @@ var PrintPDF = function (options) {
     function restore () {
       if (pfiRestoring) return;
       pfiRestoring = true;
+      clearInterval(pfiPollInterval);
+      pfiPollInterval = null;
+      pfiCancelled = true;
+      $("#" + myId).unbind("load.pfi");
       // Re-enable FeatureInfo clicks
       if (typeof Mapbender !== 'undefined' && Mapbender.enableFeatureInfo) {
         Mapbender.enableFeatureInfo();
@@ -1335,12 +1342,15 @@ var PrintPDF = function (options) {
           "<?php echo _mb("Print"); ?>": function () {
             if (pfiSubmitting) return;
             pfiSubmitting = true;
+            pfiCancelled = false;
 
             // Generate a unique progress token for this print job
             var pfiProgressToken = 'pfi' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 
-            // Disable dialog buttons to prevent double-click
-            $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
+            // Disable only the Print button to prevent double-click; keep Cancel active
+            $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').filter(function () {
+              return $(this).text() === '<?php echo _mb("Print"); ?>';
+            }).attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
 
             // Show real progress bar, hide old spinner
             $dialogDiv.find('#pfi-progress-wrap').show();
@@ -1386,7 +1396,7 @@ var PrintPDF = function (options) {
             var pfiLastPercent = 0;
 
             // Poll the progress endpoint
-            var pfiPollInterval = setInterval(function () {
+            pfiPollInterval = setInterval(function () {
               $.getJSON('../print/printProgress.php', { token: pfiProgressToken }, function (data) {
                 var pct = Math.min(100, parseInt(data.percent, 10) || 0);
                 // Update label always (to show latest status)
@@ -1415,16 +1425,18 @@ var PrintPDF = function (options) {
               restore();
             };
 
-            $("#" + myId).bind("load", function () {
+            $("#" + myId).bind("load.pfi", function () {
               clearInterval(pfiPollInterval);
+              pfiPollInterval = null;
               pfiErrorCallback = null;
-              // Success: keep the dialog and spotlight open so the user can pan and print again.
-              // Just reset the submission state and progress bar.
+              // Success: keep dialog open, show download link (set by showResult).
+              // Reset submission state so user can print again; progress bar stays
+              // visible with the download link until they close the dialog.
               pfiSubmitting = false;
-              $dialogDiv.find('#pfi-progress-wrap').hide();
-              $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
-              $dialogDiv.find('#pfi-progress-label').text('');
-              $dialogDiv.closest('.ui-dialog').find('.ui-dialog-buttonpane button').removeAttr('disabled').css({ opacity: '', cursor: '' });
+              $dialogDiv.find('#pfi-progress-bar').css('width', '100%');
+              $dialogDiv.closest('.ui-dialog').find('.ui-dialog-buttonpane button').filter(function () {
+                return $(this).text() === '<?php echo _mb("Print"); ?>';
+              }).removeAttr('disabled').css({ opacity: '', cursor: '' });
               showHideWorking("hide");
             });
             // $("." + myId + "_working").show();
