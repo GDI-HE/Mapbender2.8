@@ -7,7 +7,9 @@
  * POST ?token=<token>&...      → internal use by printFactory.php only (loopback)
  */
 require_once dirname(__FILE__) . "/../php/mb_validateSession.php";
-
+if (session_status() === PHP_SESSION_ACTIVE) {
+     session_write_close();
+}
 // Validate token: alphanumeric only, max 64 chars
 $token = isset($_REQUEST['token']) ? $_REQUEST['token'] : '';
 if (!preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $token)) {

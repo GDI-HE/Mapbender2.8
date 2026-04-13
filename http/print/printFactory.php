@@ -3,8 +3,8 @@ require_once dirname(__FILE__) . "/../php/mb_validateSession.php";
 require_once dirname(__FILE__) . "/classes/factoryClasses.php";
 
 // Allow long-running print jobs (many WMS layers) to complete without PHP killing the process.
-// 10 minutes is sufficient for even very large layer stacks while still bounding resource use.
-set_time_limit(600);
+// 3 minutes is sufficient for even very large layer stacks while still bounding resource use.
+set_time_limit(180);
 
 /**
  * Internal flag: marks that featureInfo pages are currently being rendered.
@@ -38,15 +38,29 @@ function pfi_write_progress($token, $step, $stepLabel, $percent, $done = false, 
     }
 
     $progressFile = TMPDIR . '/print_progress_' . $token . '.json';
-    file_put_contents($progressFile, json_encode(array(
+    $progressJson = json_encode(array(
         'step'      => $step,
         'stepLabel' => $stepLabel,
         'percent'   => $percent,
         'done'      => $done,
         'error'     => $error
-    )));
+    ));
+    $tmpFile = $progressFile . '.tmp.' . getmypid() . '.' . uniqid('', true);
+    $bytesWritten = file_put_contents($tmpFile, $progressJson, LOCK_EX);
+    if ($bytesWritten === false) {
+        if (file_exists($tmpFile)) {
+            @unlink($tmpFile);
+         }
+         return;
+    }
+    rename($tmpFile, $progressFile);
 }
 $gui_id = Mapbender::session()->get("mb_user_gui");
+
+// Release the session lock before starting the potentially long-running print job
+// so concurrent requests (for example, progress polling) are not blocked.
+session_write_close();
+
 //select all element_ids from database, if $_REQUEST['e_id'] is in this list - use this e_id for getting php_var
 $sql = "SELECT e_id FROM gui_element WHERE fkey_gui_id = $1";
 $v = array($gui_id);
