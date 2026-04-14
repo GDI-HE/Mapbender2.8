@@ -85,7 +85,7 @@
                     "marker": {
                         "anchor": [0.5, 1],
                         "file": "../img/marker/red.png",
-                        "size": [ 3.8, 6.8 ]
+                        "size": [ 6.8, 6.8 ]
                     }
                 },
 
@@ -126,7 +126,7 @@
                     "marker": {
                         "anchor": [0.5, 1],
                         "file": "../img/marker/red.png",
-                        "size": [ 3.8, 6.8 ]
+                        "size": [ 6.8, 6.8 ]
                     }
                 },
                 "legende" : {
