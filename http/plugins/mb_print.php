@@ -520,6 +520,7 @@ var PrintPDF = function (options) {
    * @see jquery.forms#beforeSubmitHandler
    */
   var validate = function (formData, jqForm, params) {
+    pfiCancelled = false;
     showHideWorking("show");
 
     // map urls
@@ -807,23 +808,43 @@ var PrintPDF = function (options) {
         ).appendTo("body");
       }
       var pdfUrl = stripslashes(res.outputFileName);
-      // Show a download link in the progress area instead of auto-opening
-      var $progressWrap = $("[id='pfi-progress-wrap']");
-      var $progressLabel = $("[id='pfi-progress-label']");
-      $progressLabel.html(
-        '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
-        'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
-        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="margin-bottom:-3px;margin-right:3px;">' +
-          '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>' +
-          '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>' +
-        '</svg>' +
-        '<?php echo _mb("Herunterladen"); ?></a>'
-      );
-      $progressWrap.show();
-      showHideWorking("hide");
-      $("#" + myId).trigger("load");
-      //remove printbox after successful print
-      //destroyPrintBox();
+      if (printFeatureInfoData !== null) {
+        // FeatureInfo print: show a clickable download link in the progress area
+        var $progressWrap = $("[id='pfi-progress-wrap']");
+        var $progressLabel = $("[id='pfi-progress-label']");
+        $progressLabel.html(
+          '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
+          'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="margin-bottom:-3px;margin-right:3px;">' +
+            '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>' +
+            '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>' +
+          '</svg>' +
+          '<?php echo _mb("Herunterladen"); ?></a>'
+        );
+        $progressWrap.show();
+        showHideWorking("hide");
+        $("#" + myId).trigger("load");
+      } else {
+        // Normal print (Werkzeug/Drucken): restore original delivery behaviour
+        if ($.browser.msie) {
+          $('<div></div>')
+            .attr('id', 'ie-print')
+            .append($('<p>Ihr PDF wurde erstellt und kann nun heruntergeladen werden:</p>'))
+            .append($('<a>Zum Herunterladen hier klicken</a>')
+              .attr('href', pdfUrl)
+              .click(function () {
+                $(this).parent().dialog('destroy');
+              }))
+            .appendTo('body')
+            .dialog({
+              title: 'PDF-Druck'
+            });
+        } else {
+          window.frames[myId + "_frame"].location.href = pdfUrl;
+        }
+        showHideWorking("hide");
+        $("#" + myId).trigger("load");
+      }
     } else {
       /* something went wrong */
       $("#" + myId + "_result").html(text);
