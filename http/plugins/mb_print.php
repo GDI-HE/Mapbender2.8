@@ -1411,6 +1411,99 @@ var PrintPDF = function (options) {
               // Allow 10s per WMS service, minimum 90s
               options.timeout = Math.max(options.timeout || 90000, activeWmsCount * 10000);
             }());
+
+            // Refresh GetFeatureInfo request URLs for any map panning that occurred
+            // since the dialog was opened. pfiPixelCenter is always kept current by
+            // eventAfterMapRequest, so rebuild each URL using the current map state.
+            (function () {
+              if (!pfiPixelCenter) return;
+              var ind = getMapObjIndexByName(myTarget);
+              var mapObj = ind !== undefined ? mb_mapObj[ind] : null;
+              if (!mapObj) return;
+              var clickPoint = { x: pfiPixelCenter[0], y: pfiPixelCenter[1] };
+
+              // Build wms_id → wms object lookup
+              var wmsById = {};
+              for (var wi = 0; wi < mapObj.wms.length; wi++) {
+                wmsById[mapObj.wms[wi].wms_id] = mapObj.wms[wi];
+              }
+
+              // Build wms_id lookup for Flurstücke by layer name
+              var cadWmsId = printInfo.pfiCadastralWmsId || null;
+              var cadLayerNames = printInfo.pfiCadastralLayerNames || [];
+
+              for (var ui = 0; ui < printInfo.urls.length; ui++) {
+                var urlEntry = printInfo.urls[ui];
+                if (!urlEntry.inBbox) continue;
+
+                var refreshed = false;
+
+                // Case 1: Flurstücke — refresh using the stored cadastral WMS id.
+                // Temporarily enable the layer so getFeatureInfoRequest() includes it.
+                if (!refreshed && cadWmsId && cadLayerNames.length > 0) {
+                  var cadWms = wmsById[cadWmsId];
+                  if (cadWms) {
+                    // Check if this url entry belongs to the cadastral WMS
+                    var cadBase = cadWms.wms_getfeatureinfo ? cadWms.wms_getfeatureinfo.split('?')[0].toLowerCase() : '';
+                    var entryBase = (urlEntry.request || '').split('?')[0].toLowerCase();
+                    var isCad = cadBase && entryBase && entryBase.indexOf(cadBase) !== -1;
+                    if (!isCad) {
+                      // Also check by title match against cadastral layer names
+                      for (var ci = 0; ci < cadLayerNames.length; ci++) {
+                        if (urlEntry.title && urlEntry.title === cadLayerNames[ci]) { isCad = true; break; }
+                      }
+                    }
+                    if (isCad) {
+                      // Temporarily enable the Flurstücke layer
+                      var cadPatches = [];
+                      for (var li = 0; li < cadWms.objLayer.length; li++) {
+                        var lyr = cadWms.objLayer[li];
+                        if (cadLayerNames.indexOf(lyr.layer_name) >= 0) {
+                          cadPatches.push({ layer: lyr, v: lyr.gui_layer_visible, q: lyr.gui_layer_querylayer });
+                          lyr.gui_layer_visible = 1;
+                          lyr.gui_layer_querylayer = 1;
+                        }
+                      }
+                      var newReq = cadWms.getFeatureInfoRequest(mapObj, clickPoint);
+                      for (var pi = 0; pi < cadPatches.length; pi++) {
+                        cadPatches[pi].layer.gui_layer_visible = cadPatches[pi].v;
+                        cadPatches[pi].layer.gui_layer_querylayer = cadPatches[pi].q;
+                      }
+                      if (newReq) {
+                        var infoFmt = urlEntry.request.match(/[?&]INFO_FORMAT=([^&]+)/i);
+                        if (infoFmt) { newReq = newReq.replace(/([?&]INFO_FORMAT=)[^&]+/i, '$1' + infoFmt[1]); }
+                        urlEntry.request = newReq;
+                        refreshed = true;
+                      }
+                    }
+                  }
+                }
+
+                // Case 2: regular WMS layers — match by base URL
+                if (!refreshed) {
+                  for (var wi = 0; wi < mapObj.wms.length; wi++) {
+                    var wms = mapObj.wms[wi];
+                    if (!wms.wms_getfeatureinfo) continue;
+                    var wmsBase = wms.wms_getfeatureinfo.split('?')[0].toLowerCase();
+                    var urlBase = (urlEntry.request || '').split('?')[0].toLowerCase();
+                    if (wmsBase && urlBase && urlBase.indexOf(wmsBase) !== -1) {
+                      var newReq = wms.getFeatureInfoRequest(mapObj, clickPoint);
+                      if (newReq) {
+                        var infoFmt = urlEntry.request.match(/[?&]INFO_FORMAT=([^&]+)/i);
+                        if (infoFmt) { newReq = newReq.replace(/([?&]INFO_FORMAT=)[^&]+/i, '$1' + infoFmt[1]); }
+                        urlEntry.request = newReq;
+                      }
+                      break;
+                    }
+                  }
+                }
+              }
+
+              // Keep originalUrls in sync so checkbox logic stays correct
+              printInfo.originalUrls = printInfo.urls.slice();
+              printFeatureInfoData = printInfo;
+            }());
+
             hookForm();
 
             // Track last progress to prevent backwards jumps
