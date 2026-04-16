@@ -383,20 +383,29 @@ class mbTemplatePdf extends mbPdf
                 }
             }
 
-            // Hide the red stripe column (.tab1) as Dompdf 0.8.x cannot handle
-            // float-based side-by-side layouts and causes timeouts/rendering issues.
-            $domPdfLayoutFix = '<style type="text/css">'
-                . '.tab1 { display: none !important; }'
-                . '.tab2 { margin-left: 0 !important; }'
-                . '</style>';
-            if (stripos($featureInfoResult, '</head>') !== false) {
-                $featureInfoResult = str_ireplace('</head>', $domPdfLayoutFix . '</head>', $featureInfoResult);
-            } else {
-                $featureInfoResult = $domPdfLayoutFix . $featureInfoResult;
+            // Hide the red stripe column (.tab1) for BRW-Ort content only.
+            // Dompdf 0.8.x cannot handle float-based side-by-side layouts; for other
+            // layers the column is wanted and can be left in place.
+            // Check both the layer title from config and the <title> tag in the HTML response.
+            $htmlTitleMatch = array();
+            preg_match('/<title[^>]*>(.*?)<\/title>/is', $featureInfoResult, $htmlTitleMatch);
+            $htmlTitle = isset($htmlTitleMatch[1]) ? $htmlTitleMatch[1] : '';
+            if (stripos($url->title, 'BRW') !== false || stripos($htmlTitle, 'BRW') !== false) {
+                $domPdfLayoutFix = '<style type="text/css">'
+                    . '.tab1 { display: none !important; }'
+                    . '.tab2 { margin-left: 0 !important; }'
+                    . '</style>';
+                if (stripos($featureInfoResult, '</head>') !== false) {
+                    $featureInfoResult = str_ireplace('</head>', $domPdfLayoutFix . '</head>', $featureInfoResult);
+                } else {
+                    $featureInfoResult = $domPdfLayoutFix . $featureInfoResult;
+                }
             }
 
-            // Remove all images - Dompdf 0.8.x cannot reliably load remote images.
-            $featureInfoResult = preg_replace('/<img[^>]*>/i', '', $featureInfoResult);
+            // Remove remote images (Dompdf 0.8.x cannot reliably load them),
+            // but keep base64-encoded images which Dompdf can render inline.
+            $featureInfoResult = preg_replace('/<img(?![^>]*src=["\']data:)[^>]*>/i', '', $featureInfoResult);
+
 
             $dompdf->loadHtml("$featureInfoResult");
             $dompdf->render();
