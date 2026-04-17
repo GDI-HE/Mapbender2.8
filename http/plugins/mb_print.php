@@ -577,7 +577,7 @@ var PrintPDF = function (options) {
                 layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
                 var layerStyle = currentWms.getCurrentStyleByLayerName(currentLayer.layer_name);
                 if (layerStyle === false || layerStyle === "") {
-                  layerStyle = "default";
+                  layerStyle = "";
                 }
                 layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
                 // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
@@ -632,7 +632,7 @@ var PrintPDF = function (options) {
               layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
               var layerStyle = currentWms.getCurrentStyleByLayerName(currentLayer.layer_name);
               if (layerStyle === false || layerStyle === "") {
-                layerStyle = "default";
+                layerStyle = "";
               }
               layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
               // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
@@ -1324,11 +1324,15 @@ var PrintPDF = function (options) {
     });
 
     // Add input fields for print options (title, dpi, comment, scale)
-   
- 
-    // Scale field with proportional resize buttons
-   
-  
+
+    // Legend option checkbox
+    var $optionsDiv = $('<div class="pfi-options" style="margin-top:8px;padding-top:6px;border-top:1px solid #ccc;">'
+      + '<label style="cursor:pointer;">'
+      + '<input type="checkbox" id="pfi_include_legend" checked style="margin-right:4px;">'
+      + 'Legende einschlie&szlig;en'
+      + '</label>'
+      + '</div>');
+    $dialogDiv.append($optionsDiv);
 
     function restore () {
       if (pfiRestoring) return;
@@ -1418,6 +1422,10 @@ var PrintPDF = function (options) {
             if (scaleVal) {
               $('#printPDF_form #scale').val(scaleVal);
             }
+
+            // Inject the legend include flag as a hidden field
+            $('#printPDF_form').find('[name="pfi_include_legend"]').remove();
+            $('<input type="hidden" name="pfi_include_legend">').val($dialogDiv.find('#pfi_include_legend').is(':checked') ? '1' : '0').appendTo('#printPDF_form');
 
             // Inject the progress token as a hidden field into the print form
             $('#printPDF_form').find('[name="pfi_progress_token"]').remove();

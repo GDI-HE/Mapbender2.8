@@ -12,6 +12,7 @@ class mbTemplatePdf extends mbPdf
     public $logType = "file";
     public $featureInfo;
     private $insertPages = array();
+    private $appendFiles  = array();
     public $renderingFeatureInfo = false;
 
     public function __construct($jsonConf)
@@ -142,22 +143,32 @@ class mbTemplatePdf extends mbPdf
         if ($this->isRendered) {
             $this->objPdf->Output(TMPDIR . "/" . $this->outputFileName, "F");
             $this->isSaved = true;
-            if (!empty($this->insertPages)) {
+            if (!empty($this->insertPages) || !empty($this->appendFiles)) {
                 new mb_notice("inserting pages");
 
                 $dir = TMPDIR;
                 $base = $this->baseOutputFileName();
-                log_error_exec("pdfseparate $dir/$this->outputFileName $dir/$base-%d.pdf");
+
+
+                $separateOk = log_error_exec("pdfseparate $dir/$this->outputFileName $dir/$base-%d.pdf");
+
                 $origPages = $this->objPdf->PageNo();
                 $mergePdfs = array();
                 for ($i = 1; $i <= $origPages; $i++) {
-                    $mergePdfs[] = "$dir/$base-$i.pdf";
+                    $pageFile = "$dir/$base-$i.pdf";
+                    $mergePdfs[] = $pageFile;
                     if (array_key_exists($i, $this->insertPages)) {
-                        $mergePdfs[] = $this->insertPages[$i];
+                        $fiFile = $this->insertPages[$i];
+                        $mergePdfs[] = $fiFile;
                     }
                 }
+                // Append legend page(s) at the very end
+                foreach ($this->appendFiles as $appendFile) {
+                    $mergePdfs[] = $appendFile;
+                }
                 $mergeNames = join(" ", $mergePdfs);
-                log_error_exec("pdfunite $mergeNames $dir/$this->outputFileName");
+                $uniteOk = log_error_exec("pdfunite $mergeNames $dir/$this->outputFileName");
+                $finalSize = file_exists("$dir/$this->outputFileName") ? filesize("$dir/$this->outputFileName") : -1;
                 log_error_exec("rm $mergeNames");
             }
         }
@@ -195,7 +206,6 @@ class mbTemplatePdf extends mbPdf
 
         $mapUrls = explode("___", $_REQUEST["map_url"]);
 
-        new mb_notice("print featureinfo: mapUrls: " . join(", ", $mapUrls));
 
         $backgroundUrls = array();
 
@@ -203,7 +213,6 @@ class mbTemplatePdf extends mbPdf
             $backgroundUrls[] = $mapUrls[$index];
         }
 
-        new mb_notice("print featureinfo: " . json_encode($backgroundUrls));
 
         // Progress tracking
         $pfi_token = (isset($_REQUEST['pfi_progress_token']) && preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $_REQUEST['pfi_progress_token']))
@@ -234,16 +243,15 @@ class mbTemplatePdf extends mbPdf
             $featureInfoConnector->load($url->request);
             $featureInfoResult = $featureInfoConnector->file;
 
+            $httpCode = intval($featureInfoConnector->getHttpCode());
+
             if (!trim($featureInfoResult) || preg_match("/<body>\s*<\/body>/i", $featureInfoResult)) {
                 continue;
             }
 
-            if (intval($featureInfoConnector->getHttpCode()) >= 400) {
+            if ($httpCode >= 400) {
                 continue;
             }
-
-            $this->objPdf->addPage();
-            $this->objPdf->useTemplate($tplidx);
 
             // extract specific wms layer(s) from feature info request
 
@@ -251,39 +259,42 @@ class mbTemplatePdf extends mbPdf
             preg_match("/^[^?]*/", $url->request, $matches);
             $host = $matches[0];
             preg_match("/LAYERS=([^&]*)/", $url->request, $matches);
-            $queryLayers = explode(",", $matches[1]);
+            $queryLayers = explode(",", urldecode($matches[1]));
 
-            new mb_notice("print featureinfo: host: $host, layers: " . implode(",", $queryLayers));
 
             // find wms url in mapUrls that contains any of the queried layers
+            // Pass 1: strict host match (direct WMS URL)
+            // Pass 2: fallback layer-only match (handles owsproxy / URL rewriting)
 
             $matchedMapUrl = null;
             $matchedLayers = array();
             $matchedStyles = array();
+            $candidateLayers = array();
 
-            foreach ($mapUrls as $candidateUrl) {
-                // Must be from the same host
-                if (strpos($candidateUrl, $host) !== 0) {
-                    continue;
-                }
-                if (!preg_match("/LAYERS=([^&]*)/", $candidateUrl, $lm)) {
-                    continue;
-                }
-                $candidateLayers = explode(",", $lm[1]);
-                // Check if any of our query layers appear in this map URL
-                $found = array_intersect($queryLayers, $candidateLayers);
-                if (!empty($found)) {
-                    $matchedMapUrl = $candidateUrl;
-                    $matchedLayers = $found;
-                    // Extract corresponding styles
-                    if (preg_match("/STYLES=([^&]*)/", $candidateUrl, $sm)) {
-                        $allStyles = explode(",", $sm[1]);
-                        foreach ($found as $layer) {
-                            $pos = array_search($layer, $candidateLayers);
-                            $matchedStyles[] = isset($allStyles[$pos]) ? $allStyles[$pos] : "";
-                        }
+            foreach (array(true, false) as $requireHostMatch) {
+                foreach ($mapUrls as $candidateUrl) {
+                    if ($requireHostMatch && strpos($candidateUrl, $host) !== 0) {
+                        continue;
                     }
-                    break;
+                    if (!preg_match("/LAYERS=([^&]*)/", $candidateUrl, $lm)) {
+                        continue;
+                    }
+                    $cLayers = explode(",", urldecode($lm[1]));
+                    $found = array_intersect($queryLayers, $cLayers);
+                    if (!empty($found)) {
+                        $matchedMapUrl = $candidateUrl;
+                        $matchedLayers = $found;
+                        $candidateLayers = $cLayers;
+                        // Extract corresponding styles
+                        if (preg_match("/STYLES=([^&]*)/", $candidateUrl, $sm)) {
+                            $allStyles = explode(",", $sm[1]);
+                            foreach ($found as $layer) {
+                                $pos = array_search($layer, $cLayers);
+                                $matchedStyles[] = isset($allStyles[$pos]) ? $allStyles[$pos] : "";
+                            }
+                        }
+                        break 2;
+                    }
                 }
             }
 
@@ -292,7 +303,11 @@ class mbTemplatePdf extends mbPdf
                 continue;
             }
 
-            new mb_notice("print featureinfo: found url: $matchedMapUrl");
+
+            // Add page only after we know we have a valid match — avoids blank pages on failure
+            $this->objPdf->addPage();
+            $this->objPdf->useTemplate($tplidx);
+
 
             // construct new map url with only the matched layers
             $layersStr = implode(",", $matchedLayers);
@@ -306,7 +321,6 @@ class mbTemplatePdf extends mbPdf
 
             $mapUrl = join("___", array_merge($backgroundUrls, array($mapUrl)));
 
-            new mb_notice("print featureinfo: new url: $mapUrl");
 
             // Reject legend URLs that contain more than one '?' — these are malformed parent-layer
             // URLs where multiple GetLegendGraphic requests are concatenated (e.g. STYLE=...,https://...?...).
@@ -390,7 +404,8 @@ class mbTemplatePdf extends mbPdf
             $htmlTitleMatch = array();
             preg_match('/<title[^>]*>(.*?)<\/title>/is', $featureInfoResult, $htmlTitleMatch);
             $htmlTitle = isset($htmlTitleMatch[1]) ? $htmlTitleMatch[1] : '';
-            if (stripos($url->title, 'BRW') !== false || stripos($htmlTitle, 'BRW') !== false) {
+            $hasTab2 = (stripos($featureInfoResult, 'class="tab2"') !== false || stripos($featureInfoResult, "class='tab2'") !== false);
+            if ($hasTab2 && (stripos($url->title, 'BRW') !== false || stripos($htmlTitle, 'BRW') !== false)) {
                 $domPdfLayoutFix = '<style type="text/css">'
                     . '.tab1 { display: none !important; }'
                     . '.tab2 { margin-left: 0 !important; }'
@@ -406,9 +421,9 @@ class mbTemplatePdf extends mbPdf
             // but keep base64-encoded images which Dompdf can render inline.
             $featureInfoResult = preg_replace('/<img(?![^>]*src=["\']data:)[^>]*>/i', '', $featureInfoResult);
 
-
             $dompdf->loadHtml("$featureInfoResult");
             $dompdf->render();
+            $dompdfOutput = $dompdf->output();
 
             // Update progress: rendering page
             if ($totalUrls > 0 && $pfi_token) {
@@ -420,13 +435,120 @@ class mbTemplatePdf extends mbPdf
 
             $pageNo = $this->objPdf->PageNo();
             $fileName = TMPDIR . "/" . $this->baseOutputFileName() . "-$pageNo-fi.pdf";
-            file_put_contents($fileName, $dompdf->output());
+            file_put_contents($fileName, $dompdfOutput);
             $this->insertPages[$pageNo] = $fileName;
         }
+
+        $this->renderLegendPage($pfi_token);
 
         if ($pfi_token) {
             pfi_write_progress($pfi_token, 4, 'PDF-Dateien werden zusammengeführt...', 70);
         }
+    }
+
+    private function renderLegendPage($pfi_token = '')
+    {
+        // Respect the user's choice from the print dialog
+        if (isset($_REQUEST['pfi_include_legend']) && $_REQUEST['pfi_include_legend'] === '0') {
+            return;
+        }
+
+        $legendJson = isset($_REQUEST['legend_url']) ? $_REQUEST['legend_url'] : '';
+        if (empty($legendJson)) {
+            return;
+        }
+
+        $wmsLegendArray = json_decode($legendJson, true);
+        if (!is_array($wmsLegendArray) || empty($wmsLegendArray)) {
+            return;
+        }
+
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+              . '<style>'
+              . 'body{font-family:Arial,sans-serif;font-size:11pt;margin:10mm 15mm;}'
+              . 'h1{font-size:14pt;border-bottom:1px solid #333;padding-bottom:3mm;margin-bottom:6mm;}'
+              . 'h2{font-size:11pt;margin:6mm 0 2mm;color:#333;}'
+              . '.layer{margin-bottom:4mm;}'
+              . '.layer-title{font-size:9pt;color:#555;margin-bottom:1mm;}'
+              . 'img{max-width:100%;height:auto;}'
+              . '</style></head><body>'
+              . '<h1>Legende</h1>';
+
+        $hasContent = false;
+
+        require_once(dirname(__FILE__) . "/../../extensions/dompdf/autoload.inc.php");
+
+        foreach ($wmsLegendArray as $wmsObj) {
+            if (!is_array($wmsObj)) {
+                continue;
+            }
+            foreach ($wmsObj as $wmsTitle => $layers) {
+                if (!is_array($layers)) {
+                    continue;
+                }
+                $wmsHtml = '';
+                foreach ($layers as $layer) {
+                    if (!is_array($layer)) {
+                        continue;
+                    }
+                    $legendUrl = isset($layer['legendUrl']) ? $layer['legendUrl'] : '';
+                    if (empty($legendUrl) || substr_count($legendUrl, '?') > 1) {
+                        continue;
+                    }
+                    // Reject non-HTTP schemes to prevent SSRF (file://, gopher://, etc.)
+                    if (!preg_match('/^https?:\/\//i', $legendUrl)) {
+                        continue;
+                    }
+                    $imgConnector = new connector();
+                    $imgConnector->set('timeOut', '10');
+                    $imgConnector->load($legendUrl);
+                    $imgData = $imgConnector->file;
+                    if (empty($imgData)) {
+                        continue;
+                    }
+                    // Detect MIME type from magic bytes
+                    if (substr($imgData, 0, 3) === "\xFF\xD8\xFF") {
+                        $mime = 'image/jpeg';
+                    } elseif (substr($imgData, 0, 4) === "GIF8") {
+                        $mime = 'image/gif';
+                    } else {
+                        $mime = 'image/png';
+                    }
+                    $b64 = base64_encode($imgData);
+                    $layerTitle = isset($layer['title']) ? $layer['title'] : '';
+                    $wmsHtml .= '<div class="layer">';
+                    if ($layerTitle !== '') {
+                        $wmsHtml .= '<div class="layer-title">' . htmlspecialchars($layerTitle, ENT_QUOTES, 'UTF-8') . '</div>';
+                    }
+                    $wmsHtml .= '<img src="data:' . $mime . ';base64,' . $b64 . '" />';
+                    $wmsHtml .= '</div>';
+                    $hasContent = true;
+                }
+                if ($wmsHtml !== '') {
+                    $html .= '<h2>' . htmlspecialchars($wmsTitle, ENT_QUOTES, 'UTF-8') . '</h2>' . $wmsHtml;
+                }
+            }
+        }
+
+        $html .= '</body></html>';
+
+        if (!$hasContent) {
+            return;
+        }
+
+        $dompdf = new Dompdf\Dompdf(array(
+            'isRemoteEnabled' => false,
+            'tempDir'         => ABSOLUTE_TMPDIR
+        ));
+        $format      = strtoupper($this->confPdf->format);
+        $orientation = ($this->confPdf->orientation === 'L') ? 'landscape' : 'portrait';
+        $dompdf->setPaper($format, $orientation);
+        $dompdf->loadHtml($html);
+        $dompdf->render();
+        $output   = $dompdf->output();
+        $fileName = TMPDIR . '/' . $this->baseOutputFileName() . '-legend-page.pdf';
+        file_put_contents($fileName, $output);
+        $this->appendFiles[] = $fileName;
     }
 }
 
