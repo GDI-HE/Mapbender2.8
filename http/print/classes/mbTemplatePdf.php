@@ -322,27 +322,130 @@ class mbTemplatePdf extends mbPdf
             $mapUrl = join("___", array_merge($backgroundUrls, array($mapUrl)));
 
 
-            // Reject legend URLs that contain more than one '?' — these are malformed parent-layer
-            // URLs where multiple GetLegendGraphic requests are concatenated (e.g. STYLE=...,https://...?...).
-            $rawLegendUrl = ($url->legendurl !== "empty" && !empty($url->legendurl)) ? $url->legendurl : "";
-            $legendUrl = (substr_count($rawLegendUrl, '?') <= 1) ? $rawLegendUrl : "";
+            // $url->legendurl is a comma-separated string built in map_obj.js
+            // (one entry per in-bbox layer, trailing comma, entries may be "empty").
+            // Collect ALL valid HTTP URLs — a combined WMS query may cover several layers.
+            $legendUrls = array();
+            if (!empty($url->legendurl)) {
+                $legendUrlParts = explode(',', $url->legendurl);
+                foreach ($legendUrlParts as $legendUrlPart) {
+                    $legendUrlPart = trim($legendUrlPart);
+                    if ($legendUrlPart === '' || $legendUrlPart === 'empty') {
+                        continue;
+                    }
+                    if (preg_match('/^https?:\/\//i', $legendUrlPart) && substr_count($legendUrlPart, '?') <= 1) {
+                        $legendUrls[] = $legendUrlPart;
+                    }
+                }
+            }
 
             $manualValues = array(
                 "title" => $url->title,
                 "map_url" => $mapUrl,
-                "legend_url" => json_encode(array(
-                    array(
-                        "Legende" => array(
-                            array(
-                                "title" => $url->title,
-                                "legendUrl" => $legendUrl
-                            )
-                        )
-                    )
-                ))
             );
 
+            // Suppress the template's legend element while rendering the featureInfo
+            // map page — legend will be drawn side-by-side with the map below.
+            $savedPrintLegend = $this->printLegend;
+            $this->printLegend = 'false';
+
+            // If legend is to be shown, narrow the map element to 70% of its original
+            // width so the legend panel can sit beside it (not on top of it).
+            $includeLegend = !isset($_REQUEST['pfi_include_legend']) || $_REQUEST['pfi_include_legend'] !== '0';
+            $mapElementConf  = null;
+            $savedMapWidth   = null;
+            if ($includeLegend && !empty($legendUrls)) {
+                foreach ($pageConf->elements as $pageElementConf) {
+                    if ($pageElementConf->type === 'map') {
+                        $mapElementConf = $pageElementConf;
+                        break;
+                    }
+                }
+                if ($mapElementConf !== null) {
+                    $savedMapWidth = $mapElementConf->width;
+                    $mapElementConf->width = $mapElementConf->width * 0.70;
+                }
+            }
+
             $this->renderElements($pageConf, $manualValues);
+            $this->printLegend = $savedPrintLegend;
+
+            // Restore original map width (so subsequent pages are unaffected).
+            if ($savedMapWidth !== null && $mapElementConf !== null) {
+                $mapElementConf->width = $savedMapWidth;
+            }
+
+            // Draw legend image(s) in the freed 30% to the right of the map.
+            if ($includeLegend && !empty($legendUrls) && $mapElementConf !== null) {
+                $mapX = floatval($mapElementConf->x_ul);
+                $mapY = floatval($mapElementConf->y_ul);
+                $mapW = floatval($savedMapWidth);   // original full width
+                $mapH = floatval($mapElementConf->height);
+
+                // Legend panel occupies the right 30% of the original map area.
+                $panelW  = $mapW * 0.30;
+                $panelX  = $mapX + $mapW * 0.70;   // starts right after the narrowed map
+                $padding = 1.5;
+
+                // White background panel with a thin left border.
+                $this->objPdf->SetFillColor(255, 255, 255);
+                $this->objPdf->SetDrawColor(180, 180, 180);
+                $this->objPdf->SetLineWidth(0.2);
+                $this->objPdf->Rect($panelX, $mapY, $panelW, $mapH, 'FD');
+
+                // "Legende" heading.
+                $this->objPdf->SetFont('Arial', 'B', 6);
+                $this->objPdf->SetTextColor(0, 0, 0);
+                $this->objPdf->SetXY($panelX + $padding, $mapY + $padding);
+                $this->objPdf->Cell($panelW - $padding * 2, 4, 'Legende', 0, 1, 'L');
+
+                $curY   = $mapY + $padding + 4 + 1;
+                $imgW   = $panelW - $padding * 2;
+                // Distribute available height evenly across all legend items so no
+                // single large image dominates the panel.
+                $availH = $mapH - $padding * 2 - 5;   // subtract heading area
+                $maxPerItem = $availH / max(1, count($legendUrls));
+
+                foreach ($legendUrls as $legendUrlItem) {
+                    if ($curY >= $mapY + $mapH - $padding) {
+                        break;
+                    }
+                    $legendConnector = new connector();
+                    $legendConnector->set('timeOut', '10');
+                    $legendConnector->load($legendUrlItem);
+                    $legendImgData = $legendConnector->file;
+                    if (empty($legendImgData)) {
+                        continue;
+                    }
+                    $tmpImgFile = TMPDIR . '/' . $this->baseOutputFileName()
+                        . '-lgnd-' . substr(md5($legendUrlItem), 0, 8) . '.png';
+                    file_put_contents($tmpImgFile, $legendImgData);
+                    $imgInfo = @getimagesize($tmpImgFile);
+                    if ($imgInfo !== false && $imgInfo[0] > 0 && $imgInfo[1] > 0) {
+                        // Convert natural pixel size to mm at 96 dpi (screen resolution).
+                        $naturalW = $imgInfo[0] * 25.4 / 96.0;
+                        $naturalH = $imgInfo[1] * 25.4 / 96.0;
+                        // Scale DOWN to panel width if needed, but never upscale.
+                        if ($naturalW > $imgW) {
+                            $drawW = $imgW;
+                            $drawH = $imgW * ($naturalH / $naturalW);
+                        } else {
+                            $drawW = $naturalW;
+                            $drawH = $naturalH;
+                        }
+                        // Cap height: never exceed per-item budget or remaining space.
+                        $maxH = min($maxPerItem, $mapY + $mapH - $padding - $curY);
+                        if ($drawH > $maxH && $maxH > 0) {
+                            $drawH = $maxH;
+                            $drawW = $drawH * ($naturalW / $naturalH);
+                            if ($drawW > $imgW) $drawW = $imgW;
+                        }
+                        $this->objPdf->Image($tmpImgFile, $panelX + $padding, $curY, $drawW, $drawH);
+                        $curY += $drawH + 1;
+                    }
+                    @unlink($tmpImgFile);
+                }
+            }
 
             require_once(dirname(__FILE__) . "/../../extensions/dompdf/autoload.inc.php");
 
@@ -421,6 +524,12 @@ class mbTemplatePdf extends mbPdf
             // but keep base64-encoded images which Dompdf can render inline.
             $featureInfoResult = preg_replace('/<img(?![^>]*src=["\']data:)[^>]*>/i', '', $featureInfoResult);
 
+            // Inject per-layer legend as an inline right-side column (65 / 35 split).
+            $includeLegend = !isset($_REQUEST['pfi_include_legend']) || $_REQUEST['pfi_include_legend'] !== '0';
+            if ($includeLegend && !empty($legendUrls)) {
+                // Legend is already drawn on the FPDF map page above; nothing to do here.
+            }
+
             $dompdf->loadHtml("$featureInfoResult");
             $dompdf->render();
             $dompdfOutput = $dompdf->output();
@@ -438,8 +547,6 @@ class mbTemplatePdf extends mbPdf
             file_put_contents($fileName, $dompdfOutput);
             $this->insertPages[$pageNo] = $fileName;
         }
-
-        $this->renderLegendPage($pfi_token);
 
         if ($pfi_token) {
             pfi_write_progress($pfi_token, 4, 'PDF-Dateien werden zusammengeführt...', 70);

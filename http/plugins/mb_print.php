@@ -558,6 +558,29 @@ var PrintPDF = function (options) {
       }
     }
 
+    // When printing featureInfo, only show legend for layers checked in the dialog.
+    // printFeatureInfoData.urls already holds only the checked entries (unchecked
+    // items are spliced out by the checkbox handler).  Build a lookup set from the
+    // LAYERS= parameter of each request URL so we can filter both legend loops below.
+    var pfiCheckedLayerNames = null;
+    if (printFeatureInfoData !== null &&
+        printFeatureInfoData.urls &&
+        printFeatureInfoData.urls.length > 0) {
+      pfiCheckedLayerNames = {};
+      for (var pci = 0; pci < printFeatureInfoData.urls.length; pci++) {
+        var pfiReq = printFeatureInfoData.urls[pci].request || '';
+        var pfiLyrMatch = pfiReq.match(/[?&]LAYERS=([^&]*)/i);
+        if (pfiLyrMatch) {
+          var pfiLyrList = decodeURIComponent(pfiLyrMatch[1]).split(',');
+          for (var pli = 0; pli < pfiLyrList.length; pli++) {
+            if (pfiLyrList[pli]) {
+              pfiCheckedLayerNames[pfiLyrList[pli]] = true;
+            }
+          }
+        }
+      }
+    }
+
     if (options.reverseLegend == 'true') {
       for (var i = mapObj.wms.length - 1; i >= 0; i--) {
         var currentWms = mapObj.wms[i];
@@ -572,6 +595,10 @@ var PrintPDF = function (options) {
               var isVisible = (currentLayer.gui_layer_visible === 1);
               var hasNoChildren = (!currentLayer.has_childs);
               if (isVisible && hasNoChildren) {
+                // In print featureInfo mode, skip layers not checked in the dialog
+                if (pfiCheckedLayerNames !== null && !pfiCheckedLayerNames[currentLayer.layer_name]) {
+                  continue;
+                }
                 var layerLegendObj = {};
                 layerLegendObj.name = currentLayer.layer_name;
                 layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
@@ -627,6 +654,10 @@ var PrintPDF = function (options) {
             var isVisible = (currentLayer.gui_layer_visible === 1);
             var hasNoChildren = (!currentLayer.has_childs);
             if (isVisible && hasNoChildren) {
+              // In print featureInfo mode, skip layers not checked in the dialog
+              if (pfiCheckedLayerNames !== null && !pfiCheckedLayerNames[currentLayer.layer_name]) {
+                continue;
+              }
               var layerLegendObj = {};
               layerLegendObj.name = currentLayer.layer_name;
               layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
