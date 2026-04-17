@@ -1252,7 +1252,39 @@ var PrintPDF = function (options) {
 
     // feature info ebenen
 
-    $abfragenDiv.append($("<h3>Abzufragende Ebene:</h3>"));
+    var $abfragenH3 = $('<h3 style="margin-bottom:6px;">Abzufragende Ebene: </h3>');
+    var $pfiInfoBtn = $('<button type="button" title="Format-Vorschau anzeigen" ' +
+      'style="width:18px;height:18px;padding:0;line-height:1;font-size:12px;font-weight:bold;font-style:italic;' +
+      'border-radius:50%;border:1px solid #888;background:#fff;color:#555;cursor:pointer;' +
+      'vertical-align:middle;margin-left:4px;margin-bottom:2px;">i</button>');
+
+    $pfiInfoBtn.bind('click', function () {
+      var $infoDialog = $('<div style="overflow:auto;"></div>');
+      $infoDialog.append(
+        '<table style="border-collapse:collapse;width:100%;table-layout:fixed;"><tr>' +
+          '<td style="text-align:center;padding:0 8px 0 0;vertical-align:top;width:50%;">' +
+            '<div style="font-weight:bold;margin-bottom:6px;">HTML</div>' +
+            '<img src="../img/pfi-format-html.png" alt="HTML-Vorschau" ' +
+              'style="width:100%;height:auto;border:1px solid #ccc;">' +
+          '</td>' +
+          '<td style="text-align:center;padding:0 0 0 8px;vertical-align:top;width:50%;">' +
+            '<div style="font-weight:bold;margin-bottom:6px;">Text</div>' +
+            '<img src="../img/pfi-format-text.png" alt="Text-Vorschau" ' +
+              'style="width:100%;height:auto;border:1px solid #ccc;">' +
+          '</td>' +
+        '</tr></table>'
+      );
+      $infoDialog.dialog({
+        title: 'Format-Vorschau: HTML vs. Text',
+        modal: true,
+        resizable: true,
+        width: 700,
+        close: function () { $(this).dialog('destroy').remove(); }
+      });
+    });
+
+    $abfragenH3.append($pfiInfoBtn);
+    $abfragenDiv.append($abfragenH3);
 
     printInfo.urls.forEach(function (url, i) {
       var $checkBox = $('<input type="checkbox" checked>');
