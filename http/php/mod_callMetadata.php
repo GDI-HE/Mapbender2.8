@@ -28,6 +28,7 @@ $registratingDepartments = NULL;
 $isoCategories = NULL;
 $inspireThemes = NULL;
 $customCategories = NULL;
+$adminTypes = NULL;
 $timeBegin = NULL;
 $timeEnd = NULL;
 $regTimeBegin = NULL;
@@ -82,7 +83,7 @@ $searchURL = $_SERVER['QUERY_STRING'];
 $searchURL = urldecode($searchURL);
 //control if some request variables are not set and set them explicit to NULL
 
-$checkForNullRequests = array("registratingDepartments","isoCategories","inspireThemes","customCategories","regTimeBegin","regTimeEnd","timeBegin","timeEnd","searchBbox","searchTypeBbox","searchResources","orderBy","hostName","resourceIds","restrictToOpenData", "restrictToHvd");
+$checkForNullRequests = array("registratingDepartments","isoCategories","inspireThemes","customCategories","regTimeBegin","regTimeEnd","timeBegin","timeEnd","searchBbox","searchTypeBbox","searchResources","orderBy","hostName","resourceIds","restrictToOpenData", "restrictToHvd", "adminTypes");
 
 for($i=0; $i < count($checkForNullRequests); $i++){
 	if (!$_REQUEST[$checkForNullRequests[$i]] or $_REQUEST[$checkForNullRequests[$i]] == 'false' or $_REQUEST[$checkForNullRequests[$i]] == 'undefined') {
@@ -343,6 +344,18 @@ if (isset($_REQUEST["restrictToHvd"]) & $_REQUEST["restrictToHvd"] != "") {
 			$restrictToHvd = "false";
 		break;	
 	}
+	$testMatch = NULL;
+}
+
+//adminTypes - filter by admin_code (nuts1,nuts2,nuts3,lau2,other)
+if (isset($_REQUEST["adminTypes"]) & $_REQUEST["adminTypes"] != "") {
+	$testMatch = $_REQUEST["adminTypes"];
+	$pattern = '/^[a-z0-9,]+$/';
+	if (!preg_match($pattern, $testMatch)) {
+		echo 'Parameter <b>adminTypes</b> is not valid (csv list of: nuts1,nuts2,nuts3,lau2,other).<br/>';
+		die();
+	}
+	$adminTypes = $testMatch;
 	$testMatch = NULL;
 }
 
@@ -661,6 +674,7 @@ $classificationElements[9]['name'] = 'searchResources';
 $classificationElements[10]['name'] = 'timeBegin';
 $classificationElements[11]['name'] = 'timeEnd';
 $classificationElements[12]['name'] = 'restrictToHvd';
+$classificationElements[13]['name'] = 'adminTypes';
 
 $classificationElements[0]['source'] = '';
 $classificationElements[1]['source'] = 'database';
@@ -675,8 +689,7 @@ $classificationElements[9]['source'] = '';
 $classificationElements[10]['source'] = '';
 $classificationElements[11]['source'] = '';
 $classificationElements[12]['source'] = '';
-
-$classificationElements[0]['list'] = true;
+$classificationElements[13]['source'] = '';
 $classificationElements[1]['list'] = true;
 $classificationElements[2]['list'] = true;
 $classificationElements[3]['list'] = true;
@@ -689,6 +702,7 @@ $classificationElements[9]['list'] = true;
 $classificationElements[10]['list'] = false;
 $classificationElements[11]['list'] = false;
 $classificationElements[12]['list'] = false;
+$classificationElements[13]['list'] = true;
 
 //Defining of the different result categories		
 		$resourceCategories = array();
@@ -713,6 +727,7 @@ switch($languageCode){
 			$classificationElements[10]['name2show'] = 'Datenaktualität von:';
 			$classificationElements[11]['name2show'] = 'Datenaktualität bis:';
 			$classificationElements[12]['name2show'] = 'Nur HVD:';
+			$classificationElements[13]['name2show'] = 'Herkunft:';
 
 			$resourceCategories['wms'] = 'Kartenebenen';
 			$resourceCategories['wfs'] = 'Such- und Download- und Erfassungsmodule';
@@ -745,6 +760,7 @@ switch($languageCode){
 			$classificationElements[10]['name2show'] = 'Actuality of dataset from:';
 			$classificationElements[11]['name2show'] = 'Actuality of dataset to:';
 			$classificationElements[12]['name2show'] = 'Only HVD:';
+			$classificationElements[13]['name2show'] = 'Origin:';
 
 			$resourceCategories['wms'] = 'Maplayers';
 			$resourceCategories['wfs'] = 'Search- and Downloadservices';
@@ -1154,13 +1170,13 @@ if ($resultTarget == 'file') {
 		$e = new mb_notice($str);
 		exec($str);*/
 		
-		$metadata = new searchMetadata($userId, $searchId, $searchText, $registratingDepartments, $isoCategories, $inspireThemes, $timeBegin, $timeEnd, $regTimeBegin, $regTimeEnd, $maxResults, $searchBbox, $searchTypeBbox, $accessRestrictions, $languageCode, $searchEPSG, $searchResourcesArray[$i], $searchPages[$i], $outputFormat, $resultTarget, $searchURL, $customCategories, $hostName, $orderBy, $resourceIds, $restrictToOpenData, $originFromHeader, $resolveCoupledResources, $https, $restrictToHvd);
+		$metadata = new searchMetadata($userId, $searchId, $searchText, $registratingDepartments, $isoCategories, $inspireThemes, $timeBegin, $timeEnd, $regTimeBegin, $regTimeEnd, $maxResults, $searchBbox, $searchTypeBbox, $accessRestrictions, $languageCode, $searchEPSG, $searchResourcesArray[$i], $searchPages[$i], $outputFormat, $resultTarget, $searchURL, $customCategories, $hostName, $orderBy, $resourceIds, $restrictToOpenData, $originFromHeader, $resolveCoupledResources, $https, $restrictToHvd, $adminTypes);
 	}
 }
 if ($resultTarget == 'web' or $resultTarget == 'debug' or $resultTarget == 'webclient' or $resultTarget == 'categories') {
 	if (count($searchResourcesArray) == 1) {
 		//$e = new mb_exception("originFromHeader: ".$originFromHeader);
-		$metadata = new searchMetadata($userId, $searchId, $searchText, $registratingDepartments, $isoCategories, $inspireThemes, $timeBegin, $timeEnd, $regTimeBegin, $regTimeEnd, $maxResults, $searchBbox, $searchTypeBbox, $accessRestrictions, $languageCode, $searchEPSG, $searchResourcesArray[0], $searchPages[0], $outputFormat, $resultTarget, $searchURL, $customCategories, $hostName, $orderBy, $resourceIds, $restrictToOpenData, $originFromHeader, $resolveCoupledResources, $https, $restrictToHvd);
+		$metadata = new searchMetadata($userId, $searchId, $searchText, $registratingDepartments, $isoCategories, $inspireThemes, $timeBegin, $timeEnd, $regTimeBegin, $regTimeEnd, $maxResults, $searchBbox, $searchTypeBbox, $accessRestrictions, $languageCode, $searchEPSG, $searchResourcesArray[0], $searchPages[0], $outputFormat, $resultTarget, $searchURL, $customCategories, $hostName, $orderBy, $resourceIds, $restrictToOpenData, $originFromHeader, $resolveCoupledResources, $https, $restrictToHvd, $adminTypes);
 		#if ($outputFormat == 'xml') {
 		#	header("Content-type: application/xhtml+xml; charset=UTF-8");		
 		#}

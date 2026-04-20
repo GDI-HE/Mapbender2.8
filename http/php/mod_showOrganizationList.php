@@ -14,7 +14,7 @@ if (isset($_REQUEST["orderBy"]) & $_REQUEST["orderBy"] != "") {
 	$testMatch = NULL;
 }
 $sql = <<<SQL
-SELECT published_resources.*, datasets+featuretypes+layers+wmcs as all_resources, mb_group_name, mb_group_description, mb_group_logo_path, mb_group_title, mb_group_homepage, uuid FROM (
+SELECT published_resources.*, datasets+featuretypes+layers+wmcs as all_resources, mb_group_name, mb_group_description, mb_group_logo_path, mb_group_title, mb_group_homepage, uuid, mb_group_admin_code, mb_group_stateorprovince FROM (
 SELECT SUM(dataset_count) AS datasets, SUM(featuretype_count) AS featuretypes, SUM(layer_count) AS layers, SUM(wmc_count) AS wmcs, mb_group_id FROM (
 
 SELECT 0 AS dataset_count, 0 AS featuretype_count, resource_count AS layer_count, 0 AS wmc_count, mb_group_id FROM (
@@ -91,6 +91,8 @@ while($row = db_fetch_array($res)){
 	$jsonOutput->organizations[$numberOfOrgas]->{'image_display_url'} = $row['mb_group_logo_path'];
 	$jsonOutput->organizations[$numberOfOrgas]->{'detail_url'} = '../mod_showOrganizationInfo.php?id='.$row['mb_group_id'].'&outputFormat=ckan';
 	$jsonOutput->organizations[$numberOfOrgas]->{'homepage'} = $row['mb_group_homepage'];
+	$jsonOutput->organizations[$numberOfOrgas]->{'admin_code'} = $row['mb_group_admin_code'];
+	$jsonOutput->organizations[$numberOfOrgas]->{'stateorprovince'} = $row['mb_group_stateorprovince'];
 	$jsonOutput->organizations[$numberOfOrgas]->{'datasets'} = $row['datasets'];
 	$jsonOutput->organizations[$numberOfOrgas]->{'layers'} = $row['layers'];
 	$jsonOutput->organizations[$numberOfOrgas]->{'featuretypes'} = $row['featuretypes'];

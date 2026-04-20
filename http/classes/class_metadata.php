@@ -59,6 +59,7 @@ class searchMetadata
 	var $resourceIds;
 	var $restrictToOpenData;
 	var $restrictToHvd;
+	var $adminTypes;
 	var $originFromHeader;
 	var $resolveCoupledResources; //only for class of dataset metadata - it pulls the coupled ressources (ogc-services : wms-layer/wfs-featuretypes)
 	var $https;
@@ -66,7 +67,7 @@ class searchMetadata
 	var $hvdInspireCats;
 	var $hvdCustomCats;
 	var $internalProcessCoupledWMS = false;
-	function __construct($userId, $searchId, $searchText, $registratingDepartments, $isoCategories, $inspireThemes, $timeBegin, $timeEnd, $regTimeBegin, $regTimeEnd, $maxResults, $searchBbox, $searchTypeBbox, $accessRestrictions, $languageCode, $searchEPSG, $searchResources, $searchPages, $outputFormat, $resultTarget, $searchURL, $customCategories, $hostName, $orderBy, $resourceIds, $restrictToOpenData, $originFromHeader, $resolveCoupledResources = false, $https = false, $restrictToHvd)
+	function __construct($userId, $searchId, $searchText, $registratingDepartments, $isoCategories, $inspireThemes, $timeBegin, $timeEnd, $regTimeBegin, $regTimeEnd, $maxResults, $searchBbox, $searchTypeBbox, $accessRestrictions, $languageCode, $searchEPSG, $searchResources, $searchPages, $outputFormat, $resultTarget, $searchURL, $customCategories, $hostName, $orderBy, $resourceIds, $restrictToOpenData, $originFromHeader, $resolveCoupledResources = false, $https = false, $restrictToHvd, $adminTypes = NULL)
 	{
 		$this->userId = (int) $userId;
 		$this->searchId = $searchId;
@@ -104,6 +105,7 @@ class searchMetadata
 		} else {
 			$this->restrictToHvd = false;
 		}
+		$this->adminTypes = $adminTypes;
 		$this->originFromHeader = $originFromHeader;
 		$this->internalResult = null; //will only be filled, if resultTarget = 'internal', includes json for wms or wfs
 		$this->resolveCoupledResources = $resolveCoupledResources;
@@ -121,7 +123,7 @@ class searchMetadata
 		$this->minFontSize = 10;
 
 		if (file_exists ( dirname ( __FILE__ ) . "/../../conf/hvd_cats.json" )) {
-			$configObject = json_decode ( file_get_contents ( "../../conf/hvd_cats.json" ) );
+			$configObject = json_decode ( file_get_contents ( dirname ( __FILE__ ) . "/../../conf/hvd_cats.json" ) );
 		}
 		if (isset ( $configObject ) && isset ( $configObject->hvd_inspire_cat ) && count($configObject->hvd_inspire_cat) > 0 ) {
 			$this->hvdInspireCats = $configObject->hvd_inspire_cat;
@@ -212,6 +214,19 @@ class searchMetadata
 				break;
 		}
 		$this->resourceClassifications[3]['requestName'] = "registratingDepartments";
+
+		switch ($this->languageCode) {
+			case "de":
+				$this->resourceClassifications[4]['title'] = "Herkunft";
+				break;
+			case "en":
+				$this->resourceClassifications[4]['title'] = "Origin";
+				break;
+			default:
+				$this->resourceClassifications[4]['title'] = "Origin";
+				break;
+		}
+		$this->resourceClassifications[4]['requestName'] = "adminTypes";
 
 		//Defining of the different result categories		
 		$this->resourceCategories = array();
@@ -686,6 +701,20 @@ class searchMetadata
 				$md_topic_categoriesArray = explode(",",trim(str_replace("}{",",",$datasetMatrix[$i]['md_topic_cats']),"{}"));
 				$this->datasetJSON->dataset->srv[$i]->isoCategories = $md_topic_categoriesArray;
 			}
+			//create element with custom category codes (mapbender ids)
+			$md_custom_categoriesArray = array();
+			if (isset($datasetMatrix[$i]['md_custom_cats']) && $datasetMatrix[$i]['md_custom_cats'] != "") {
+				$md_custom_categoriesArray = explode(",",trim(str_replace("}{",",",$datasetMatrix[$i]['md_custom_cats']),"{}"));
+				$this->datasetJSON->dataset->srv[$i]->customCategories = $md_custom_categoriesArray;
+			}
+			//create element with inspire category codes (mapbender ids)
+			$md_inspire_categoriesArray = array();
+			if (isset($datasetMatrix[$i]['md_inspire_cats']) && $datasetMatrix[$i]['md_inspire_cats'] != "") {
+				$md_inspire_categoriesArray = explode(",",trim(str_replace("}{",",",$datasetMatrix[$i]['md_inspire_cats']),"{}"));
+				$this->datasetJSON->dataset->srv[$i]->inspireCategories = $md_inspire_categoriesArray;
+			}
+			//compute isHVD flag based on hvd_cats.json config
+			$this->datasetJSON->dataset->srv[$i]->isHVD = $this->computeIsHVD($md_custom_categoriesArray);
 			$this->datasetJSON->dataset->srv[$i]->iso3166 = $spatialSource;
 			$this->datasetJSON->dataset->srv[$i]->bbox = array($datasetMatrix[$i]['bbox']); //TODO: read out bbox from wmc $datasetMatrix[$i][''];
 			$this->datasetJSON->dataset->srv[$i]->timeBegin = date("Y-m-d", strtotime($datasetMatrix[$i]['timebegin']));
@@ -808,7 +837,7 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 					$downloadOptionsFromMetadata = json_decode(getDownloadOptions(array($datasetMatrix[$i]['fileidentifier']), $this->protocol . "://" . $this->hostName . "/mapbender/", $this->protocol . "://" . $this->hostName));
 					//try to load coupled atom feeds from mod_getDownloadOptions and add them to result list! (if no wms layer nor wfs featuretype is available)
 					foreach ($downloadOptionsFromMetadata->{$datasetMatrix[$i]['fileidentifier']}->option as $dlOption) {
-						if ($dlOption->type == "downloadlink" || $dlOption->type == "distribution" || $dlOption->type == "remotelist") {
+						if ($dlOption->type == "downloadlink" || $dlOption->type == "distribution" || $dlOption->type == "remotelist" || $dlOption->type == "ogcapifeatures" || $dlOption->type == "directwfs") {
 							$this->datasetJSON->dataset->srv[$i]->coupledResources->inspireAtomFeeds[] = $dlOption;
 						}
 					}
@@ -910,6 +939,25 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 				$spatialSource = $applicationMatrix[$i]['mb_group_stateorprovince'];
 			}
 			$this->applicationJSON->application->srv[$i]->iso3166 = $spatialSource;
+			//create element with iso topic category codes (mapbender ids)
+			if (isset($applicationMatrix[$i]['md_topic_cats']) && $applicationMatrix[$i]['md_topic_cats'] != "") {
+				$md_topic_categoriesArray = explode(",",trim(str_replace("}{"  ,",",$applicationMatrix[$i]['md_topic_cats']),"{}"));
+				$this->applicationJSON->application->srv[$i]->isoCategories = $md_topic_categoriesArray;
+			}
+			//create element with custom category codes (mapbender ids)
+			$md_custom_categoriesArray = array();
+			if (isset($applicationMatrix[$i]['md_custom_cats']) && $applicationMatrix[$i]['md_custom_cats'] != "") {
+				$md_custom_categoriesArray = explode(",",trim(str_replace("}{"  ,",",$applicationMatrix[$i]['md_custom_cats']),"{}"));
+				$this->applicationJSON->application->srv[$i]->customCategories = $md_custom_categoriesArray;
+			}
+			//create element with inspire category codes (mapbender ids)
+			$md_inspire_categoriesArray = array();
+			if (isset($applicationMatrix[$i]['md_inspire_cats']) && $applicationMatrix[$i]['md_inspire_cats'] != "") {
+				$md_inspire_categoriesArray = explode(",",trim(str_replace("}{"  ,",",$applicationMatrix[$i]['md_inspire_cats']),"{}"));
+				$this->applicationJSON->application->srv[$i]->inspireCategories = $md_inspire_categoriesArray;
+			}
+			//compute isHVD flag based on hvd_cats.json config
+			$this->applicationJSON->application->srv[$i]->isHVD = $this->computeIsHVD($md_custom_categoriesArray);
 
 			$this->applicationJSON->application->srv[$i]->bbox = array($applicationMatrix[$i]['bbox']); //TODO: read out bbox from wmc $applicationMatrix[$i][''];
 			$this->applicationJSON->application->srv[$i]->timeBegin = date("Y-m-d", strtotime($applicationMatrix[$i]['timebegin']));
@@ -1476,27 +1524,19 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 		if (strtolower($this->searchResources) !== "wmc" && $this->restrictToOpenData) {
 			array_push($whereCondArray, '(isopen = 1)');
 		}
-		//search filter for HVD classification 
-		//
+		//search filter for HVD classification - only checks custom categories
+		//HVD custom cats are assigned to datasets that have isopen=1 AND matching inspire categories
+		//so checking custom cats alone is sufficient
 		if (strtolower($this->searchResources) == "dataset" && $this->restrictToHvd) {
-			//FIX INSPIRE Category ids: [1,2,3]
-			//FIX CUSTOM Category ids: [2,3,4]
-			//{"hvd_inspire_cat": [1,2,3], "hvd_custom_cat": [3,4,5]}
-			//array_push($whereCondArray, '(isopen = 1)');
-			$e = new mb_exception("classes/class_metadata.php: inspire cats: " . json_encode($this->hvdInspireCats));
-			$hvdFilter = "";
-			foreach ($this->hvdInspireCats as $inspireCatId) {
- 				$hvdFilter .= " md_inspire_cats like '%{" . $inspireCatId . "}%' OR";
-			}
-			foreach ($this->hvdCustomCats as $customCatId) {
-				$hvdFilter .= " md_inspire_cats like '%{" . $customCatId . "}%' OR";
-		   	}
-			$hvdFilter = ltrim($hvdFilter, " ");
-			//remove trailing " OR"
-			$hvdFilter = preg_replace('/ OR$/', '$1', $hvdFilter);
-			if ($hvdFilter && $hvdFilter !== "") {
-				$hvdFilter = "(" . $hvdFilter . ")";
-				array_push($whereCondArray, $hvdFilter);
+			if (!empty($this->hvdCustomCats)) {
+				$hvdFilter = "";
+				foreach ($this->hvdCustomCats as $customCatId) {
+					$hvdFilter .= " md_custom_cats like '%{" . $customCatId . "}%' OR";
+				}
+				$hvdFilter = rtrim($hvdFilter, " OR");
+				if ($hvdFilter !== "") {
+					array_push($whereCondArray, '(' . $hvdFilter . ')');
+				}
 			}
 		}
 		//search filter for md_topic_categories
@@ -1588,6 +1628,37 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 			array_push($whereCondArray, $dep);
 		}
 
+		//adminType condition (filter by admin_code of registrating department)
+		if ($this->adminTypes != NULL) {
+			$adminTypeMapping = array(
+				'nuts1' => "'NUTS 1'",
+				'nuts2' => "'NUTS 2'",
+				'nuts3' => "'NUTS 3'",
+				'lau2' => "'LAU 2'",
+			);
+			$adminCodes = explode(",", $this->adminTypes);
+			$sqlParts = array();
+			$includeOther = false;
+			foreach ($adminCodes as $code) {
+				$code = trim($code);
+				if ($code === 'other') {
+					$includeOther = true;
+				} else if (isset($adminTypeMapping[$code])) {
+					$sqlParts[] = $adminTypeMapping[$code];
+				}
+			}
+			$adminWhere = "";
+			if (!empty($sqlParts) && $includeOther) {
+				$adminWhere = " department IN (SELECT mb_group_id FROM mb_group WHERE mb_group_admin_code IN (" . implode(",", $sqlParts) . ") OR mb_group_admin_code IS NULL OR mb_group_admin_code = '' OR mb_group_admin_code = 'other')";
+			} else if (!empty($sqlParts)) {
+				$adminWhere = " department IN (SELECT mb_group_id FROM mb_group WHERE mb_group_admin_code IN (" . implode(",", $sqlParts) . "))";
+			} else if ($includeOther) {
+				$adminWhere = " department IN (SELECT mb_group_id FROM mb_group WHERE mb_group_admin_code IS NULL OR mb_group_admin_code = '' OR mb_group_admin_code = 'other')";
+			}
+			if ($adminWhere !== "") {
+				array_push($whereCondArray, $adminWhere);
+			}
+		}
 		//resourceId conditions
 		if ($this->resourceIds != NULL) {
 			$resourceCondition = " " . $this->databaseIdColumnName . " IN (" . $this->resourceIds . ") ";
@@ -1828,7 +1899,7 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 							$this->catJSON->searchMD->category[$i]->title = "Organizations";
 							break;
 					}
-					$sqlCat[$i] = "SELECT department AS id, COUNT(department) AS count, mb_group.mb_group_name AS title FROM " . $this->searchView . " INNER JOIN mb_group ON department = mb_group.mb_group_id";
+					$sqlCat[$i] = "SELECT department AS id, COUNT(department) AS count, mb_group.mb_group_title AS title FROM " . $this->searchView . " INNER JOIN mb_group ON department = mb_group.mb_group_id";
 					if ($this->resourceClassifications[$i]['title'] != $this->resourceClassifications[2]['title']) {
 						if ($whereStr != '') {
 							$sqlCat[$i] .= " " . $whereStr . " GROUP BY ";
@@ -1842,7 +1913,7 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 							$sqlCat[$i] .= " WHERE " . $this->whereStrCatExtension . " GROUP BY ";
 						}
 					}
-					$sqlCat[$i] .= "department, mb_group.mb_group_name";
+					$sqlCat[$i] .= "department, mb_group.mb_group_title";
 					$sqlCategory = $sqlCat[$i];
 					//TODO solve problem
 					$sqlCategory = str_replace("WHERE  AND", "WHERE", $sqlCategory);
@@ -1879,6 +1950,80 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 					}
 					$e = new mb_notice("class_metadata: countsql: " . $sqlCat[$i]);
 				}
+
+				//*********************************************************************
+				//create a facet for Herkunft (admin_code / origin type)
+				$i = 4;
+				switch ($this->languageCode) {
+					case "de":
+						$this->catJSON->searchMD->category[$i]->title = "Herkunft";
+						break;
+					case "en":
+						$this->catJSON->searchMD->category[$i]->title = "Origin";
+						break;
+					default:
+						$this->catJSON->searchMD->category[$i]->title = "Origin";
+						break;
+				}
+				// Map admin_code values to short IDs and localized labels
+				$adminTypeLabels = array(
+					'NUTS 1' => array('id' => 'nuts1', 'de' => 'Land', 'en' => 'Country/State'),
+					'NUTS 2' => array('id' => 'nuts2', 'de' => 'Regierungsbezirk', 'en' => 'Government District'),
+					'NUTS 3' => array('id' => 'nuts3', 'de' => 'Kreis', 'en' => 'District'),
+					'LAU 2'  => array('id' => 'lau2', 'de' => 'Gemeinde', 'en' => 'Municipality'),
+				);
+				$labelLang = isset($adminTypeLabels['NUTS 1'][$this->languageCode]) ? $this->languageCode : 'en';
+				$otherLabel = ($this->languageCode == 'de') ? 'Sonstiges' : 'Other';
+
+				$sqlCat[$i] = "SELECT CASE "
+					. "WHEN mb_group.mb_group_admin_code = 'NUTS 1' THEN 'nuts1' "
+					. "WHEN mb_group.mb_group_admin_code = 'NUTS 2' THEN 'nuts2' "
+					. "WHEN mb_group.mb_group_admin_code = 'NUTS 3' THEN 'nuts3' "
+					. "WHEN mb_group.mb_group_admin_code = 'LAU 2' THEN 'lau2' "
+					. "ELSE 'other' "
+					. "END AS admin_type_id, "
+					. "COUNT(department) AS count "
+					. "FROM " . $this->searchView . " INNER JOIN mb_group ON department = mb_group.mb_group_id";
+				if ($whereStr != '') {
+					$sqlCat[$i] .= " " . $whereStr . " GROUP BY admin_type_id";
+				} else {
+					$sqlCat[$i] .= " GROUP BY admin_type_id";
+				}
+				$sqlCategory = $sqlCat[$i];
+				$sqlCategory = str_replace("WHERE  AND", "WHERE", $sqlCategory);
+				$res = db_prep_query($sqlCategory, $v, $t);
+				$e = new mb_notice("class_metadata: countCatHerkunft sql: " . $sqlCategory);
+				$categoryCounts = db_fetch_all($res);
+				if ($categoryCounts) {
+					if (count($categoryCounts) > 0) {
+						$this->catJSON->searchMD->category[$i]->subcat = array();
+						for ($j = 0; $j < count($categoryCounts); $j++) {
+							$shortId = $categoryCounts[$j]["admin_type_id"];
+							// Resolve label from mapping
+							$label = $otherLabel;
+							foreach ($adminTypeLabels as $rawCode => $mapping) {
+								if ($mapping['id'] === $shortId) {
+									$label = $mapping[$labelLang];
+									break;
+								}
+							}
+							$this->catJSON->searchMD->category[$i]->subcat[$j]->id = $shortId;
+							$this->catJSON->searchMD->category[$i]->subcat[$j]->title = $label;
+							$this->catJSON->searchMD->category[$i]->subcat[$j]->count = $categoryCounts[$j]['count'];
+							// Build filter link
+							$filteredSearchString = $this->delTotalFromQuery('searchId', $this->searchURL);
+							$paramValue = $this->getValueForParam($this->resourceClassifications[$i]['requestName'], $filteredSearchString);
+							$paramValue = urldecode($paramValue);
+							if ($paramValue == false) {
+								$filteredSearchString .= "&" . $this->resourceClassifications[$i]['requestName'] . "=" . $shortId;
+							} else {
+								$filteredSearchString = $this->addToQuery($this->resourceClassifications[$i]['requestName'], $filteredSearchString, $shortId, $paramValue);
+							}
+							$this->catJSON->searchMD->category[$i]->subcat[$j]->filterLink = $filteredSearchString;
+						}
+					}
+				}
+				$e = new mb_notice("class_metadata: countsql Herkunft: " . $sqlCat[$i]);
 
 				$this->catJSON = $this->json->encode($this->catJSON);
 				//write categories files only when file is requested and the searchid was not used before!
@@ -2183,6 +2328,27 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 			$countsublayer++;
 		}
 		return $layerIdArray;
+	}
+
+	/**
+	 * Computes whether a resource is a High-Value Dataset (HVD)
+	 * based on the hvd_cats.json configuration.
+	 * Checks if any of the resource's custom or inspire category IDs
+	 * match those configured as HVD categories.
+	 *
+	 * @param array $customCats Array of custom category IDs (strings)
+	 * @param array $inspireCats Array of inspire category IDs (strings)
+	 * @return bool true if the resource qualifies as HVD
+	 */
+	private function computeIsHVD($customCats) {
+		if (!empty($this->hvdCustomCats)) {
+			foreach ($customCats as $catId) {
+				if (in_array((int)$catId, $this->hvdCustomCats)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private function hasConstraints($type, $id)
