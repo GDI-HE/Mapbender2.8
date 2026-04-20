@@ -520,9 +520,56 @@ class mbTemplatePdf extends mbPdf
                 }
             }
 
-            // Remove remote images (Dompdf 0.8.x cannot reliably load them),
-            // but keep base64-encoded images which Dompdf can render inline.
-            $featureInfoResult = preg_replace('/<img(?![^>]*src=["\']data:)[^>]*>/i', '', $featureInfoResult);
+            // Convert remote <img src="..."> to inline base64 data URIs so that
+            // Dompdf can render them without making outbound HTTP requests itself.
+            // Images that are already data: URIs are left untouched.
+            // If fetching fails the tag is removed rather than left as a broken ref.
+            //
+            // Security: to prevent SSRF, only fetch images whose host matches the
+            // host of the featureInfo WMS request.  Images from any other origin
+            // are silently dropped.
+            $featureInfoHost = parse_url($url->request, PHP_URL_HOST);
+            $featureInfoResult = preg_replace_callback(
+                '/<img(?![^>]*src=["\']data:)([^>]*)>/i',
+                function ($m) use ($featureInfoHost) {
+                    // Extract src attribute value
+                    if (!preg_match('/src=["\']([^"\']+)["\']/', $m[1], $srcMatch)) {
+                        return '';  // no src → drop tag
+                    }
+                    $imgUrl = $srcMatch[1];
+                    // Only fetch http/https URLs; reject anything else for security
+                    if (!preg_match('/^https?:\/\//i', $imgUrl)) {
+                        return '';
+                    }
+                    // SSRF guard: only allow images from the same host as the WMS
+                    $imgHost = parse_url($imgUrl, PHP_URL_HOST);
+                    if (!$imgHost || strcasecmp($imgHost, $featureInfoHost) !== 0) {
+                        return '';
+                    }
+                    $imgConnector = new connector();
+                    $imgConnector->set('timeOut', '10');
+                    $imgConnector->load($imgUrl);
+                    $imgData = $imgConnector->file;
+                    if (empty($imgData)) {
+                        return '';
+                    }
+                    // Detect MIME type from magic bytes
+                    if (substr($imgData, 0, 3) === "\xFF\xD8\xFF") {
+                        $mime = 'image/jpeg';
+                    } elseif (substr($imgData, 0, 4) === "\x89PNG") {
+                        $mime = 'image/png';
+                    } elseif (substr($imgData, 0, 4) === 'GIF8') {
+                        $mime = 'image/gif';
+                    } else {
+                        $mime = 'image/png';
+                    }
+                    $b64 = base64_encode($imgData);
+                    // Rebuild the tag with only src replaced, keeping other attributes
+                    $newAttrs = preg_replace('/src=["\'][^"\']*["\']/', 'src="data:' . $mime . ';base64,' . $b64 . '"', $m[1]);
+                    return '<img' . $newAttrs . '>';
+                },
+                $featureInfoResult
+            );
 
             // Inject per-layer legend as an inline right-side column (65 / 35 split).
             $includeLegend = !isset($_REQUEST['pfi_include_legend']) || $_REQUEST['pfi_include_legend'] !== '0';
