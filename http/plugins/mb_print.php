@@ -1357,7 +1357,7 @@ var PrintPDF = function (options) {
     // Add input fields for print options (title, dpi, comment, scale)
 
     // Legend option checkbox
-    var $optionsDiv = $('<div class="pfi-options" style="margin-top:8px;padding-top:6px;border-top:1px solid #ccc;">'
+    var $optionsDiv = $('<div class="pfi-options" style="margin-left:9px;font-size: 12px;">'
       + '<label style="cursor:pointer;">'
       + '<input type="checkbox" id="pfi_include_legend" checked style="margin-right:4px;">'
       + 'Legende einschlie&szlig;en'

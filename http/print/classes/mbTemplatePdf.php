@@ -352,8 +352,14 @@ class mbTemplatePdf extends mbPdf
             // If legend is to be shown, narrow the map element to 70% of its original
             // width so the legend panel can sit beside it (not on top of it).
             $includeLegend = !isset($_REQUEST['pfi_include_legend']) || $_REQUEST['pfi_include_legend'] !== '0';
-            $mapElementConf  = null;
-            $savedMapWidth   = null;
+            $mapElementConf = null;
+            $savedMapWidth  = null;
+            $panelX = null;
+            $panelW = null;
+            $mapX   = null;
+            $mapY   = null;
+            $mapH   = null;
+            $padding = 1.5;
             if ($includeLegend && !empty($legendUrls)) {
                 foreach ($pageConf->elements as $pageElementConf) {
                     if ($pageElementConf->type === 'map') {
@@ -364,6 +370,27 @@ class mbTemplatePdf extends mbPdf
                 if ($mapElementConf !== null) {
                     $savedMapWidth = $mapElementConf->width;
                     $mapElementConf->width = $mapElementConf->width * 0.70;
+
+                    // Compute panel geometry here so the white background can be
+                    // drawn BEFORE renderElements() — overview and other decorators
+                    // then render on top of the white panel (correct Z-order).
+                    $mapX  = floatval($mapElementConf->x_ul);
+                    $mapY  = floatval($mapElementConf->y_ul);
+                    $mapW  = floatval($savedMapWidth);
+                    $mapH  = floatval($mapElementConf->height);
+                    $legendGap = 3.0;  // mm breathing room between map edge and legend text
+                    $panelW = $mapW * 0.30 - $legendGap;
+                    $panelX = $mapX + $mapW * 0.70 + $legendGap;  // text/image start
+                    $fillX  = $mapX + $mapW * 0.70;               // fill + line at map edge
+
+                    // White background — drawn first so all page decorators
+                    // (overview minimap, etc.) paint on top of it.
+                    $this->objPdf->SetFillColor(255, 255, 255);
+                    $this->objPdf->Rect($fillX, $mapY, $mapW * 0.30, $mapH, 'F');
+                    // Separator line sits cleanly at the map/legend boundary.
+                    $this->objPdf->SetDrawColor(180, 180, 180);
+                    $this->objPdf->SetLineWidth(0.2);
+                    $this->objPdf->Line($fillX, $mapY, $fillX, $mapY + $mapH);
                 }
             }
 
@@ -375,23 +402,9 @@ class mbTemplatePdf extends mbPdf
                 $mapElementConf->width = $savedMapWidth;
             }
 
-            // Draw legend image(s) in the freed 30% to the right of the map.
-            if ($includeLegend && !empty($legendUrls) && $mapElementConf !== null) {
-                $mapX = floatval($mapElementConf->x_ul);
-                $mapY = floatval($mapElementConf->y_ul);
-                $mapW = floatval($savedMapWidth);   // original full width
-                $mapH = floatval($mapElementConf->height);
-
-                // Legend panel occupies the right 30% of the original map area.
-                $panelW  = $mapW * 0.30;
-                $panelX  = $mapX + $mapW * 0.70;   // starts right after the narrowed map
-                $padding = 1.5;
-
-                // White background panel with a thin left border.
-                $this->objPdf->SetFillColor(255, 255, 255);
-                $this->objPdf->SetDrawColor(180, 180, 180);
-                $this->objPdf->SetLineWidth(0.2);
-                $this->objPdf->Rect($panelX, $mapY, $panelW, $mapH, 'FD');
+            // Draw legend heading and images AFTER renderElements() so they appear
+            // on top of all other page elements (overview, permanent images, etc.).
+            if ($includeLegend && !empty($legendUrls) && $mapElementConf !== null && $panelX !== null) {
 
                 // "Legende" heading.
                 $this->objPdf->SetFont('Arial', 'B', 6);
@@ -399,11 +412,19 @@ class mbTemplatePdf extends mbPdf
                 $this->objPdf->SetXY($panelX + $padding, $mapY + $padding);
                 $this->objPdf->Cell($panelW - $padding * 2, 4, 'Legende', 0, 1, 'L');
 
-                $curY   = $mapY + $padding + 4 + 1;
-                $imgW   = $panelW - $padding * 2;
-                // Distribute available height evenly across all legend items so no
-                // single large image dominates the panel.
-                $availH = $mapH - $padding * 2 - 5;   // subtract heading area
+                // Layer title as subtitle — FPDF uses ISO-8859-1, so convert from UTF-8
+                // to avoid garbled characters (e.g. ü showing as Ã¼).
+                $titleForFpdf = mb_convert_encoding($url->title, 'ISO-8859-1', 'UTF-8');
+                $this->objPdf->SetFont('Arial', '', 7);
+                $this->objPdf->SetTextColor(80, 80, 80);
+                $this->objPdf->SetXY($panelX + $padding, $mapY + $padding + 4);
+                $this->objPdf->MultiCell($panelW - $padding * 2, 3, $titleForFpdf, 0, 'L');
+                $titleEndY = $this->objPdf->GetY();
+
+                $curY = $titleEndY + 1;
+                $imgW = $panelW - $padding * 2;
+                // Distribute available height evenly across all legend items.
+                $availH = ($mapY + $mapH - $padding) - $curY;
                 $maxPerItem = $availH / max(1, count($legendUrls));
 
                 foreach ($legendUrls as $legendUrlItem) {
@@ -422,10 +443,10 @@ class mbTemplatePdf extends mbPdf
                     file_put_contents($tmpImgFile, $legendImgData);
                     $imgInfo = @getimagesize($tmpImgFile);
                     if ($imgInfo !== false && $imgInfo[0] > 0 && $imgInfo[1] > 0) {
-                        // Convert natural pixel size to mm at 96 dpi (screen resolution).
+                        // Convert natural pixel size to mm at 96 dpi.
                         $naturalW = $imgInfo[0] * 25.4 / 96.0;
                         $naturalH = $imgInfo[1] * 25.4 / 96.0;
-                        // Scale DOWN to panel width if needed, but never upscale.
+                        // Scale DOWN to panel width if needed, never upscale.
                         if ($naturalW > $imgW) {
                             $drawW = $imgW;
                             $drawH = $imgW * ($naturalH / $naturalW);
@@ -450,7 +471,7 @@ class mbTemplatePdf extends mbPdf
             require_once(dirname(__FILE__) . "/../../extensions/dompdf/autoload.inc.php");
 
             $dompdf = new Dompdf\Dompdf(array(
-              "isRemoteEnabled" => true,
+              "isRemoteEnabled" => false,  // all images are inlined as base64 above
               "tempDir" => ABSOLUTE_TMPDIR
             ));
 
@@ -500,6 +521,19 @@ class mbTemplatePdf extends mbPdf
                 }
             }
 
+            // Inject the layer title as a heading at the top of the featureInfo page.
+            // This uses the layer title from the WMS config directly, independent of
+            // any title the user may have typed in the print dialog.
+            $layerTitleHtml = '<div style="font-family:Arial,sans-serif;font-size:10pt;font-weight:bold;'
+                . 'border-bottom:1px solid #ccc;margin-bottom:4mm;padding-bottom:1mm;">'
+                . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8')
+                . '</div>';
+            if (preg_match('/<body[^>]*>/i', $featureInfoResult)) {
+                $featureInfoResult = preg_replace('/(<body[^>]*>)/i', '$1' . $layerTitleHtml, $featureInfoResult);
+            } else {
+                $featureInfoResult = $layerTitleHtml . $featureInfoResult;
+            }
+
             // Hide the red stripe column (.tab1) for BRW-Ort content only.
             // Dompdf 0.8.x cannot handle float-based side-by-side layouts; for other
             // layers the column is wanted and can be left in place.
@@ -520,30 +554,31 @@ class mbTemplatePdf extends mbPdf
                 }
             }
 
-            // Convert remote <img src="..."> to inline base64 data URIs so that
-            // Dompdf can render them without making outbound HTTP requests itself.
-            // Images that are already data: URIs are left untouched.
-            // If fetching fails the tag is removed rather than left as a broken ref.
+            // Sanitize and inline all remote <img> tags as base64 data URIs.
             //
-            // Security: to prevent SSRF, only fetch images whose host matches the
-            // host of the featureInfo WMS request.  Images from any other origin
-            // are silently dropped.
-            $featureInfoHost = parse_url($url->request, PHP_URL_HOST);
+            // Security layers:
+            //  1. HTTPS-only — plain HTTP image URLs are rejected to prevent
+            //     man-in-the-middle injection of crafted image bytes in transit.
+            //     HTTPS-sourced images from any host are allowed (WMS and featureInfo
+            //     servers may legitimately serve images from different origins).
+            //  2. GD pixel-buffer transcoding — the fetched bytes are decoded by PHP
+            //     GD into a raw in-memory pixel buffer, then re-encoded as a fresh PNG.
+            //     EXIF data, ICC profiles, XMP, embedded scripts, and polyglot payloads
+            //     are ALL stripped because GD never writes anything except pixel values.
+            //     The original bytes are nulled immediately after GD reads them.
+            //  3. GD unavailable → image is dropped entirely.
+            //  4. dompdf isRemoteEnabled is false (set above), so dompdf itself cannot
+            //     make any further outbound requests during PDF rendering.
             $featureInfoResult = preg_replace_callback(
                 '/<img(?![^>]*src=["\']data:)([^>]*)>/i',
-                function ($m) use ($featureInfoHost) {
-                    // Extract src attribute value
+                function ($m) {
+                    // Must have a src attribute
                     if (!preg_match('/src=["\']([^"\']+)["\']/', $m[1], $srcMatch)) {
-                        return '';  // no src → drop tag
-                    }
-                    $imgUrl = $srcMatch[1];
-                    // Only fetch http/https URLs; reject anything else for security
-                    if (!preg_match('/^https?:\/\//i', $imgUrl)) {
                         return '';
                     }
-                    // SSRF guard: only allow images from the same host as the WMS
-                    $imgHost = parse_url($imgUrl, PHP_URL_HOST);
-                    if (!$imgHost || strcasecmp($imgHost, $featureInfoHost) !== 0) {
+                    $imgUrl = $srcMatch[1];
+                    // HTTPS-only: reject http://, file://, gopher://, data:, etc.
+                    if (!preg_match('/^https:\/\//i', $imgUrl)) {
                         return '';
                     }
                     $imgConnector = new connector();
@@ -553,19 +588,27 @@ class mbTemplatePdf extends mbPdf
                     if (empty($imgData)) {
                         return '';
                     }
-                    // Detect MIME type from magic bytes
-                    if (substr($imgData, 0, 3) === "\xFF\xD8\xFF") {
-                        $mime = 'image/jpeg';
-                    } elseif (substr($imgData, 0, 4) === "\x89PNG") {
-                        $mime = 'image/png';
-                    } elseif (substr($imgData, 0, 4) === 'GIF8') {
-                        $mime = 'image/gif';
-                    } else {
-                        $mime = 'image/png';
+                    // GD transcoding: decode into pixel buffer → re-encode as clean PNG.
+                    // Strips EXIF, metadata, embedded scripts — only pixels survive.
+                    // All processing stays in PHP RAM; no temp files are written.
+                    if (!function_exists('imagecreatefromstring') || !function_exists('imagepng')) {
+                        return '';  // GD unavailable — drop rather than risk unsafe content
                     }
-                    $b64 = base64_encode($imgData);
-                    // Rebuild the tag with only src replaced, keeping other attributes
-                    $newAttrs = preg_replace('/src=["\'][^"\']*["\']/', 'src="data:' . $mime . ';base64,' . $b64 . '"', $m[1]);
+                    $gdImage = @imagecreatefromstring($imgData);
+                    $imgData = null;  // discard original bytes immediately
+                    if ($gdImage === false) {
+                        return '';  // not a valid image
+                    }
+                    ob_start();
+                    imagepng($gdImage);
+                    $sanitizedPng = ob_get_clean();
+                    imagedestroy($gdImage);
+                    if (empty($sanitizedPng)) {
+                        return '';
+                    }
+                    $b64 = base64_encode($sanitizedPng);
+                    $sanitizedPng = null;  // free RAM
+                    $newAttrs = preg_replace('/src=["\'][^"\']*["\']/', 'src="data:image/png;base64,' . $b64 . '"', $m[1]);
                     return '<img' . $newAttrs . '>';
                 },
                 $featureInfoResult
