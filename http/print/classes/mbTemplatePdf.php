@@ -113,6 +113,63 @@ class mbTemplatePdf extends mbPdf
                     break;
                 case "marker":
                     break;
+                case "scalebar":
+                    // Graphic scale bar — drawn after the map so $this->mapinfo["scale"] is set.
+                    $mapScale = isset($this->mapinfo["scale"]) && $this->mapinfo["scale"] > 0
+                        ? floatval($this->mapinfo["scale"])
+                        : (isset($_REQUEST["scale"]) && $_REQUEST["scale"] > 0 ? floatval($_REQUEST["scale"]) : 0);
+                    if ($mapScale <= 0) break;
+
+                    $sbX     = floatval($pageElementConf->x_ul);
+                    $sbY     = floatval($pageElementConf->y_ul);
+                    $maxW    = isset($pageElementConf->width)       ? floatval($pageElementConf->width)       : 70.0;
+                    $nSeg    = isset($pageElementConf->segments)    ? intval($pageElementConf->segments)      : 4;
+                    $sbFont  = isset($pageElementConf->font_family) ? $pageElementConf->font_family           : 'Arial';
+                    $sbFSize = isset($pageElementConf->font_size)   ? floatval($pageElementConf->font_size)   : 7.0;
+                    $barH    = 2.5; // mm
+
+                    // Find the largest "nice" segment distance (metres) that keeps bar <= maxW.
+                    // bar_mm = seg_m * 1000 / scale  =>  max_seg_m = (maxW / nSeg) * scale / 1000
+                    $maxSegM = ($maxW / $nSeg) * $mapScale / 1000.0;
+                    $niceVals = [1,2,5,10,20,25,50,100,200,250,500,1000,2000,2500,5000,10000,20000,25000,50000,100000];
+                    $segM = 1;
+                    foreach ($niceVals as $v) {
+                        if ($v <= $maxSegM) $segM = $v;
+                    }
+                    $segW   = ($segM * 1000.0) / $mapScale; // mm per segment
+                    $totalW = $segW * $nSeg;
+
+                    $useKm  = ($segM >= 1000);
+                    $divBy  = $useKm ? 1000.0 : 1.0;
+                    $unit   = $useKm ? 'km' : 'm';
+
+                    // Alternating black/white filled segments with outline
+                    $this->objPdf->SetLineWidth(0.2);
+                    $this->objPdf->SetDrawColor(0, 0, 0);
+                    for ($si = 0; $si < $nSeg; $si++) {
+                        $segX = $sbX + $si * $segW;
+                        $fill = ($si % 2 === 0) ? 0 : 255;
+                        $this->objPdf->SetFillColor($fill, $fill, $fill);
+                        $this->objPdf->Rect($segX, $sbY, $segW, $barH, 'FD');
+                    }
+
+                    // Tick labels at each segment boundary
+                    $this->objPdf->SetFont($sbFont, '', $sbFSize);
+                    $this->objPdf->SetTextColor(0, 0, 0);
+                    for ($si = 0; $si <= $nSeg; $si++) {
+                        $tickV = ($si * $segM) / $divBy;
+                        $lbl = (fmod($tickV, 1.0) == 0.0)
+                            ? number_format((int)$tickV)
+                            : rtrim(rtrim(number_format($tickV, 2, '.', ''), '0'), '.');
+                        $this->objPdf->SetXY($sbX + $si * $segW - 3.5, $sbY + $barH + 0.3);
+                        $this->objPdf->Cell(7.0, 3.0, utf8_decode($lbl), 0, 0, 'C');
+                    }
+
+                    // Unit label just right of the bar
+                    $this->objPdf->SetXY($sbX + $totalW + 1.0, $sbY);
+                    $this->objPdf->Cell(8.0, $barH, utf8_decode($unit), 0, 0, 'L');
+
+                    break;
             }
         }
     }
