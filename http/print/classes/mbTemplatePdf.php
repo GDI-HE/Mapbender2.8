@@ -120,6 +120,15 @@ class mbTemplatePdf extends mbPdf
                         : (isset($_REQUEST["scale"]) && $_REQUEST["scale"] > 0 ? floatval($_REQUEST["scale"]) : 0);
                     if ($mapScale <= 0) break;
 
+                    // When the featureInfo map is narrowed (legend panel), calculateExtent()
+                    // expands the Y bbox by 1/factor to keep square pixels. This increases
+                    // the actual paper scale by 1/factor relative to the requested scale.
+                    // Correct for that here so the bar represents the true rendered scale.
+                    $widthFactor = isset($this->mapinfo["pfi_map_width_factor"]) && $this->mapinfo["pfi_map_width_factor"] > 0
+                        ? floatval($this->mapinfo["pfi_map_width_factor"])
+                        : 1.0;
+                    $mapScale = $mapScale / $widthFactor;
+
                     $sbX     = floatval($pageElementConf->x_ul);
                     $sbY     = floatval($pageElementConf->y_ul);
                     $maxW    = isset($pageElementConf->width)       ? floatval($pageElementConf->width)       : 70.0;
@@ -451,7 +460,16 @@ class mbTemplatePdf extends mbPdf
                 }
             }
 
+            // Store the map-narrowing factor so the scalebar element can derive
+            // the true paper scale (actual_scale = requested_scale / width_factor).
+            // Reset to 1.0 for non-narrowed pages so the scalebar is always correct.
+            $this->mapinfo["pfi_map_width_factor"] = ($savedMapWidth !== null && $savedMapWidth > 0)
+                ? ($mapElementConf->width / $savedMapWidth)   // = 0.70
+                : 1.0;
+
             $this->renderElements($pageConf, $manualValues);
+
+            $this->mapinfo["pfi_map_width_factor"] = 1.0;  // reset after rendering
             $this->printLegend = $savedPrintLegend;
 
             // Restore original map width (so subsequent pages are unaffected).
