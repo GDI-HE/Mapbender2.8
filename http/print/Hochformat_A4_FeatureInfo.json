@@ -23,8 +23,8 @@
             },
             "options" : [
                 {
-                    "value" : "144",
-                    "label" : "144 dpi"
+                    "value" : "72",
+                    "label" : "72 dpi"
                 },
                 {
                     "value" : "144",
@@ -89,6 +89,24 @@
                     }
                 },
 
+				"nordpfeil" : {
+                    "type" : "image",
+                    "x_ul" : 188.0,
+                    "y_ul" : 30.0,
+                    "width" : 10,
+                    "height" : 12,
+                    "angle" : 0,
+                    "filename" : "./img/northarrow.png"
+                },
+				"scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 248.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
 				"scale" : {
                     "type" : "text",
                     "x_ul" : 106.0,
@@ -129,6 +147,24 @@
                         "size": [ 6.8, 6.8 ]
                     }
                 },
+                "nordpfeil" : {
+                    "type" : "image",
+                    "x_ul" : 134.0,
+                    "y_ul" : 30.0,
+                    "width" : 10,
+                    "height" : 12,
+                    "angle" : 0,
+                    "filename" : "./img/northarrow.png"
+                },
+                "scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 237.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
                 "legende" : {
                     "type" : "legend",
                     "x_ul" : 18.5,
@@ -143,3 +179,4 @@
         }
     ]
 }
+
