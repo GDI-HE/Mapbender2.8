@@ -41,7 +41,7 @@ class mb_fpdi extends FPDI {
 	            $info=$this->_parsejpg($file);
 	        elseif($type=='png'){
 	            $info=$this->_parsepng($file);
-	            if ($info=='alpha') return $this->ImagePngWithAlpha($file,$x,$y,$w,$h,$link);
+            if ($info=='alpha') return $this->ImagePngWithAlpha($file,$x,$y,$w,$h,$link,$align,$angle);
 	        }
 	        else
 	        {
@@ -131,7 +131,7 @@ class mb_fpdi extends FPDI {
 	
 	// needs GD 2.x extension
 	// pixel-wise operation, not very fast
-	function ImagePngWithAlpha($file,$x,$y,$w=0,$h=0,$link='')
+	function ImagePngWithAlpha($file,$x,$y,$w=0,$h=0,$link='',$align='',$angle=0)
 	{
 	    $tmp_alpha = tempnam('.', 'mska');
 	    $this->tmpFiles[] = $tmp_alpha;
@@ -171,7 +171,7 @@ class mb_fpdi extends FPDI {
 	    $maskImg = $this->Image($tmp_alpha, 0,0,0,-$h*10, 'PNG', '', true);
 	    
 	    //embed image, masked with previously embedded mask
-	    $this->Image($tmp_plain,$x,$y,$w,$h,'PNG',$link, false, $maskImg);
+    $this->Image($tmp_plain,$x,$y,$w,$h,'PNG',$link, false, $maskImg, $align, $angle);
 	}
 	
 	function Close()
@@ -647,3 +647,4 @@ class mb_fpdi extends FPDI {
 }
 
 ?>
+

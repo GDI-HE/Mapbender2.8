@@ -106,12 +106,12 @@
               
                 "nordpfeil" : {
                     "type" : "image",
-                    "x_ul" : 194,
-                    "y_ul" : 249,
-                    "width" : 1,
-                    "height" : 1,
+                    "x_ul" : 188,
+                    "y_ul" : 30,
+                    "width" : 10,
+                    "height" : 12,
                     "angle" : 0,
-                    "filename" : "./img/northarrowdummy.png"
+                    "filename" : "./img/northarrow.png"
                 },
 		"titel" : {
                     "type" : "text",

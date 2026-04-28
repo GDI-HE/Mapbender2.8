@@ -127,6 +127,12 @@ var PrintPDF = function (options) {
   var actualConfig;
 
   /**
+   * Callback set by printFeatureInfo to intercept AJAX errors (timeout, server error).
+   * When set, the hookForm error handler calls this instead of showing the generic alert.
+   */
+  var pfiErrorCallback = null;
+
+  /**
    * constructor
    */
   eventInit.register(function () {
@@ -397,10 +403,22 @@ var PrintPDF = function (options) {
       dataType: 'json',
       beforeSubmit: validate,
       success: showResult,
-      timeout: options.timeout ? options.timeout : 90000,
-      error: function () {
+      timeout: options.timeout ? options.timeout : 10000,
+      error: function (xhr, textStatus) {
         showHideWorking("hide");
-        alert("An error occured or timeout of " + Math.round(options.timeout / 1000) + " seconds reached. Print was aborted.");
+        var msg;
+        if (textStatus === 'timeout') {
+          msg = '<?php echo _mb("Zeitüberschreitung: Der Druckvorgang hat zu lange gedauert und wurde abgebrochen."); ?>';
+        } else {
+          msg = '<?php echo _mb("Serverfehler: Der Druckvorgang konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut."); ?>';
+        }
+        if (pfiErrorCallback) {
+          var cb = pfiErrorCallback;
+          pfiErrorCallback = null;
+          cb(msg);
+        } else {
+          alert(msg);
+        }
       }
     };
     $("#" + myId + "_form").ajaxForm(o);
@@ -502,6 +520,7 @@ var PrintPDF = function (options) {
    * @see jquery.forms#beforeSubmitHandler
    */
   var validate = function (formData, jqForm, params) {
+    pfiCancelled = false;
     showHideWorking("show");
 
     // map urls
@@ -539,6 +558,32 @@ var PrintPDF = function (options) {
       }
     }
 
+<<<<<<< HEAD
+=======
+    // When printing featureInfo, only show legend for layers checked in the dialog.
+    // printFeatureInfoData.urls already holds only the checked entries (unchecked
+    // items are spliced out by the checkbox handler).  Build a lookup set from the
+    // LAYERS= parameter of each request URL so we can filter both legend loops below.
+    var pfiCheckedLayerNames = null;
+    if (printFeatureInfoData !== null &&
+        printFeatureInfoData.urls &&
+        printFeatureInfoData.urls.length > 0) {
+      pfiCheckedLayerNames = {};
+      for (var pci = 0; pci < printFeatureInfoData.urls.length; pci++) {
+        var pfiReq = printFeatureInfoData.urls[pci].request || '';
+        var pfiLyrMatch = pfiReq.match(/[?&]LAYERS=([^&]*)/i);
+        if (pfiLyrMatch) {
+          var pfiLyrList = decodeURIComponent(pfiLyrMatch[1]).split(',');
+          for (var pli = 0; pli < pfiLyrList.length; pli++) {
+            if (pfiLyrList[pli]) {
+              pfiCheckedLayerNames[pfiLyrList[pli]] = true;
+            }
+          }
+        }
+      }
+    }
+
+>>>>>>> b0f87364c4a5ed7117882328cd1418a54ab07dcc
     if (options.reverseLegend == 'true') {
       for (var i = mapObj.wms.length - 1; i >= 0; i--) {
         var currentWms = mapObj.wms[i];
@@ -553,15 +598,20 @@ var PrintPDF = function (options) {
               var isVisible = (currentLayer.gui_layer_visible === 1);
               var hasNoChildren = (!currentLayer.has_childs);
               if (isVisible && hasNoChildren) {
+                // In print featureInfo mode, skip layers not checked in the dialog
+                if (pfiCheckedLayerNames !== null && !pfiCheckedLayerNames[currentLayer.layer_name]) {
+                  continue;
+                }
                 var layerLegendObj = {};
                 layerLegendObj.name = currentLayer.layer_name;
                 layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
                 var layerStyle = currentWms.getCurrentStyleByLayerName(currentLayer.layer_name);
                 if (layerStyle === false || layerStyle === "") {
-                  layerStyle = "default";
+                  layerStyle = "";
                 }
                 layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
-                if (layerLegendObj.legendUrl !== false) {
+                // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
+                if (layerLegendObj.legendUrl !== false && (layerLegendObj.legendUrl.split('?').length - 1) <= 1) {
                     //if wms id is not excluded from printing
                     if (!array_contains(exclude,currentWms.wms_id)){
                     	//alert("The legend of the WMS with id " + JSON.stringify(currentWms.wms_id) + " should be printed");
@@ -607,15 +657,20 @@ var PrintPDF = function (options) {
             var isVisible = (currentLayer.gui_layer_visible === 1);
             var hasNoChildren = (!currentLayer.has_childs);
             if (isVisible && hasNoChildren) {
+              // In print featureInfo mode, skip layers not checked in the dialog
+              if (pfiCheckedLayerNames !== null && !pfiCheckedLayerNames[currentLayer.layer_name]) {
+                continue;
+              }
               var layerLegendObj = {};
               layerLegendObj.name = currentLayer.layer_name;
               layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
               var layerStyle = currentWms.getCurrentStyleByLayerName(currentLayer.layer_name);
               if (layerStyle === false || layerStyle === "") {
-                layerStyle = "default";
+                layerStyle = "";
               }
               layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
-              if (layerLegendObj.legendUrl !== false) {
+              // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
+              if (layerLegendObj.legendUrl !== false && (layerLegendObj.legendUrl.split('?').length - 1) <= 1) {
                 //if wms id is not excluded from printing
                 if (!array_contains(exclude,currentWms.wms_id)){
                 	//alert("The legend of the WMS with id " + JSON.stringify(currentWms.wms_id) + " should be printed");
@@ -774,6 +829,10 @@ var PrintPDF = function (options) {
    * that triggers a download popup or is displayed in PDF plugin.
    */
   var showResult = function (res, text) {
+    if (pfiCancelled) {
+      showHideWorking("hide");
+      return;
+    }
     if (text == 'success') {
       var $downloadFrame = $("#" + myId + "_frame");
       if ($downloadFrame.size() === 0) {
@@ -782,27 +841,44 @@ var PrintPDF = function (options) {
           myId + "_frame' width='0' height='0' style='display:none'></iframe>"
         ).appendTo("body");
       }
-      if ($.browser.msie) {
-        $('<div></div>')
-          .attr('id', 'ie-print')
-          .append($('<p>Ihr PDF wurde erstellt und kann nun heruntergeladen werden:</p>'))
-          .append($('<a>Zum Herunterladen hier klicken</a>')
-            .attr('href', stripslashes(res.outputFileName))
-            .click(function () {
-              $(this).parent().dialog('destroy');
-            }))
-          .appendTo('body')
-          .dialog({
-            title: 'PDF-Druck'
-          });
+      var pdfUrl = stripslashes(res.outputFileName);
+      if (printFeatureInfoData !== null) {
+        // FeatureInfo print: show a clickable download link in the progress area
+        var $progressWrap = $("[id='pfi-progress-wrap']");
+        var $progressLabel = $("[id='pfi-progress-label']");
+        $progressLabel.html(
+          '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
+          'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="margin-bottom:-3px;margin-right:3px;">' +
+            '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>' +
+            '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>' +
+          '</svg>' +
+          '<?php echo _mb("Herunterladen"); ?></a>'
+        );
+        $progressWrap.show();
+        showHideWorking("hide");
+        $("#" + myId).trigger("load");
       } else {
-        window.frames[myId + "_frame"].location.href =
-          stripslashes(res.outputFileName);
+        // Normal print (Werkzeug/Drucken): restore original delivery behaviour
+        if ($.browser.msie) {
+          $('<div></div>')
+            .attr('id', 'ie-print')
+            .append($('<p>Ihr PDF wurde erstellt und kann nun heruntergeladen werden:</p>'))
+            .append($('<a>Zum Herunterladen hier klicken</a>')
+              .attr('href', pdfUrl)
+              .click(function () {
+                $(this).parent().dialog('destroy');
+              }))
+            .appendTo('body')
+            .dialog({
+              title: 'PDF-Druck'
+            });
+        } else {
+          window.frames[myId + "_frame"].location.href = pdfUrl;
+        }
+        showHideWorking("hide");
+        $("#" + myId).trigger("load");
       }
-      showHideWorking("hide");
-      $("#" + myId).trigger("load");
-      //remove printbox after successful print
-      //destroyPrintBox();
     } else {
       /* something went wrong */
       $("#" + myId + "_result").html(text);
@@ -982,6 +1058,8 @@ var PrintPDF = function (options) {
   var printFeatureInfoData = null;
   var pfiSubmitting = false;
   var pfiPixelCenter = null;
+  var pfiPollInterval = null;
+  var pfiCancelled = false;
 
   function fixMapFormValues (printInfo) {
     var map = getMapObjByName(myTarget);
@@ -1128,6 +1206,18 @@ var PrintPDF = function (options) {
           }
         }
         if (pfiFlurstuckeLayer !== null) {
+<<<<<<< HEAD
+=======
+          // If the layer is already visible and queryable in the tree it will already be in pfiUrls — skip injection to avoid duplicates
+          var pfiLayerAlreadyActive = (pfiFlurstuckeLayer.gui_layer_visible == 1 && pfiFlurstuckeLayer.gui_layer_querylayer == 1);
+          if (pfiLayerAlreadyActive) {
+            // Still store the cadastral WMS/layer references so validate() can force them into the GetMap URL
+            printInfo.pfiCadastralWmsId = pfiFountCadWms.wms_id;
+            printInfo.pfiCadastralLayerNames = [pfiFlurstuckeLayer.layer_name];
+          }
+        }
+        if (pfiFlurstuckeLayer !== null && !pfiLayerAlreadyActive) {
+>>>>>>> b0f87364c4a5ed7117882328cd1418a54ab07dcc
           var pfiPxCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
 
           // Temporarily force-enable only the Flurstücke layer so getFeatureInfoRequest() includes it
@@ -1199,7 +1289,43 @@ var PrintPDF = function (options) {
 
     // feature info ebenen
 
+<<<<<<< HEAD
     $abfragenDiv.append($("<h3>Abzufragende Ebene:</h3>"));
+=======
+    var $abfragenH3 = $('<h3 style="margin-bottom:6px;">Abzufragende Ebene: </h3>');
+    var $pfiInfoBtn = $('<button type="button" title="Format-Vorschau anzeigen" ' +
+      'style="width:18px;height:18px;padding:0;line-height:1;font-size:12px;font-weight:bold;font-style:italic;' +
+      'border-radius:50%;border:1px solid #888;background:#fff;color:#555;cursor:pointer;' +
+      'vertical-align:middle;margin-left:4px;margin-bottom:2px;">i</button>');
+
+    $pfiInfoBtn.bind('click', function () {
+      var $infoDialog = $('<div style="overflow:auto;"></div>');
+      $infoDialog.append(
+        '<table style="border-collapse:collapse;width:100%;table-layout:fixed;"><tr>' +
+          '<td style="text-align:center;padding:0 8px 0 0;vertical-align:top;width:50%;">' +
+            '<div style="font-weight:bold;margin-bottom:6px;">HTML</div>' +
+            '<img src="../img/pfi-format-html.png" alt="HTML-Vorschau" ' +
+              'style="width:100%;height:auto;border:1px solid #ccc;">' +
+          '</td>' +
+          '<td style="text-align:center;padding:0 0 0 8px;vertical-align:top;width:50%;">' +
+            '<div style="font-weight:bold;margin-bottom:6px;">Text</div>' +
+            '<img src="../img/pfi-format-text.png" alt="Text-Vorschau" ' +
+              'style="width:100%;height:auto;border:1px solid #ccc;">' +
+          '</td>' +
+        '</tr></table>'
+      );
+      $infoDialog.dialog({
+        title: 'Format-Vorschau: HTML vs. Text',
+        modal: true,
+        resizable: true,
+        width: 700,
+        close: function () { $(this).dialog('destroy').remove(); }
+      });
+    });
+
+    $abfragenH3.append($pfiInfoBtn);
+    $abfragenDiv.append($abfragenH3);
+>>>>>>> b0f87364c4a5ed7117882328cd1418a54ab07dcc
 
     printInfo.urls.forEach(function (url, i) {
       var $checkBox = $('<input type="checkbox" checked>');
@@ -1239,15 +1365,31 @@ var PrintPDF = function (options) {
     });
 
     // Add input fields for print options (title, dpi, comment, scale)
+<<<<<<< HEAD
    
  
     // Scale field with proportional resize buttons
    
   
+=======
+
+    // Legend option checkbox
+    var $optionsDiv = $('<div class="pfi-options" style="margin-left:9px;font-size: 12px;">'
+      + '<label style="cursor:pointer;">'
+      + '<input type="checkbox" id="pfi_include_legend" checked style="margin-right:4px;">'
+      + 'Legende einschlie&szlig;en'
+      + '</label>'
+      + '</div>');
+    $dialogDiv.append($optionsDiv);
+>>>>>>> b0f87364c4a5ed7117882328cd1418a54ab07dcc
 
     function restore () {
       if (pfiRestoring) return;
       pfiRestoring = true;
+      clearInterval(pfiPollInterval);
+      pfiPollInterval = null;
+      pfiCancelled = true;
+      $("#" + myId).unbind("load.pfi");
       // Re-enable FeatureInfo clicks
       if (typeof Mapbender !== 'undefined' && Mapbender.enableFeatureInfo) {
         Mapbender.enableFeatureInfo();
@@ -1255,6 +1397,11 @@ var PrintPDF = function (options) {
       if (stopSpotlight) { stopSpotlight(); stopSpotlight = null; }
       pfiPixelCenter = null;
       pfiSubmitting = false;
+      pfiErrorCallback = null;
+      // Reset progress bar for next use
+      $dialogDiv.find('#pfi-progress-wrap').hide();
+      $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
+      $dialogDiv.find('#pfi-progress-label').text('');
       $dialog.dialog('close').remove();
       $featureInfoDialog.dialog('open');
       actualConfig = oldConfig;
@@ -1301,10 +1448,21 @@ var PrintPDF = function (options) {
           "<?php echo _mb("Print"); ?>": function () {
             if (pfiSubmitting) return;
             pfiSubmitting = true;
-            // Disable dialog buttons to prevent double-click
-            $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
-            // Show processing indicator inside the dialog
-            $dialogDiv.find('#pfi-processing').show();
+            pfiCancelled = false;
+
+            // Generate a unique progress token for this print job
+            var pfiProgressToken = 'pfi' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+
+            // Disable only the Print button to prevent double-click; keep Cancel active
+            $(this).closest('.ui-dialog').find('.ui-dialog-buttonpane button').filter(function () {
+              return $(this).text() === '<?php echo _mb("Print"); ?>';
+            }).attr('disabled', 'disabled').css({ opacity: '0.5', cursor: 'default' });
+
+            // Show real progress bar, hide old spinner
+            $dialogDiv.find('#pfi-progress-wrap').show();
+            $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
+            $dialogDiv.find('#pfi-progress-label').text('Druck wird gestartet...');
+
             // Copy dialog field values to the actual form fields in #printPDF_form
             $('#printPDF_form #title').val($dialogDiv.find('#pfi_title').val() || '');
             $('#printPDF_form #dpi').val($dialogDiv.find('#pfi_dpi').val() || '150');
@@ -1313,12 +1471,179 @@ var PrintPDF = function (options) {
             if (scaleVal) {
               $('#printPDF_form #scale').val(scaleVal);
             }
-            
-            $("#" + myId).bind("load", function () {
+
+            // Inject the legend include flag as a hidden field
+            $('#printPDF_form').find('[name="pfi_include_legend"]').remove();
+            $('<input type="hidden" name="pfi_include_legend">').val($dialogDiv.find('#pfi_include_legend').is(':checked') ? '1' : '0').appendTo('#printPDF_form');
+
+            // Inject the progress token as a hidden field into the print form
+            $('#printPDF_form').find('[name="pfi_progress_token"]').remove();
+            $('<input type="hidden" name="pfi_progress_token">').val(pfiProgressToken).appendTo('#printPDF_form');
+
+            // Scale AJAX timeout dynamically based on active WMS service count.
+            // map_url is not yet populated (it's filled in validate()), so count
+            // directly from the map object — the same source validate() uses.
+            (function () {
+              var ind = getMapObjIndexByName(myTarget);
+              var mapObj = ind !== undefined ? mb_mapObj[ind] : null;
+              var activeWmsCount = 1;
+              if (mapObj) {
+                activeWmsCount = 0;
+                for (var wi = 0; wi < mapObj.wms.length; wi++) {
+                  var w = mapObj.wms[wi];
+                  if (w.gui_wms_visible > 0 && w.mapURL && w.mapURL !== 'false') {
+                    activeWmsCount++;
+                  }
+                }
+                activeWmsCount = Math.max(1, activeWmsCount);
+              }
+              // Allow 10s per WMS service, minimum 90s
+              options.timeout = Math.max(options.timeout || 90000, activeWmsCount * 10000);
+            }());
+
+            // Refresh GetFeatureInfo request URLs for any map panning that occurred
+            // since the dialog was opened. pfiPixelCenter is always kept current by
+            // eventAfterMapRequest, so rebuild each URL using the current map state.
+            (function () {
+              if (!pfiPixelCenter) return;
+              var ind = getMapObjIndexByName(myTarget);
+              var mapObj = ind !== undefined ? mb_mapObj[ind] : null;
+              if (!mapObj) return;
+              var clickPoint = { x: pfiPixelCenter[0], y: pfiPixelCenter[1] };
+
+              // Build wms_id → wms object lookup
+              var wmsById = {};
+              for (var wi = 0; wi < mapObj.wms.length; wi++) {
+                wmsById[mapObj.wms[wi].wms_id] = mapObj.wms[wi];
+              }
+
+              // Build wms_id lookup for Flurstücke by layer name
+              var cadWmsId = printInfo.pfiCadastralWmsId || null;
+              var cadLayerNames = printInfo.pfiCadastralLayerNames || [];
+
+              for (var ui = 0; ui < printInfo.urls.length; ui++) {
+                var urlEntry = printInfo.urls[ui];
+                if (!urlEntry.inBbox) continue;
+
+                var refreshed = false;
+
+                // Case 1: Flurstücke — refresh using the stored cadastral WMS id.
+                // Temporarily enable the layer so getFeatureInfoRequest() includes it.
+                if (!refreshed && cadWmsId && cadLayerNames.length > 0) {
+                  var cadWms = wmsById[cadWmsId];
+                  if (cadWms) {
+                    // Check if this url entry belongs to the cadastral WMS
+                    var cadBase = cadWms.wms_getfeatureinfo ? cadWms.wms_getfeatureinfo.split('?')[0].toLowerCase() : '';
+                    var entryBase = (urlEntry.request || '').split('?')[0].toLowerCase();
+                    var isCad = cadBase && entryBase && entryBase.indexOf(cadBase) !== -1;
+                    if (!isCad) {
+                      // Also check by title match against cadastral layer names
+                      for (var ci = 0; ci < cadLayerNames.length; ci++) {
+                        if (urlEntry.title && urlEntry.title === cadLayerNames[ci]) { isCad = true; break; }
+                      }
+                    }
+                    if (isCad) {
+                      // Temporarily enable the Flurstücke layer
+                      var cadPatches = [];
+                      for (var li = 0; li < cadWms.objLayer.length; li++) {
+                        var lyr = cadWms.objLayer[li];
+                        if (cadLayerNames.indexOf(lyr.layer_name) >= 0) {
+                          cadPatches.push({ layer: lyr, v: lyr.gui_layer_visible, q: lyr.gui_layer_querylayer });
+                          lyr.gui_layer_visible = 1;
+                          lyr.gui_layer_querylayer = 1;
+                        }
+                      }
+                      var newReq = cadWms.getFeatureInfoRequest(mapObj, clickPoint);
+                      for (var pi = 0; pi < cadPatches.length; pi++) {
+                        cadPatches[pi].layer.gui_layer_visible = cadPatches[pi].v;
+                        cadPatches[pi].layer.gui_layer_querylayer = cadPatches[pi].q;
+                      }
+                      if (newReq) {
+                        var infoFmt = urlEntry.request.match(/[?&]INFO_FORMAT=([^&]+)/i);
+                        if (infoFmt) { newReq = newReq.replace(/([?&]INFO_FORMAT=)[^&]+/i, '$1' + infoFmt[1]); }
+                        urlEntry.request = newReq;
+                        refreshed = true;
+                      }
+                    }
+                  }
+                }
+
+                // Case 2: regular WMS layers — match by base URL
+                if (!refreshed) {
+                  for (var wi = 0; wi < mapObj.wms.length; wi++) {
+                    var wms = mapObj.wms[wi];
+                    if (!wms.wms_getfeatureinfo) continue;
+                    var wmsBase = wms.wms_getfeatureinfo.split('?')[0].toLowerCase();
+                    var urlBase = (urlEntry.request || '').split('?')[0].toLowerCase();
+                    if (wmsBase && urlBase && urlBase.indexOf(wmsBase) !== -1) {
+                      var newReq = wms.getFeatureInfoRequest(mapObj, clickPoint);
+                      if (newReq) {
+                        var infoFmt = urlEntry.request.match(/[?&]INFO_FORMAT=([^&]+)/i);
+                        if (infoFmt) { newReq = newReq.replace(/([?&]INFO_FORMAT=)[^&]+/i, '$1' + infoFmt[1]); }
+                        urlEntry.request = newReq;
+                      }
+                      break;
+                    }
+                  }
+                }
+              }
+
+              // Keep originalUrls in sync so checkbox logic stays correct
+              printInfo.originalUrls = printInfo.urls.slice();
+              printFeatureInfoData = printInfo;
+            }());
+
+            hookForm();
+
+            // Track last progress to prevent backwards jumps
+            var pfiLastPercent = 0;
+
+            // Poll the progress endpoint
+            pfiPollInterval = setInterval(function () {
+              $.getJSON('../print/printProgress.php', { token: pfiProgressToken }, function (data) {
+                var pct = Math.min(100, parseInt(data.percent, 10) || 0);
+                // Update label always (to show latest status)
+                $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                // Only update progress bar if moving forward
+                if (pct >= pfiLastPercent) {
+                  pfiLastPercent = pct;
+                  $dialogDiv.find('#pfi-progress-bar').css('width', pct + '%');
+                }
+                if (data.error) {
+                  clearInterval(pfiPollInterval);
+                  pfiErrorCallback = null;
+                  alert('<?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?>');
+                  restore();
+                } else if (data.done) {
+                  clearInterval(pfiPollInterval);
+                }
+              });
+            }, 800);
+
+            // Register error handler so hookForm's AJAX error (timeout, server error)
+            // shows a proper message and closes the dialog
+            pfiErrorCallback = function (msg) {
+              clearInterval(pfiPollInterval);
+              alert(msg || '<?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?>');
               restore();
+            };
+
+            $("#" + myId).bind("load.pfi", function () {
+              clearInterval(pfiPollInterval);
+              pfiPollInterval = null;
+              pfiErrorCallback = null;
+              // Success: keep dialog open, show download link (set by showResult).
+              // Reset submission state so user can print again; progress bar stays
+              // visible with the download link until they close the dialog.
+              pfiSubmitting = false;
+              $dialogDiv.find('#pfi-progress-bar').css('width', '100%');
+              $dialogDiv.closest('.ui-dialog').find('.ui-dialog-buttonpane button').filter(function () {
+                return $(this).text() === '<?php echo _mb("Print"); ?>';
+              }).removeAttr('disabled').css({ opacity: '', cursor: '' });
+              showHideWorking("hide");
             });
-            $("." + myId + "_working").show();
-            $("." + myId + "_working_bg").show();
+            // $("." + myId + "_working").show();
+            // $("." + myId + "_working_bg").show();
             $('#printPDF_form').submit();
           },
           "<?php echo _mb("Cancel"); ?>": restore
@@ -1353,9 +1678,19 @@ var PrintPDF = function (options) {
         }
       });
 
+      // Append progress bar into the dialog content (hidden until print starts)
+      $dialogDiv.append(
+        '<div id="pfi-progress-wrap" style="display:none;margin:10px 4px 4px 4px;">' +
+          '<div id="pfi-progress-label" style="font-size:12px;margin-bottom:4px;color:#333;">Wird gestartet...</div>' +
+          '<div style="background:#ddd;border-radius:4px;height:18px;overflow:hidden;">' +
+            '<div id="pfi-progress-bar" style="height:100%;width:0%;background:#4a90d9;border-radius:4px;transition:width 0.4s ease;"></div>' +
+          '</div>' +
+        '</div>'
+      );
+
       $dialog
         .append('<div class="' + myId + '_working_bg" style="display: none;"></div>')
-        .append('<div class="' + myId + '_working" style="display: none;"><img src="../img/indicator_wheel.gif" style="padding:10px 0 0 10px">Generating PDF</div>');
+        .append('<div class="' + myId + '_working" style="display: none;"></div>');
     })
   };
 };

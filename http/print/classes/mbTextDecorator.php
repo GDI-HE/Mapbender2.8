@@ -30,7 +30,16 @@ class mbTextDecorator extends mbTemplatePdfDecorator
                     break;
                 case "scale":
                     $mapInfoScale = $this->pdf->getMapInfo();
-                    $this->{$overrideMemberFromRequest} = "1 : " . $mapInfoScale["scale"];
+                    $rawScale = floatval($mapInfoScale["scale"]);
+                    $widthFactor = isset($mapInfoScale["pfi_map_width_factor"]) && $mapInfoScale["pfi_map_width_factor"] > 0
+                        ? floatval($mapInfoScale["pfi_map_width_factor"]) : 1.0;
+                    $correctedScale = $widthFactor != 1.0 ? $rawScale / $widthFactor : $rawScale;
+                    // Round to the same nearest power-of-10 magnitude as the JS printbox does
+                    if ($correctedScale > 0) {
+                        $magnitude = pow(10, floor(log10($correctedScale)));
+                        $correctedScale = round($correctedScale / $magnitude) * $magnitude;
+                    }
+                    $this->{$overrideMemberFromRequest} = "1 : " . intval($correctedScale);
                     break;
                 default:
                     $this->overrideMembers();
@@ -47,7 +56,8 @@ class mbTextDecorator extends mbTemplatePdfDecorator
             $rgb = explode(',', $fontColor);
         }
         $this->pdf->objPdf->setTextColor($rgb[0], $rgb[1], $rgb[2]);
-        $this->pdf->objPdf->setFont($this->conf->font_family, "", $this->conf->font_size);
+        $fontStyle = isset($this->conf->font_style) ? $this->conf->font_style : "";
+        $this->pdf->objPdf->setFont($this->conf->font_family, $fontStyle, $this->conf->font_size);
         new mb_notice("print: " . $this->conf->x_ul . " " . $this->conf->y_ul . " " . $this->value);
         $this->pdf->objPdf->Text($this->conf->x_ul, $this->conf->y_ul, utf8_decode($this->value));
     }
@@ -56,3 +66,4 @@ class mbTextDecorator extends mbTemplatePdfDecorator
 }
 
 ?>
+

@@ -1011,7 +1011,7 @@ Mapbender.Map = function (options) {
 			if (typeof(featureInfoRequest) !== 'undefined' && featureInfoRequest !== "" && featureInfoRequest !== false) {
 				//iterate over all layers to select those which are queryable and active which lie in the region
 				for (var j = 0; j < this.wms[i].objLayer.length; j++) {
-					if (this.wms[i].objLayer[j].gui_layer_querylayer == 1 && this.wms[i].objLayer[j].gui_layer_queryable == 1 && !this.wms[i].objLayer[j].layer_name.startsWith('unnamed_layer')) {
+					if (this.wms[i].objLayer[j].gui_layer_querylayer == 1 && this.wms[i].objLayer[j].gui_layer_queryable == 1 && !this.wms[i].objLayer[j].has_childs && !this.wms[i].objLayer[j].layer_name.startsWith('unnamed_layer')) {
 						var bbox = this.objectFindByKey(this.wms[i].objLayer[j].layer_epsg, "epsg", epsg);
 						if (bbox) {
 							//check if clicked point is in bbox of layer
@@ -1058,6 +1058,9 @@ Mapbender.Map = function (options) {
 					featureInfoRequest = changeURLParameterValue(featureInfoRequest,"QUERY_LAYERS", featureInfoObj.names);
 					featureInfoRequest = changeURLParameterValue(featureInfoRequest,"STYLES", featureInfoObj.styles);
 					featureInfoObj.request = featureInfoRequest;
+					// At least one layer was in bbox (only in-bbox layers are added to names).
+					// Override any stale false value from the last layer's bbox check.
+					featureInfoObj.inBbox = true;
 					//give back objects
 					allRequests.push(featureInfoObj);
 				}
@@ -1066,7 +1069,7 @@ Mapbender.Map = function (options) {
 			//get all layers for this wms which have activated featureInfo Button
 			//loop over all layers of this wms
 	 		for (var j = 0; j < this.wms[i].objLayer.length; j++) {
-				if (this.wms[i].objLayer[j].gui_layer_querylayer == 1 && this.wms[i].objLayer[j].gui_layer_queryable == 1 && !this.wms[i].objLayer[j].layer_name.startsWith('unnamed_layer')) {
+				if (this.wms[i].objLayer[j].gui_layer_querylayer == 1 && this.wms[i].objLayer[j].gui_layer_queryable == 1 && !this.wms[i].objLayer[j].has_childs && !this.wms[i].objLayer[j].layer_name.startsWith('unnamed_layer')) {
 					var featureInfoObj = {};
                    			featureInfoObj.title = this.wms[i].objLayer[j].gui_layer_title;
 					//pull featureinfo request
@@ -1978,3 +1981,4 @@ Mapbender.Map.prototype.getWfsConfIds = function(wfs_config){
     }
     return js_wfs_conf_id;
 };
+
