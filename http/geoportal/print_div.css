@@ -1,46 +1,113 @@
 @CHARSET "ISO-8859-1";
 
-#printPDF label, #printPDF input, #printPDF select, #printPDF textarea {
-	display: block;
-	width: 154px;
-	float: left;
-	margin: 5px 0px;
-	padding: 0px;
-	line-height: 18px;
-	height: 18px;
-	border: 1px solid lightgrey;
-	-ms-box-sizing:content-box;
-	-moz-box-sizing:content-box;
-	-webkit-box-sizing:content-box;
-	box-sizing:content-box;
+/* ── Regular Werkzeug/Drucken form — matches FeatureInfo dialog style ── */
+
+/* Section box for template selector and form fields */
+#printPDF_selector,
+#printPDF_input .print_option_dyn {
+    background: #f7f9fc;
+    border: 1px solid #dde3ee;
+    border-radius: 6px;
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+#printPDF_selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-#printPDF input#submit {
-	display: block;
-	width: auto;
-	float: left;
-	padding: 0px 8px;
-	line-height: 21px;
-	height: auto;
+/* Each form-field row as a flex row */
+#printPDF_input .print_option_dyn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
 }
 
+/* Labels */
 #printPDF label {
-	text-align: left;
-	padding-right: 5px;
-	width: 100px !important;
-	border: 1px solid transparent;
-	cursor: unset !important;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a6a7e;
+    min-width: 78px;
+    text-align: right;
+    flex-shrink: 0;
+    float: none !important;
+    display: block;
+    border: none !important;
+    height: auto !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: normal !important;
+    cursor: default !important;
+    box-sizing: border-box;
 }
 
+/* Inputs, selects, textareas */
+#printPDF input[type="text"],
+#printPDF input:not([type]),
+#printPDF select,
+#printPDF textarea {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #c7cdd8 !important;
+    border-radius: 4px !important;
+    padding: 4px 7px !important;
+    font-size: 12px !important;
+    color: #333 !important;
+    background: #fff !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    line-height: normal !important;
+    width: auto !important;
+    margin: 0 !important;
+    float: none !important;
+    display: block !important;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+#printPDF input[type="text"]:focus,
+#printPDF input:not([type]):focus,
+#printPDF select:focus,
+#printPDF textarea:focus {
+    border-color: #0078d4 !important;
+    box-shadow: 0 0 0 2px rgba(0,120,212,0.12) !important;
+}
+#printPDF textarea {
+    height: 52px !important;
+    resize: vertical;
+    min-height: 36px;
+}
+
+/* Submit button */
+#printPDF input#submit {
+    display: inline-block;
+    float: none;
+    border-radius: 5px !important;
+    padding: 5px 20px !important;
+    font-size: 12px !important;
+    font-weight: 600;
+    cursor: pointer !important;
+    background: #0078d4 !important;
+    color: #fff !important;
+    border: 1px solid #005ba1 !important;
+    height: auto !important;
+    width: auto !important;
+    line-height: normal !important;
+    margin: 0 !important;
+    transition: background 0.15s;
+}
+#printPDF input#submit:hover {
+    background: #005ba1 !important;
+}
+
+/* Clear old float-based linebreaks */
 #printPDF br {
-	clear: left;
-}
-
-#printPDF input {
-	display:block;
-	z-index:1;
-	padding:0px 4px;
-	width: 146px;
+    display: none;
 }
 
 #printPDF_working, .printPDF_working {
@@ -65,14 +132,9 @@
 	top: 0;
 }
 
-#printPDF textarea {
-        height: auto;
-}
-
 #printPDF_handle {
         cursor: pointer;
-        float: left;
-        display: block;
+        flex-shrink: 0;
 }
 
 /* ============================================================
@@ -301,3 +363,4 @@
 .pfi-dialog .ui-dialog-buttonset button:last-child:hover {
     background: #f0f2f5 !important;
 }
+

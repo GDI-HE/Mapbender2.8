@@ -46,8 +46,33 @@ class weldMaps2PNG{
 		$white = ImageColorAllocate($image,255,255,255); 
 		ImageFilledRectangle($image,0,0,$width,$height,$white); 
 
+		// Get progress token for granular feedback
+		$pfi_token = (isset($_REQUEST['pfi_progress_token']) && preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $_REQUEST['pfi_progress_token']))
+			? $_REQUEST['pfi_progress_token']
+			: '';
+		$totalUrls = count($url);
+		
+		// Check if we're rendering featureInfo (skip progress to avoid backwards jumps).
+		// Uses a static function — never $_REQUEST — to prevent external manipulation.
+		$skipProgress = function_exists('pfi_is_rendering_featureinfo') && pfi_is_rendering_featureinfo();
+
 		for($i=0; $i<count($url); $i++){
 			$obj = new stripRequest($url[$i]);
+
+			// Report progress for each WMS service (only for normal pages)
+			if ($pfi_token && $totalUrls > 0 && !$skipProgress && function_exists('pfi_write_progress')) {
+				$wmsPercent = 32 + (int)(($i / $totalUrls) * 3);
+				$layerName = $obj->get("LAYERS");
+				if ($layerName) {
+					pfi_write_progress($pfi_token, 2,
+						'WMS-Kartenbild ' . ($i + 1) . ' von ' . $totalUrls . ' wird geladen: ' . htmlspecialchars($layerName, ENT_QUOTES, 'UTF-8'),
+						$wmsPercent);
+				} else {
+					pfi_write_progress($pfi_token, 2,
+						'WMS-Kartenbild ' . ($i + 1) . ' von ' . $totalUrls . ' wird geladen...',
+						$wmsPercent);
+				}
+			}
 
 			$url[$i] = $obj->setPNG();
 			$url[$i] = $obj->encodeGET($encode);
@@ -150,3 +175,4 @@ class weldMaps2PNG{
 }
 
 ?>
+
