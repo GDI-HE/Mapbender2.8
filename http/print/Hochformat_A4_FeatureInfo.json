@@ -23,8 +23,8 @@
             },
             "options" : [
                 {
-                    "value" : "144",
-                    "label" : "144 dpi"
+                    "value" : "72",
+                    "label" : "72 dpi"
                 },
                 {
                     "value" : "144",
@@ -85,28 +85,10 @@
                     "marker": {
                         "anchor": [0.5, 1],
                         "file": "../img/marker/red.png",
-                        "size": [ 6.8, 6.8 ]
+                        "size": [ 3.8, 6.8 ]
                     }
                 },
 
-				"nordpfeil" : {
-                    "type" : "image",
-                    "x_ul" : 188.0,
-                    "y_ul" : 35.0,
-                    "width" : 10,
-                    "height" : 12,
-                    "angle" : 0,
-                    "filename" : "./img/northarrow.png"
-                },
-				"scalebar" : {
-                    "type" : "scalebar",
-                    "x_ul" : 18.5,
-                    "y_ul" : 248.0,
-                    "width" : 80,
-                    "segments" : 4,
-                    "font_family" : "Arial",
-                    "font_size" : 7
-                },
 				"scale" : {
                     "type" : "text",
                     "x_ul" : 106.0,
@@ -144,43 +126,8 @@
                     "marker": {
                         "anchor": [0.5, 1],
                         "file": "../img/marker/red.png",
-                        "size": [ 6.8, 6.8 ]
+                        "size": [ 3.8, 6.8 ]
                     }
-                },
-                "nordpfeil" : {
-                    "type" : "image",
-                    "x_ul" : 134.0,
-                    "y_ul" : 35.0,
-                    "width" : 10,
-                    "height" : 12,
-                    "angle" : 0,
-                    "filename" : "./img/northarrow.png"
-                },
-                "scalebar" : {
-                    "type" : "scalebar",
-                    "x_ul" : 18.5,
-                    "y_ul" : 237.0,
-                    "width" : 80,
-                    "segments" : 4,
-                    "font_family" : "Arial",
-                    "font_size" : 7
-                },
-		"massstab_label" : {
-                    "type" : "text",
-                    "x_ul" : 84.0,
-                    "y_ul" : 250,
-                    "font_family" : "Arial",
-		    "font_style" : "B",
-                    "font_size" : 14,
-                    "value" : "Maßstab: "
-                },
-		"scale" : {
-                    "type" : "text",
-                    "x_ul" : 110.0,
-                    "y_ul" : 250,
-                    "font_family" : "Arial",
-                    "font_size" : 11,
-                    "value" : "scale"
                 },
                 "legende" : {
                     "type" : "legend",
@@ -196,4 +143,3 @@
         }
     ]
 }
-

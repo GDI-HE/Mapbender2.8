@@ -75,230 +75,32 @@
         display: block;
 }
 
-/* ============================================================
-   Modern FeatureInfo Print Dialog
-   ============================================================ */
-
-/* Section boxes */
-.pfi-selectbackground,
-.pfi-print-options {
-    background: #f7f9fc;
-    border: 1px solid #dde3ee;
-    border-radius: 6px;
-    padding: 10px 12px 8px;
-    margin-bottom: 10px;
-}
-
 .pfi-abfragen {
-    background: #f7f9fc;
-    border: 1px solid #dde3ee;
-    border-radius: 6px;
-    padding: 10px 12px 8px;
-    margin-bottom: 10px;
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    column-gap: 8px;
-    row-gap: 3px;
+	/*display: table;*/
+	display: grid;
+	grid-template-columns: 60% 40%;
 }
-
-/* Section headers */
-.pfi-selectbackground h3,
-.pfi-abfragen h3,
-.pfi-print-options h3 {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    color: #0078d4;
-    border-bottom: 1px solid #dde3ee;
-    padding-bottom: 5px;
-    margin: 0 0 8px 0;
-}
-
 .pfi-abfragen h3 {
-    grid-column: 1 / -1;
+	grid-column-start: 1;
+	grid-column-end: 2;
+}
+.pfi-abfragen label:nth-child(3n-1) {
+    display: inline-block;
+    margin-bottom: 5px;
 }
 
-/* Background layer select */
-.pfi-selectbackground select {
-    width: 100%;
-    border: 1px solid #c7cdd8;
-    border-radius: 4px;
-    padding: 3px 5px;
-    font-size: 12px;
-    color: #333;
-    background: #fff;
-    outline: none;
-    box-sizing: border-box;
-}
-.pfi-selectbackground select:focus {
-    border-color: #0078d4;
-    box-shadow: 0 0 0 2px rgba(0,120,212,0.12);
-}
-
-/* Query (Abfragen) items */
 .pfi-abfragen-check {
-    grid-column: 1;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    color: #333;
-    padding: 2px 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
+	grid-column-start: 1;
+	grid-column-end: 1;
+	display: inline-block;
 }
-.pfi-abfragen-check input[type="checkbox"] {
-    margin: 0;
-    cursor: pointer;
-    flex-shrink: 0;
+
+.pfi-abfragen-radio:nth-of-type(2n) {
+	display: inline-block;
 }
+
 .pfi-abfragen-radio {
-    grid-column: auto;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: #555;
-    cursor: pointer;
-    white-space: nowrap;
-    float: none;
+	grid-column-start: 2;
+	grid-column-end: 2;
+	float: right;
 }
-.pfi-abfragen-radio input[type="radio"] {
-    margin: 0;
-    cursor: pointer;
-}
-
-/* Print options (Druckoptionen) form fields */
-.pfi-print-options .print_option_dyn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-.pfi-print-options .print_option_dyn:last-child {
-    margin-bottom: 0;
-}
-.pfi-print-options .print_label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #5a6a7e;
-    min-width: 78px;
-    text-align: right;
-    flex-shrink: 0;
-    border: none !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    float: none !important;
-    line-height: normal !important;
-    width: auto !important;
-    display: block;
-}
-.pfi-print-options input[type="text"],
-.pfi-print-options select,
-.pfi-print-options textarea {
-    flex: 1;
-    min-width: 0;
-    border: 1px solid #c7cdd8 !important;
-    border-radius: 4px !important;
-    padding: 4px 7px !important;
-    font-size: 12px !important;
-    color: #333 !important;
-    background: #fff !important;
-    outline: none !important;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    box-sizing: border-box !important;
-    height: auto !important;
-    line-height: normal !important;
-    width: auto !important;
-    margin: 0 !important;
-    float: none !important;
-    display: block !important;
-}
-.pfi-print-options input[type="text"]:focus,
-.pfi-print-options select:focus,
-.pfi-print-options textarea:focus {
-    border-color: #0078d4 !important;
-    box-shadow: 0 0 0 2px rgba(0,120,212,0.12) !important;
-}
-.pfi-print-options textarea {
-    height: 52px !important;
-    resize: vertical;
-    min-height: 36px;
-}
-
-/* ============================================================
-   jQuery UI dialog overrides for FeatureInfo print dialog
-   ============================================================ */
-.pfi-dialog.ui-dialog {
-    border-radius: 8px !important;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.20) !important;
-    border: 1px solid #c5d0e8 !important;
-    padding: 0 !important;
-    font-family: 'Segoe UI', Arial, sans-serif !important;
-}
-.pfi-dialog .ui-dialog-titlebar {
-    background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%) !important;
-    color: #fff !important;
-    border-radius: 7px 7px 0 0 !important;
-    padding: 10px 14px !important;
-    border: none !important;
-}
-.pfi-dialog .ui-dialog-title {
-    color: #fff !important;
-    font-weight: 600 !important;
-    font-size: 13px !important;
-}
-.pfi-dialog .ui-dialog-titlebar-close {
-    background: transparent !important;
-    border: none !important;
-    top: 50% !important;
-    margin-top: -10px !important;
-}
-.pfi-dialog .ui-dialog-titlebar-close .ui-icon-closethick {
-    background-color: rgba(255,255,255,0.7) !important;
-}
-.pfi-dialog .ui-dialog-titlebar-close:hover .ui-icon-closethick {
-    background-color: #fff !important;
-}
-.pfi-dialog .ui-dialog-content {
-    padding: 12px 14px 6px !important;
-    background: #fff !important;
-}
-.pfi-dialog .ui-dialog-buttonpane {
-    background: #f5f7fa !important;
-    border-top: 1px solid #dde3ee !important;
-    padding: 8px 14px !important;
-    margin: 0 !important;
-    border-bottom-left-radius: 7px !important;
-    border-bottom-right-radius: 7px !important;
-}
-.pfi-dialog .ui-dialog-buttonset button {
-    border-radius: 5px !important;
-    padding: 5px 20px !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    box-shadow: none !important;
-}
-.pfi-dialog .ui-dialog-buttonset button:first-child {
-    background: #0078d4 !important;
-    color: #fff !important;
-    border: 1px solid #005ba1 !important;
-}
-.pfi-dialog .ui-dialog-buttonset button:first-child:hover {
-    background: #005ba1 !important;
-}
-.pfi-dialog .ui-dialog-buttonset button:last-child {
-    background: #fff !important;
-    color: #444 !important;
-    border: 1px solid #c7cdd8 !important;
-}
-.pfi-dialog .ui-dialog-buttonset button:last-child:hover {
-    background: #f0f2f5 !important;
-}
-

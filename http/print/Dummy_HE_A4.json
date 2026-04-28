@@ -43,14 +43,15 @@
                     "value" : "date"
                 },
               
-                 "nordpfeil" : {
+                "nordpfeil" : {
                     "type" : "image",
-                    "x_ul" : 188.0,
-                    "y_ul" : 30.0,
-                    "width" : 10,
-                    "height" : 12,
+                    "x_ul" : 194,
+                    "y_ul" : 269,
+                    "width" : 5,
+                    "height" : 5,
                     "angle" : 0,
-                    "filename" : "./img/northarrow.png"
+                    "filename" : "./img/northarrowdummy.png"
+               		
                 },
 	
 		"messung" : {
