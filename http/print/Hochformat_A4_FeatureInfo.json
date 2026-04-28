@@ -91,8 +91,8 @@
 
 				"nordpfeil" : {
                     "type" : "image",
-                    "x_ul" : 188.0,
-                    "y_ul" : 35.0,
+                    "x_ul" : 186.0,
+                    "y_ul" : 36.0,
                     "width" : 10,
                     "height" : 12,
                     "angle" : 0,
