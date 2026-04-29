@@ -455,7 +455,7 @@ class mbTemplatePdf extends mbPdf
                     $this->objPdf->Rect($fillX, $mapY, $mapW * 0.30, $mapH, 'F');
                     // Separator line sits cleanly at the map/legend boundary.
                     $this->objPdf->SetDrawColor(180, 180, 180);
-                    $this->objPdf->SetLineWidth(0.2);
+                    $this->objPdf->SetLineWidth(0.5);
                     $this->objPdf->Line($fillX, $mapY, $fillX, $mapY + $mapH);
                 }
             }
