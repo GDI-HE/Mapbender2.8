@@ -324,8 +324,14 @@ class mbTemplatePdf extends mbPdf
             $matches = array();
             preg_match("/^[^?]*/", $url->request, $matches);
             $host = $matches[0];
-            preg_match("/LAYERS=([^&]*)/", $url->request, $matches);
-            $queryLayers = explode(",", urldecode($matches[1]));
+            // Use QUERY_LAYERS if present (only the actually queried layer(s)),
+            // fall back to LAYERS if QUERY_LAYERS is absent.
+            if (preg_match("/QUERY_LAYERS=([^&]*)/i", $url->request, $matches) && !empty($matches[1])) {
+                $queryLayers = explode(",", urldecode($matches[1]));
+            } else {
+                preg_match("/LAYERS=([^&]*)/", $url->request, $matches);
+                $queryLayers = explode(",", urldecode($matches[1]));
+            }
 
 
             // find wms url in mapUrls that contains any of the queried layers
@@ -825,5 +831,6 @@ class mbTemplatePdf extends mbPdf
 }
 
 ?>
+
 
 
