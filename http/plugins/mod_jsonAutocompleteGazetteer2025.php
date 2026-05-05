@@ -104,6 +104,9 @@ if (options.gazetteerFrontImageOff === undefined) {
 if (options.helpText === undefined) {
 	options.helpText = "";
 }
+if (options.divOpen === undefined) {
+	options.divOpen = 'false';
+}
 
 var JsonAutocompleteGazetteer = function() {
 	var that = this;	
@@ -265,6 +268,9 @@ var JsonAutocompleteGazetteer = function() {
 		}
 		this.inputAddress.attr({'id':'geographicName'});
 //		this.inputAddress.attr({'autofocus':'autofocus'});
+		if (options.divOpen === 'true') {
+			that.toggleInput();
+		};
 		//that.toggleInput();	
 		//INSERTED BY BENZ----
 		this.inputAddress.attr({'placeholder':'<?php echo _mb('Search for addresses'); ?>'});
