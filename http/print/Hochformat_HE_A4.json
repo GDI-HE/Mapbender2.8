@@ -139,6 +139,15 @@
                      }
                     },
 
+                "scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 242.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
                 "kommentar1" : {
                     "type" : "para",
                     "x_ul" : 40.0,
@@ -157,3 +166,4 @@
         
     ]
 }
+

@@ -831,6 +831,3 @@ class mbTemplatePdf extends mbPdf
 }
 
 ?>
-
-
-
