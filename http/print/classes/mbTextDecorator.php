@@ -28,6 +28,14 @@ class mbTextDecorator extends mbTemplatePdfDecorator
                 case "time":
                     $this->{$overrideMemberFromRequest} = date("G:i");
                     break;
+                case "srs":
+                    $this->{$overrideMemberFromRequest} = isset($_REQUEST["map_srs"]) ? strtoupper(trim($_REQUEST["map_srs"])) : "";
+                    break;
+                case "srs_code":
+                    $fullSrs = isset($_REQUEST["map_srs"]) ? strtoupper(trim($_REQUEST["map_srs"])) : "";
+                    $colonPos = strpos($fullSrs, ':');
+                    $this->{$overrideMemberFromRequest} = $colonPos !== false ? substr($fullSrs, $colonPos + 1) : $fullSrs;
+                    break;
                 case "scale":
                     $mapInfoScale = $this->pdf->getMapInfo();
                     $rawScale = floatval($mapInfoScale["scale"]);
@@ -66,4 +74,5 @@ class mbTextDecorator extends mbTemplatePdfDecorator
 }
 
 ?>
+
 

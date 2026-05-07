@@ -714,6 +714,9 @@ var PrintPDF = function (options) {
     }
 
     updateFormField(formData, "map_scale", mb_getScale(myTarget));
+    var mapObj = getMapObjByName(myTarget);
+    var mapSrs = mapObj ? (mapObj.getSrs ? mapObj.getSrs() : '') : '';
+    formData.push({ name: "map_srs", value: mapSrs });
     // write the measured coordinates
     if (typeof (mod_measure_RX) !== "undefined") {
       var tmp_x = '';
@@ -1065,15 +1068,30 @@ var PrintPDF = function (options) {
     var scale = Math.round(rawScale / magnitude) * magnitude;
     $("#scale").val(scale.toString());
 
-    var realWidthInM = scale * getPDFMapSize("width") / 1000;
-    var realHeightInM = scale * getPDFMapSize("height") / 1000;
-
-    var bbox = [
-      printInfo.point.x - 0.5 * realWidthInM,
-      printInfo.point.y - 0.5 * realHeightInM,
-      printInfo.point.x + 0.5 * realWidthInM,
-      printInfo.point.y + 0.5 * realHeightInM
-    ];
+    var bbox;
+    var srs = map.getSrs ? map.getSrs() : '';
+    if (srs && srs.toUpperCase() === 'EPSG:4326') {
+      // geographic SRS: convert real-world metres to degrees
+      var degPerMeter = 360.0 / (2.0 * Math.PI * 6378137.0);
+      var lat = printInfo.point.y * Math.PI / 180.0;
+      var halfW = rawScale * getPDFMapSize("width")  / 1000.0 * degPerMeter / Math.cos(lat);
+      var halfH = rawScale * getPDFMapSize("height") / 1000.0 * degPerMeter;
+      bbox = [
+        printInfo.point.x - 0.5 * halfW,
+        printInfo.point.y - 0.5 * halfH,
+        printInfo.point.x + 0.5 * halfW,
+        printInfo.point.y + 0.5 * halfH
+      ];
+    } else {
+      var realWidthInM  = rawScale * getPDFMapSize("width")  / 1000;
+      var realHeightInM = rawScale * getPDFMapSize("height") / 1000;
+      bbox = [
+        printInfo.point.x - 0.5 * realWidthInM,
+        printInfo.point.y - 0.5 * realHeightInM,
+        printInfo.point.x + 0.5 * realWidthInM,
+        printInfo.point.y + 0.5 * realHeightInM
+      ];
+    }
 
     $("#coordinates").val(bbox.join(","))
   }
@@ -1396,8 +1414,9 @@ var PrintPDF = function (options) {
     printObj.loadConfig(mbPrintConfigPath + printInfo.config, function () {
       $featureInfoDialog.dialog('close');
       buildForm();
-      fixMapFormValues(printInfo);
       printObj.createPrintBox(printInfo.point);
+      if (printBox) { printBox.hide(); }
+      fixMapFormValues(printInfo);
       pfiPixelCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
       stopSpotlight = startSpotlightOverlay();
       // Disable FeatureInfo clicks while the print dialog is open
@@ -1681,3 +1700,4 @@ var printObj = new PrintPDF(options);
 if (this instanceof HTMLElement) {
   $(this).data('printObj', printObj);
 }
+

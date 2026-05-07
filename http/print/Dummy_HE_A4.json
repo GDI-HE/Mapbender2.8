@@ -70,9 +70,27 @@
                  "line_style" : {
                      "width" : 1.5
                      }
+                    },
+                    "srs_label": {
+                        "type": "text",
+                        "x_ul": 175.0,
+                        "y_ul": 267.8,
+                        "font_family": "Arial",
+                        "font_size": 11,
+                        "font_style": "B",
+                        "value": "EPSG:"
+                    },
+                    "srs": {
+                        "type": "text",
+                        "x_ul": 189.0,
+                        "y_ul": 267.8,
+                        "font_family": "Arial",
+                        "font_size": 11,
+                        "font_style": "",
+                        "value": "srs_code"
                     }
-            }
-        }
-        
+                }
+            }               
     ]
 }
+
