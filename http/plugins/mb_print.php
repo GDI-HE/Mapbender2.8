@@ -1242,10 +1242,10 @@ var PrintPDF = function (options) {
     var bbox;
     var srs = map.getSrs ? map.getSrs() : '';
     if (srs && srs.toUpperCase() === 'EPSG:4326') {
-      // geographic SRS: convert real-world metres to degrees
+      // geographic SRS: convert real-world metres to degrees using N-S scale only.
+      // No cos(lat) so bbox aspect ratio matches paper orientation.
       var degPerMeter = 360.0 / (2.0 * Math.PI * 6378137.0);
-      var lat = printInfo.point.y * Math.PI / 180.0;
-      var halfW = rawScale * getPDFMapSize("width")  / 1000.0 * degPerMeter / Math.cos(lat);
+      var halfW = rawScale * getPDFMapSize("width")  / 1000.0 * degPerMeter;
       var halfH = rawScale * getPDFMapSize("height") / 1000.0 * degPerMeter;
       bbox = [
         printInfo.point.x - 0.5 * halfW,
