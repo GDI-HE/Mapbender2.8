@@ -135,6 +135,7 @@
 #printPDF_handle {
         cursor: pointer;
         flex-shrink: 0;
+        display: none;
 }
 
 /* ============================================================

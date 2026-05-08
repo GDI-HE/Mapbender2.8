@@ -145,6 +145,104 @@ var PrintPDF = function (options) {
    * the movable printframe
    */
   var printBox = null;
+  var stopNormalSpotlight = null;
+  var normalPrintPixelCenter = null;   // fixed screen pixel [x,y] for normal-print screen-anchoring
+
+  /**
+   * SVG spotlight overlay: dims everything outside the print rectangle and
+   * shows a red center dot.  Works for both normal print and featureInfo print.
+   * Returns a cleanup function that removes the overlay when called.
+   */
+  var startSpotlightOverlay = function (overlayId) {
+      overlayId = overlayId || 'pfi-spotlight-overlay';
+      var map = getMapObjByName(myTarget);
+      var $mapEl = $(map.getDomElement());
+      var ns = 'http://www.w3.org/2000/svg';
+      // Remove any existing overlay with the same id
+      $('#' + overlayId).remove();
+      // Ensure the map element is a positioning context so the absolute SVG stays inside it
+      if ($mapEl.css('position') === 'static') {
+        $mapEl.css('position', 'relative');
+      }
+      var svgEl = document.createElementNS(ns, 'svg');
+      svgEl.id = overlayId;
+      // width/height are set via SVG attributes inside updateOverlay — do NOT put them in the
+      // style string or CSS will override the attributes and the SVG may collapse to zero size.
+      svgEl.setAttribute('style',
+        'position:absolute;top:0;left:0;z-index:999;pointer-events:none;');
+      var pathEl = document.createElementNS(ns, 'path');
+      pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
+      pathEl.setAttribute('fill-rule', 'evenodd');
+      svgEl.appendChild(pathEl);
+
+      // Red dot at the print-box center
+      var circleEl = document.createElementNS(ns, 'circle');
+      circleEl.setAttribute('r', '4');
+      circleEl.setAttribute('fill', '#ff0000');
+      circleEl.setAttribute('stroke', '#ff0000');
+      circleEl.setAttribute('stroke-width', '2');
+      circleEl.setAttribute('fill-opacity', '0.5');
+      svgEl.appendChild(circleEl);
+
+      $mapEl[0].appendChild(svgEl);
+
+      function updateOverlay() {
+        // Use the configured map dimensions — these match the pixel space that
+        // makeRealWorld2mapPos / makeClickPos2RealWorldPos use internally.
+        var mapW = map.getWidth();
+        var mapH = map.getHeight();
+        svgEl.setAttribute('width',  mapW);
+        svgEl.setAttribute('height', mapH);
+
+        var coords = $('#printPDF_form #coordinates').val();
+        // Fall back to the PrintBox object directly (e.g. before coordinates form field is populated)
+        if (!coords && printBox) { coords = printBox.getStartCoordinates(); }
+        if (!coords) return;
+        var parts = coords.split(',');
+        var minx = parseFloat(parts[0]), miny = parseFloat(parts[1]);
+        var maxx = parseFloat(parts[2]), maxy = parseFloat(parts[3]);
+
+        var c0 = makeRealWorld2mapPos(myTarget, minx, miny);   // bottom-left
+        var c1 = makeRealWorld2mapPos(myTarget, maxx, miny);   // bottom-right
+        var c2 = makeRealWorld2mapPos(myTarget, maxx, maxy);   // top-right
+        var c3 = makeRealWorld2mapPos(myTarget, minx, maxy);   // top-left
+
+        var angle = parseFloat($('#printPDF_form #angle').val() || '0');
+        if (angle !== 0) {
+          var ctr = makeRealWorld2mapPos(myTarget, (minx + maxx) / 2, (miny + maxy) / 2);
+          var cx = ctr[0], cy = ctr[1];
+          // Negate rad so the SVG spotlight rotates CW for positive angle,
+          // matching printbox.js (negated rotate) and the PDF backend (Imagick CW).
+          var rad = -(angle * Math.PI / 180);
+          var cos = Math.cos(rad), sin = Math.sin(rad);
+          function rotPt(p) {
+            var dx = p[0] - cx, dy = p[1] - cy;
+            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
+          }
+          c0 = rotPt(c0); c1 = rotPt(c1); c2 = rotPt(c2); c3 = rotPt(c3);
+        }
+
+        var d = 'M0 0 L' + mapW + ' 0 L' + mapW + ' ' + mapH + ' L0 ' + mapH + ' Z ' +
+          'M' + c3[0] + ' ' + c3[1] +
+          ' L' + c2[0] + ' ' + c2[1] +
+          ' L' + c1[0] + ' ' + c1[1] +
+          ' L' + c0[0] + ' ' + c0[1] + ' Z';
+        pathEl.setAttribute('d', d);
+
+        var boxCx = (c0[0] + c1[0] + c2[0] + c3[0]) / 4;
+        var boxCy = (c0[1] + c1[1] + c2[1] + c3[1]) / 4;
+        circleEl.setAttribute('cx', boxCx);
+        circleEl.setAttribute('cy', boxCy);
+      }
+
+      var intervalId = setInterval(updateOverlay, 80);
+      updateOverlay();
+
+      return function () {
+        clearInterval(intervalId);
+        $('#' + overlayId).remove();
+      };
+  };
 
   eventAfterMapRequest.register(function () {
     if (printBox !== null) {
@@ -164,7 +262,22 @@ var PrintPDF = function (options) {
           $('#pfi_scale').val(newScale);
         }
       } else {
-        printBox.repaint();
+        // Normal print: same screen-anchor approach as FeatureInfo.
+        // The spotlight stays at a fixed screen position; the geographic centre
+        // is recalculated to whatever lies under that pixel after each pan/zoom.
+        if (stopNormalSpotlight && normalPrintPixelCenter) {
+          var nc = makeClickPos2RealWorldPos(myTarget, normalPrintPixelCenter[0], normalPrintPixelCenter[1]);
+          var rawMapScale = getMapObjByName(myTarget).getScale();
+          var magnitude = Math.pow(10, Math.floor(Math.log(rawMapScale) / Math.LN10));
+          var newScale = Math.round(rawMapScale / magnitude) * magnitude;
+          if (newScale > 0) {
+            printBox.setCenterMap({x: nc[0], y: nc[1]});
+            printBox.setScale(newScale);
+            $('#printPDF_form #scale').val(newScale);
+          }
+        } else {
+          printBox.repaint();
+        }
         if (!printBox.isVisible()) {
           $("#printPDF_form #scale").val("");
           $("#printPDF_form #coordinates").val("");
@@ -201,6 +314,7 @@ var PrintPDF = function (options) {
         target: myTarget,
         printWidth: getPDFMapSize("width") / 10,
         printHeight: getPDFMapSize("height") / 10,
+        noFrame: true,
         scale: $scaleInput.size() > 0 && !isNaN(parseInt($scaleInput.val(), 10)) ?
           parseInt($scaleInput.val(), 10) :
           Math.pow(10, Math.floor(Math.log(map.getScale()) / Math.LN10)),
@@ -263,11 +377,46 @@ var PrintPDF = function (options) {
           pointColour: 'transparent',
           circleColour: 'transparent'
         });
+      } else {
+        // Spotlight / screen-anchored mode: fixed:true makes setScale() respect
+        // setCenterMap() instead of re-deriving the centre from old coordinates.
+        options.fixed = true;
       }
       printBox = new Mapbender.PrintBox(options);
       printBox.paintPoints();
       printBox.paintBox();
       printBox.show();
+      // For normal (non-featureInfo) print: start SVG spotlight that replaces the old rectangle
+      if (!fixedPosition) {
+        // Hide the PrintBox canvas (eliminates the duplicate canvas center dot).
+        // The SVG overlay is the sole visual — same pattern as FeatureInfo print.
+        printBox.hide();
+        if (stopNormalSpotlight) { stopNormalSpotlight(); stopNormalSpotlight = null; }
+
+        // Initialise scale + center identically to what eventAfterMapRequest does on pan/zoom.
+        // Without this the constructor uses floor-to-order-of-magnitude (e.g. 25000→10000)
+        // while eventAfterMapRequest uses round-to-nearest (25000→30000), so the spotlight
+        // hole would be 3× too small until the first pan.
+        var _map     = getMapObjByName(myTarget);
+        var _raw     = _map.getScale();
+        var _mag     = Math.pow(10, Math.floor(Math.log(_raw) / Math.LN10));
+        var _scale   = Math.round(_raw / _mag) * _mag || _raw;
+        // Use the configured pixel dimensions — same coordinate space as makeClickPos2RealWorldPos.
+        normalPrintPixelCenter = [
+          Math.round(_map.getWidth()  / 2),
+          Math.round(_map.getHeight() / 2)
+        ];
+        var _nc = makeClickPos2RealWorldPos(
+          myTarget, normalPrintPixelCenter[0], normalPrintPixelCenter[1]
+        );
+        if (_scale > 0) {
+          printBox.setCenterMap({x: _nc[0], y: _nc[1]});
+          printBox.setScale(_scale);         // updates #coordinates via afterChangeSize
+          $('#printPDF_form #scale').val(_scale);
+        }
+
+        stopNormalSpotlight = startSpotlightOverlay('print-spotlight-overlay');
+      }
     }
   };
   
@@ -325,6 +474,8 @@ var PrintPDF = function (options) {
    */
   var destroyPrintBox = function () {
     if (printBox) {
+      if (stopNormalSpotlight) { stopNormalSpotlight(); stopNormalSpotlight = null; }
+      normalPrintPixelCenter = null;
       printBox.destroy();
       printBox = null;
       $("#printboxScale").val("");
@@ -523,10 +674,30 @@ var PrintPDF = function (options) {
     pfiCancelled = false;
     showHideWorking("show");
 
+    // For normal (non-featureInfo) print with spotlight active: recompute the coordinates
+    // and scale fresh from the printBox state right now, rather than relying on field values
+    // written by async event handlers.  This guarantees the submitted BBOX always matches
+    // the spotlight regardless of event ordering after pan/zoom.
+    var f = jqForm[0];
+    if (stopNormalSpotlight && printBox && printFeatureInfoData === null) {
+      // NOTE: formData is already serialized by ajaxForm before beforeSubmit fires.
+      // f.xxx.value changes the DOM but NOT formData — must use updateFormField() for formData.
+      var _coords = printBox.getStartCoordinates();
+      if (_coords) {
+        // Patch both the DOM field (so f.scale read below works) and formData (what gets POSTed).
+        if (typeof f.coordinates !== 'undefined') { f.coordinates.value = _coords; }
+        updateFormField(formData, 'coordinates', _coords);
+      }
+      var _curScale = printBox.getScale();
+      if (_curScale > 0) {
+        if (typeof f.scale !== 'undefined') { f.scale.value = _curScale; }
+        updateFormField(formData, 'scale', _curScale);
+      }
+    }
+
     // map urls
     var ind = getMapObjIndexByName(myTarget);
     var mapObj = mb_mapObj[ind];
-    var f = jqForm[0];
     f.map_url.value = '';
     f.opacity.value = "";
 
@@ -1103,84 +1274,6 @@ var PrintPDF = function (options) {
     var stopSpotlight = null;
     var pfiRestoring = false;
 
-    function startSpotlightOverlay() {
-      var map = getMapObjByName(myTarget);
-      var $mapEl = $(map.getDomElement());
-      var mapW = $mapEl.width();
-      var mapH = $mapEl.height();
-      var ns = 'http://www.w3.org/2000/svg';
-      var svgEl = document.createElementNS(ns, 'svg');
-      svgEl.id = 'pfi-spotlight-overlay';
-      svgEl.setAttribute('style',
-        'position:absolute;top:0;left:0;width:' + mapW + 'px;height:' + mapH +
-        'px;z-index:999;pointer-events:none;');
-      var pathEl = document.createElementNS(ns, 'path');
-      pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
-      pathEl.setAttribute('fill-rule', 'evenodd');
-      svgEl.appendChild(pathEl);
-
-      // Red circle marker at the center of the print box
-      var circleEl = document.createElementNS(ns, 'circle');
-      circleEl.setAttribute('r', '4');
-      circleEl.setAttribute('fill', '#ff0000');
-      circleEl.setAttribute('stroke', '#ff0000');
-      circleEl.setAttribute('stroke-width', '2');
-      circleEl.setAttribute('fill-opacity', '0.5');
-      circleEl.setAttribute('style', 'stroke-width: 2px; fill-opacity: 0.5;');
-      svgEl.appendChild(circleEl);
-
-      $mapEl[0].appendChild(svgEl);
-
-      function updateOverlay() {
-        var coords = $('#printPDF_form #coordinates').val();
-        if (!coords) return;
-        var parts = coords.split(',');
-        var minx = parseFloat(parts[0]), miny = parseFloat(parts[1]);
-        var maxx = parseFloat(parts[2]), maxy = parseFloat(parts[3]);
-
-        // Convert unrotated map corners to pixel positions
-        var c0 = makeRealWorld2mapPos(myTarget, minx, miny);   // bottom-left
-        var c1 = makeRealWorld2mapPos(myTarget, maxx, miny);   // bottom-right
-        var c2 = makeRealWorld2mapPos(myTarget, maxx, maxy);   // top-right
-        var c3 = makeRealWorld2mapPos(myTarget, minx, maxy);   // top-left
-
-        // Apply rotation (same formula as printbox.js rotate())
-        var angle = parseFloat($('#printPDF_form #angle').val() || '0');
-        if (angle !== 0) {
-          var ctr = makeRealWorld2mapPos(myTarget, (minx + maxx) / 2, (miny + maxy) / 2);
-          var cx = ctr[0], cy = ctr[1];
-          var rad = angle * Math.PI / 180;
-          var cos = Math.cos(rad), sin = Math.sin(rad);
-          function rotPt(p) {
-            var dx = p[0] - cx, dy = p[1] - cy;
-            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
-          }
-          c0 = rotPt(c0); c1 = rotPt(c1); c2 = rotPt(c2); c3 = rotPt(c3);
-        }
-
-        var d = 'M0 0 L' + mapW + ' 0 L' + mapW + ' ' + mapH + ' L0 ' + mapH + ' Z ' +
-          'M' + c3[0] + ' ' + c3[1] +
-          ' L' + c2[0] + ' ' + c2[1] +
-          ' L' + c1[0] + ' ' + c1[1] +
-          ' L' + c0[0] + ' ' + c0[1] + ' Z';
-        pathEl.setAttribute('d', d);
-
-        // Pin the red circle to the visual center of the print box rectangle
-        var boxCx = (c0[0] + c1[0] + c2[0] + c3[0]) / 4;
-        var boxCy = (c0[1] + c1[1] + c2[1] + c3[1]) / 4;
-        circleEl.setAttribute('cx', boxCx);
-        circleEl.setAttribute('cy', boxCy);
-      }
-
-      var intervalId = setInterval(updateOverlay, 80);
-      updateOverlay();
-
-      return function() {
-        clearInterval(intervalId);
-        $('#pfi-spotlight-overlay').remove();
-      };
-    }
-
     // Auto-inject Hintergrundkarte/Flurstücke as a permanent Abfragen entry.
     // Strategy: find the WMS titled "Hintergrundkarte", then find the "Flurstücke" sublayer within it.
     // This avoids false matches when multiple WMS/layers share the word "Flurstücke".
@@ -1418,7 +1511,7 @@ var PrintPDF = function (options) {
       if (printBox) { printBox.hide(); }
       fixMapFormValues(printInfo);
       pfiPixelCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
-      stopSpotlight = startSpotlightOverlay();
+      stopSpotlight = startSpotlightOverlay('pfi-spotlight-overlay');
       // Disable FeatureInfo clicks while the print dialog is open
       if (typeof Mapbender !== 'undefined' && Mapbender.disableFeatureInfo) {
         Mapbender.disableFeatureInfo();
@@ -1700,4 +1793,5 @@ var printObj = new PrintPDF(options);
 if (this instanceof HTMLElement) {
   $(this).data('printObj', printObj);
 }
+
 

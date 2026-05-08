@@ -13,6 +13,10 @@
             "pageElementsLink" : {
                 "scale" : "value"
             }
+        },
+        {
+            "id" : "coordinates",
+            "type" : "hidden"
         }
 	
     ],
@@ -93,4 +97,5 @@
             }               
     ]
 }
+
 
