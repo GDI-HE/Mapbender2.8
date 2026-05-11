@@ -1012,11 +1012,20 @@ var PrintPDF = function (options) {
           myId + "_frame' width='0' height='0' style='display:none'></iframe>"
         ).appendTo("body");
       }
-      var pdfUrl = stripslashes(res.outputFileName);
+      var pdfUrl = (res && res.outputFileName) ? stripslashes(res.outputFileName) : '';
       if (printFeatureInfoData !== null) {
         // FeatureInfo print: show a clickable download link in the progress area
         var $progressWrap = $("[id='pfi-progress-wrap']");
         var $progressLabel = $("[id='pfi-progress-label']");
+        if (!pdfUrl) {
+          // Backend returned HTTP 200 but no file URL — display inline error
+          $progressLabel.html(
+            '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen: Keine Datei erhalten. Bitte versuchen Sie es erneut."); ?></span>'
+          );
+          $progressWrap.show();
+          showHideWorking("hide");
+          return;
+        }
         $progressLabel.html(
           '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
           'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
@@ -1052,7 +1061,17 @@ var PrintPDF = function (options) {
       }
     } else {
       /* something went wrong */
-      $("#" + myId + "_result").html(text);
+      showHideWorking("hide");
+      if (printFeatureInfoData !== null) {
+        var $progressWrap = $("[id='pfi-progress-wrap']");
+        var $progressLabel = $("[id='pfi-progress-label']");
+        $progressLabel.html(
+          '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+        );
+        $progressWrap.show();
+      } else {
+        $("#" + myId + "_result").html(text);
+      }
     }
   };
 
@@ -1696,8 +1715,10 @@ var PrintPDF = function (options) {
             pfiPollInterval = setInterval(function () {
               $.getJSON('../print/printProgress.php', { token: pfiProgressToken }, function (data) {
                 var pct = Math.min(100, parseInt(data.percent, 10) || 0);
-                // Update label always (to show latest status)
-                $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                // Only update label while not yet done — once done, showResult() writes the download link.
+                if (!data.done && !data.error) {
+                  $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                }
                 // Only update progress bar if moving forward
                 if (pct >= pfiLastPercent) {
                   pfiLastPercent = pct;
@@ -1706,8 +1727,9 @@ var PrintPDF = function (options) {
                 if (data.error) {
                   clearInterval(pfiPollInterval);
                   pfiErrorCallback = null;
-                  alert('<?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?>');
-                  restore();
+                  $dialogDiv.find('#pfi-progress-label').html(
+                    '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+                  );
                 } else if (data.done) {
                   clearInterval(pfiPollInterval);
                 }
