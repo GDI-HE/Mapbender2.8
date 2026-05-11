@@ -267,6 +267,7 @@ function makeDialog($content, title, dialogPosition, offset, printInfo) {
       open: function(){
           $('#tree2Container').hide() && $('a.toggleLayerTree').removeClass('activeToggle'),
           $('#toolsContainer').hide() && $('a.toggleToolsContainer').removeClass('activeToggle');
+          $(this).closest('.ui-dialog').find('.ui-dialog-buttonset button').blur();
       }
     };
     if (featureInfoPrint) {
@@ -584,3 +585,4 @@ if (!isDragging && featureInfoEnabled) {
             }
         }
 }
+
