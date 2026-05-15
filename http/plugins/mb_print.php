@@ -149,6 +149,7 @@ var PrintPDF = function (options) {
   var normalPrintPixelCenter = null;   // fixed screen pixel [x,y] for normal-print screen-anchoring
   var normalPollInterval = null;       // setInterval id for normal-print progress polling
   var normalProgressToken = null;      // token for current normal-print job
+  var currentPrintIsFeatureInfo = false; // true only while a FeatureInfo-triggered submit is in flight
 
   /**
    * SVG spotlight overlay: dims everything outside the print rectangle and
@@ -527,6 +528,12 @@ var PrintPDF = function (options) {
 
     //show printBox for first entry in printTemplate selectbox
     $("." + myId + "-dialog").bind("dialogopen", function () {
+      // Reset the normal print progress bar each time the panel is opened
+      if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+      var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+      $npWrap.hide();
+      $npWrap.find('#np-progress-label').text('');
+      $npWrap.find('#np-progress-bar').css('width', '0%');
       printObj.createPrintBox();
     });
 
@@ -706,12 +713,12 @@ var PrintPDF = function (options) {
   var validate = function (formData, jqForm, params) {
     pfiCancelled = false;
     // Only show the overlay spinner for FeatureInfo print; normal print uses the inline progress bar
-    if (printFeatureInfoData !== null) {
+    if (currentPrintIsFeatureInfo) {
       showHideWorking("show");
     }
 
     // Normal print: generate a progress token, start polling, show progress UI
-    if (printFeatureInfoData === null) {
+    if (!currentPrintIsFeatureInfo) {
       var npToken = 'np' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
       normalProgressToken = npToken;
       // Push token into POST data (formData is already serialised, so push rather than update)
@@ -756,7 +763,7 @@ var PrintPDF = function (options) {
     // written by async event handlers.  This guarantees the submitted BBOX always matches
     // the spotlight regardless of event ordering after pan/zoom.
     var f = jqForm[0];
-    if (stopNormalSpotlight && printBox && printFeatureInfoData === null) {
+    if (stopNormalSpotlight && printBox && !currentPrintIsFeatureInfo) {
       // NOTE: formData is already serialized by ajaxForm before beforeSubmit fires.
       // f.xxx.value changes the DOM but NOT formData — must use updateFormField() for formData.
       var _coords = printBox.getStartCoordinates();
@@ -788,7 +795,8 @@ var PrintPDF = function (options) {
     // Force-include cadastral layers in the printed map image even when unchecked in tree.
     // We temporarily set gui_layer_visible=1 so getLayers()/getMapUrl() picks them up.
     var pfiCadMapPatch = [];
-    if (printFeatureInfoData !== null &&
+    if (currentPrintIsFeatureInfo &&
+        printFeatureInfoData !== null &&
         printFeatureInfoData.pfiCadastralWmsId &&
         printFeatureInfoData.pfiCadastralLayerNames &&
         printFeatureInfoData.pfiCadastralLayerNames.length > 0) {
@@ -811,7 +819,8 @@ var PrintPDF = function (options) {
     // items are spliced out by the checkbox handler).  Build a lookup set from the
     // LAYERS= parameter of each request URL so we can filter both legend loops below.
     var pfiCheckedLayerNames = null;
-    if (printFeatureInfoData !== null &&
+    if (currentPrintIsFeatureInfo &&
+        printFeatureInfoData !== null &&
         printFeatureInfoData.urls &&
         printFeatureInfoData.urls.length > 0) {
       pfiCheckedLayerNames = {};
@@ -1053,7 +1062,7 @@ var PrintPDF = function (options) {
     }
 
     // feature info data
-    if (printFeatureInfoData !== null) {
+    if (currentPrintIsFeatureInfo && printFeatureInfoData !== null) {
       updateFormField(formData, "printPDF_template", printFeatureInfoData.config);
       formData.push({
         name: 'featureInfo',
@@ -1090,7 +1099,7 @@ var PrintPDF = function (options) {
         ).appendTo("body");
       }
       var pdfUrl = (res && res.outputFileName) ? stripslashes(res.outputFileName) : '';
-      if (printFeatureInfoData !== null) {
+      if (currentPrintIsFeatureInfo) {
         // FeatureInfo print: show a clickable download link in the progress area
         var $progressWrap = $("[id='pfi-progress-wrap']");
         var $progressLabel = $("[id='pfi-progress-label']");
@@ -1114,6 +1123,7 @@ var PrintPDF = function (options) {
         );
         $progressWrap.show();
         showHideWorking("hide");
+        currentPrintIsFeatureInfo = false;
         $("#" + myId).trigger("load");
       } else {
         // Normal print: stop poller and show a download link in the progress bar area
@@ -1144,7 +1154,8 @@ var PrintPDF = function (options) {
     } else {
       /* something went wrong */
       showHideWorking("hide");
-      if (printFeatureInfoData !== null) {
+      if (currentPrintIsFeatureInfo) {
+        currentPrintIsFeatureInfo = false;
         var $progressWrap = $("[id='pfi-progress-wrap']");
         var $progressLabel = $("[id='pfi-progress-label']");
         $progressLabel.html(
@@ -1598,6 +1609,7 @@ var PrintPDF = function (options) {
       pfiPixelCenter = null;
       pfiSubmitting = false;
       pfiErrorCallback = null;
+      currentPrintIsFeatureInfo = false;
       // Reset progress bar for next use
       $dialogDiv.find('#pfi-progress-wrap').hide();
       $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
@@ -1848,6 +1860,7 @@ var PrintPDF = function (options) {
             });
             // $("." + myId + "_working").show();
             // $("." + myId + "_working_bg").show();
+            currentPrintIsFeatureInfo = true;
             $('#printPDF_form').submit();
           },
           "<?php echo _mb("Cancel"); ?>": restore
