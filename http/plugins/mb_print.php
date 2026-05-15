@@ -147,6 +147,8 @@ var PrintPDF = function (options) {
   var printBox = null;
   var stopNormalSpotlight = null;
   var normalPrintPixelCenter = null;   // fixed screen pixel [x,y] for normal-print screen-anchoring
+  var normalPollInterval = null;       // setInterval id for normal-print progress polling
+  var normalProgressToken = null;      // token for current normal-print job
 
   /**
    * SVG spotlight overlay: dims everything outside the print rectangle and
@@ -510,6 +512,19 @@ var PrintPDF = function (options) {
     /* than we need the translation of the print button */
     $("#submit").val("<?php echo htmlentities(_mb("print"), ENT_QUOTES, "UTF-8");?>");
 
+    // Inject progress bar for normal print into the result area (hidden until print starts)
+    var $npResult = $('#' + myId + '_result');
+    if ($npResult.find('#np-progress-wrap').length === 0) {
+      $npResult.append(
+        '<div id="np-progress-wrap" style="display:none;margin-top:10px;">' +
+          '<div id="np-progress-label" style="font-size:12px;margin-bottom:4px;color:#333;"></div>' +
+          '<div style="background:#ddd;border-radius:4px;height:18px;overflow:hidden;">' +
+            '<div id="np-progress-bar" style="height:100%;width:0%;background:#4a90d9;border-radius:4px;transition:width 0.4s ease;"></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+
     //show printBox for first entry in printTemplate selectbox
     $("." + myId + "-dialog").bind("dialogopen", function () {
       printObj.createPrintBox();
@@ -527,6 +542,13 @@ var PrintPDF = function (options) {
    * GETs the config, build corresponding form, remove an existing printBox
    */
   this.loadConfig = function (configFilename, callback) {
+    // When a new template is selected, hide the normal print progress bar / download link
+    if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+    var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+    $npWrap.hide();
+    $npWrap.find('#np-progress-label').text('');
+    $npWrap.find('#np-progress-bar').css('width', '0%');
+
     // the dataType to $.get is given explicitely, because there were instances of Mapbender that were returning
     // either json or a string, which trips up $.parseJSON which was being used in the callback
     $.get(mbPrintConfigPath + configFilename, function (json, status) {
@@ -556,6 +578,8 @@ var PrintPDF = function (options) {
       success: showResult,
       timeout: options.timeout ? options.timeout : 10000,
       error: function (xhr, textStatus) {
+        // Stop any active progress poll (normal print or featureInfo)
+        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
         showHideWorking("hide");
         var msg;
         if (textStatus === 'timeout') {
@@ -568,7 +592,16 @@ var PrintPDF = function (options) {
           pfiErrorCallback = null;
           cb(msg);
         } else {
-          alert(msg);
+          // Normal print: show error in progress bar area instead of alert
+          var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+          if ($npWrap.length) {
+            $npWrap.find('#np-progress-label').html(
+              '<span style="color:#c00;font-weight:bold;">' + msg + '</span>'
+            );
+            $npWrap.show();
+          } else {
+            alert(msg);
+          }
         }
       }
     };
@@ -672,7 +705,51 @@ var PrintPDF = function (options) {
    */
   var validate = function (formData, jqForm, params) {
     pfiCancelled = false;
-    showHideWorking("show");
+    // Only show the overlay spinner for FeatureInfo print; normal print uses the inline progress bar
+    if (printFeatureInfoData !== null) {
+      showHideWorking("show");
+    }
+
+    // Normal print: generate a progress token, start polling, show progress UI
+    if (printFeatureInfoData === null) {
+      var npToken = 'np' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+      normalProgressToken = npToken;
+      // Push token into POST data (formData is already serialised, so push rather than update)
+      formData.push({ name: 'pfi_progress_token', value: npToken });
+
+      // Reset progress bar UI
+      var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+      $npWrap.find('#np-progress-label').text('<?php echo _mb("Druck wird gestartet..."); ?>');
+      $npWrap.find('#np-progress-bar').css('width', '0%');
+      $npWrap.show();
+
+      // Clear any left-over interval from a previous job
+      if (normalPollInterval) { clearInterval(normalPollInterval); }
+      var npLastPercent = 0;
+      normalPollInterval = setInterval(function () {
+        $.getJSON('../print/printProgress.php', { token: npToken }, function (data) {
+          var pct = Math.min(100, parseInt(data.percent, 10) || 0);
+          if (!data.done && !data.error) {
+            $npWrap.find('#np-progress-label').text(data.stepLabel || '');
+          }
+          if (pct >= npLastPercent) {
+            npLastPercent = pct;
+            $npWrap.find('#np-progress-bar').css('width', pct + '%');
+          }
+          if (data.error) {
+            clearInterval(normalPollInterval);
+            normalPollInterval = null;
+            $npWrap.find('#np-progress-label').html(
+              '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+            );
+            showHideWorking("hide");
+          } else if (data.done) {
+            clearInterval(normalPollInterval);
+            normalPollInterval = null;
+          }
+        });
+      }, 800);
+    }
 
     // For normal (non-featureInfo) print with spotlight active: recompute the coordinates
     // and scale fresh from the printBox state right now, rather than relying on field values
@@ -1039,23 +1116,28 @@ var PrintPDF = function (options) {
         showHideWorking("hide");
         $("#" + myId).trigger("load");
       } else {
-        // Normal print (Werkzeug/Drucken): restore original delivery behaviour
-        if ($.browser.msie) {
-          $('<div></div>')
-            .attr('id', 'ie-print')
-            .append($('<p>Ihr PDF wurde erstellt und kann nun heruntergeladen werden:</p>'))
-            .append($('<a>Zum Herunterladen hier klicken</a>')
-              .attr('href', pdfUrl)
-              .click(function () {
-                $(this).parent().dialog('destroy');
-              }))
-            .appendTo('body')
-            .dialog({
-              title: 'PDF-Druck'
-            });
-        } else {
-          window.frames[myId + "_frame"].location.href = pdfUrl;
+        // Normal print: stop poller and show a download link in the progress bar area
+        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+        var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+        $npWrap.find('#np-progress-bar').css('width', '100%');
+        if (!pdfUrl) {
+          $npWrap.find('#np-progress-label').html(
+            '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen: Keine Datei erhalten. Bitte versuchen Sie es erneut."); ?></span>'
+          );
+          $npWrap.show();
+          showHideWorking("hide");
+          return;
         }
+        $npWrap.find('#np-progress-label').html(
+          '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
+          'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="margin-bottom:-3px;margin-right:3px;">' +
+            '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>' +
+            '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>' +
+          '</svg>' +
+          '<?php echo _mb("Herunterladen"); ?></a>'
+        );
+        $npWrap.show();
         showHideWorking("hide");
         $("#" + myId).trigger("load");
       }
@@ -1070,7 +1152,13 @@ var PrintPDF = function (options) {
         );
         $progressWrap.show();
       } else {
-        $("#" + myId + "_result").html(text);
+        // Normal print: show error in progress bar area
+        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+        var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+        $npWrap.find('#np-progress-label').html(
+          '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+        );
+        $npWrap.show();
       }
     }
   };
