@@ -9,7 +9,7 @@
         {
             "id" : "scale",
             "label" : "Maßstab",
-            "type" : "hidden",
+            "type" : "text",
             "pageElementsLink" : {
                 "scale" : "value"
             }
@@ -28,10 +28,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 180.93,
+                    "x_ul" : 18.49,
+                    "y_ul" : 22.68,
+                    "width" : 179.84,
+                    "height" : 181.05,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8
@@ -45,6 +45,32 @@
                     "font_family" : "Arial",
                     "font_size" : 11,
                     "value" : "date"
+                },
+                "scale_label" : {
+                    "type" : "text",
+                    "x_ul" : 84.0,
+                    "y_ul" : 213.5,
+                    "font_family" : "Arial",
+                    "font_size" : 11,
+                    "font_style" : "B",
+                    "value" : "Maßstab:"
+                },
+                "scale" : {
+                    "type" : "text",
+                    "x_ul" : 106.0,
+                    "y_ul" : 213.5,
+                    "font_family" : "Arial",
+                    "font_size" : 11,
+                    "value" : "scale"
+                },
+                "scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 218.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
                 },
               
                  "nordpfeil" : {
@@ -97,5 +123,6 @@
             }               
     ]
 }
+
 
 

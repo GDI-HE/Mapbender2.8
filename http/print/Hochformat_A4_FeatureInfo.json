@@ -75,10 +75,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 209.4,
+                    "x_ul" : 18.37,
+                    "y_ul" : 22.77,
+                    "width" : 180.09,
+                    "height" : 210.21,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8,
@@ -151,10 +151,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 209.4,
+                    "x_ul" : 18.37,
+                    "y_ul" : 22.77,
+                    "width" : 180.09,
+                    "height" : 210.21,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8,
@@ -231,4 +231,5 @@
         }
     ]
 }
+
 
