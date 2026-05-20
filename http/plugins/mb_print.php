@@ -729,6 +729,8 @@ var PrintPDF = function (options) {
       $npWrap.find('#np-progress-label').text('<?php echo _mb("Druck wird gestartet..."); ?>');
       $npWrap.find('#np-progress-bar').css('width', '0%');
       $npWrap.show();
+      // Scroll the progress bar into view so the user sees it without having to scroll manually
+      $npWrap[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
       // Clear any left-over interval from a previous job
       if (normalPollInterval) { clearInterval(normalPollInterval); }
