@@ -511,7 +511,7 @@ var PrintPDF = function (options) {
     /* second we'd need to read the json configuration */
     that.loadConfig(mbPrintConfigFilenames[0]);
     /* than we need the translation of the print button */
-    $("#submit").val("<?php echo htmlentities(_mb("print"), ENT_QUOTES, "UTF-8");?>");
+    $("#submit").val("<?php echo htmlentities(_mb("Print"), ENT_QUOTES, "UTF-8");?>");
 
     // Inject progress bar for normal print into the result area (hidden until print starts)
     var $npResult = $('#' + myId + '_result');
