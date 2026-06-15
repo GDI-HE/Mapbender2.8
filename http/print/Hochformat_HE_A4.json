@@ -24,6 +24,10 @@
                 "karte" : "res_dpi"
             },
             "options" : [
+		{
+		    "value" : "96",
+		    "label" : "96 dpi"
+		},
                 {
                     "value" : "72",
                     "label" : "72 dpi"
