@@ -75,7 +75,7 @@ height: 150px;
     }
     
     &:hover {
-        cursor: pointer;
+        /*cursor: pointer;*/
     }
 }
 
