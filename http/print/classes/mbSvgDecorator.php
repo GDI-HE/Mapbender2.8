@@ -103,12 +103,69 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
 //        foreach ($xpath->query("//*[@style]", $doc->documentElement) as $elm) {
 //            $elm->removeAttribute('style');
 //        }
+        // Extract the minimum opacity from SVG elements so we can apply it
+        // at PDF level (more reliable than relying on Imagick alpha channels)
+        $svgOpacity = 1.0;
+
+        // Check 'opacity' attribute
+        foreach ($xpath->query("//*[@opacity]") as $elm) {
+            $val = floatval($elm->getAttribute('opacity'));
+            if ($val > 0 && $val < $svgOpacity) {
+                $svgOpacity = $val;
+            }
+        }
+
+        // Also check 'fill-opacity' attribute
+        foreach ($xpath->query("//*[@fill-opacity]") as $elm) {
+            $val = floatval($elm->getAttribute('fill-opacity'));
+            if ($val > 0 && $val < $svgOpacity) {
+                $svgOpacity = $val;
+            }
+        }
+
+        // Also check inline style for opacity/fill-opacity
+        foreach ($xpath->query("//*[@style]") as $elm) {
+            $style = $elm->getAttribute('style');
+            if (preg_match('/(?:^|;)\s*fill-opacity\s*:\s*([0-9.]+)/i', $style, $m)) {
+                $val = floatval($m[1]);
+                if ($val > 0 && $val < $svgOpacity) {
+                    $svgOpacity = $val;
+                }
+            }
+            if (preg_match('/(?:^|;)\s*opacity\s*:\s*([0-9.]+)/i', $style, $m)) {
+                $val = floatval($m[1]);
+                if ($val > 0 && $val < $svgOpacity) {
+                    $svgOpacity = $val;
+                }
+            }
+        }
+
+        // Strip ALL opacity from SVG elements so Imagick renders solid pixels.
+        // The transparency will be applied via PDF ExtGState instead.
+        if ($svgOpacity < 1.0) {
+            foreach ($xpath->query("//*[@opacity]") as $elm) {
+                $elm->removeAttribute('opacity');
+            }
+            foreach ($xpath->query("//*[@fill-opacity]") as $elm) {
+                $elm->removeAttribute('fill-opacity');
+            }
+            // Strip opacity and fill-opacity from inline styles too
+            foreach ($xpath->query("//*[@style]") as $elm) {
+                $style = $elm->getAttribute('style');
+                $style = preg_replace('/(?:^|(?<=;))\s*fill-opacity\s*:\s*[0-9.]+\s*;?/i', '', $style);
+                $style = preg_replace('/(?:^|(?<=;))\s*opacity\s*:\s*[0-9.]+\s*;?/i', '', $style);
+                $elm->setAttribute('style', trim($style, '; '));
+            }
+        }
+
         $imagick = new \Imagick();
-        $imagick->setBackgroundColor(new \ImagickPixel('transparent'));
+        $imagick->setBackgroundColor(new \ImagickPixel('none'));
         $imagick->readImageBlob($doc->saveXML());
+        $quantum = $imagick->getQuantumRange()['quantumRangeLong'];
+        $imagick->transparentPaintImage($imagick->getImagePixelColor(0, 0), 0.0, $quantum * 0.05, false);
         $imagick->setImageFormat("png32");
         if ($angle != 0) {
-            $imagick->rotateImage(new ImagickPixel('transparent'), $angle);
+            $imagick->rotateImage(new \ImagickPixel('none'), $angle);
 //            $imgWidth = $imagick->getImageWidth();
 //            $imgHeight = $imagick->getImageHeight();
 //            $imagick->cropImage($map_width_px, $map_height_px, ($imgWidth-$map_width_px)/2, ($imgHeight-$map_height_px)/2); orig, imagick bug?
@@ -116,7 +173,14 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
                 ($neededHeight - $map_height_px) / 2);
         }
         file_put_contents($this->filename, $imagick->getImageBlob());
+        if ($svgOpacity < 1.0) {
+            $this->pdf->objPdf->SetAlpha($svgOpacity);
+        }
         $this->pdf->objPdf->Image($this->filename, $mapOffset_left, $mapOffset_bottom, $map_width, $map_height, 'png');
+        if ($svgOpacity < 1.0) {
+            $this->pdf->objPdf->SetAlpha(1.0);
+        }
         $this->pdf->unlink($this->filename);
     }
 }
+

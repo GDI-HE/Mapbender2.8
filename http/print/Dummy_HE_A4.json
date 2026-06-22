@@ -9,10 +9,14 @@
         {
             "id" : "scale",
             "label" : "Maßstab",
-            "type" : "hidden",
+            "type" : "text",
             "pageElementsLink" : {
                 "scale" : "value"
             }
+        },
+        {
+            "id" : "coordinates",
+            "type" : "hidden"
         }
 	
     ],
@@ -24,10 +28,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 180.93,
+                    "x_ul" : 18.49,
+                    "y_ul" : 22.68,
+                    "width" : 179.84,
+                    "height" : 181.05,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8
@@ -42,16 +46,41 @@
                     "font_size" : 11,
                     "value" : "date"
                 },
+                "scale_label" : {
+                    "type" : "text",
+                    "x_ul" : 84.0,
+                    "y_ul" : 213.5,
+                    "font_family" : "Arial",
+                    "font_size" : 11,
+                    "font_style" : "B",
+                    "value" : "Maßstab:"
+                },
+                "scale" : {
+                    "type" : "text",
+                    "x_ul" : 106.0,
+                    "y_ul" : 213.5,
+                    "font_family" : "Arial",
+                    "font_size" : 11,
+                    "value" : "scale"
+                },
+                "scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 218.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
               
-                "nordpfeil" : {
+                 "nordpfeil" : {
                     "type" : "image",
-                    "x_ul" : 194,
-                    "y_ul" : 269,
-                    "width" : 5,
-                    "height" : 5,
+                    "x_ul" : 188.0,
+                    "y_ul" : 30.0,
+                    "width" : 10,
+                    "height" : 12,
                     "angle" : 0,
-                    "filename" : "./img/northarrowdummy.png"
-               		
+                    "filename" : "./img/northarrow.png"
                 },
 	
 		"messung" : {
@@ -71,9 +100,29 @@
                  "line_style" : {
                      "width" : 1.5
                      }
+                    },
+                    "srs_label": {
+                        "type": "text",
+                        "x_ul": 175.0,
+                        "y_ul": 267.8,
+                        "font_family": "Arial",
+                        "font_size": 11,
+                        "font_style": "B",
+                        "value": "EPSG:"
+                    },
+                    "srs": {
+                        "type": "text",
+                        "x_ul": 189.0,
+                        "y_ul": 267.8,
+                        "font_family": "Arial",
+                        "font_size": 11,
+                        "font_style": "",
+                        "value": "srs_code"
                     }
-            }
-        }
-        
+                }
+            }               
     ]
 }
+
+
+

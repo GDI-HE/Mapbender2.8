@@ -24,6 +24,10 @@
                 "karte" : "res_dpi"
             },
             "options" : [
+		{
+		    "value" : "96",
+		    "label" : "96 dpi"
+		},
                 {
                     "value" : "72",
                     "label" : "72 dpi"
@@ -77,10 +81,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 199.4,
+                    "x_ul" : 18.49,
+                    "y_ul" : 22.68,
+                    "width" : 179.85,
+                    "height" : 199.64,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8
@@ -106,12 +110,12 @@
               
                 "nordpfeil" : {
                     "type" : "image",
-                    "x_ul" : 194,
-                    "y_ul" : 249,
-                    "width" : 1,
-                    "height" : 1,
+                    "x_ul" : 188,
+                    "y_ul" : 30,
+                    "width" : 10,
+                    "height" : 12,
                     "angle" : 0,
-                    "filename" : "./img/northarrowdummy.png"
+                    "filename" : "./img/northarrow.png"
                 },
 		"titel" : {
                     "type" : "text",
@@ -139,6 +143,15 @@
                      }
                     },
 
+                "scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 242.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
                 "kommentar1" : {
                     "type" : "para",
                     "x_ul" : 40.0,
@@ -151,9 +164,30 @@
                     "border" : 0,
                     "fill" : 0,
                     "border_width" : 0.3
+                },
+                "srs_label": {
+                    "type": "text",
+                    "x_ul": 170.0,
+                    "y_ul": 230.0,
+                    "font_family": "Arial",
+                    "font_size": 11,
+                    "font_style": "B",
+                    "value": "EPSG:"
+                },
+                "srs": {
+                    "type": "text",
+                    "x_ul": 188.0,
+                    "y_ul": 230.0,
+                    "font_family": "Arial",
+                    "font_size": 11,
+                    "font_style": "",
+                    "value": "srs_code"
                 }
             }
         }
         
     ]
 }
+
+
+

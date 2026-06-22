@@ -108,11 +108,20 @@ class mbMapDecorator extends mbTemplatePdfDecorator
         /* show coordinates ... */
         if ($this->conf->coords == 1) {
             $coord = mb_split(",", $this->pdf->getMapExtent());
+            $mapSrs = isset($_REQUEST["map_srs"]) ? strtoupper(trim($_REQUEST["map_srs"])) : (isset($srs) ? strtoupper($srs) : '');
+            $isGeographic = (strpos($mapSrs, '4326') !== false);
 
-            $myMinx = "R " . substr(round($coord[0]), 0, 4) . "" . substr(round($coord[0]), 4, 3) . "";
-            $myMiny = "H " . substr(round($coord[1]), 0, 4) . "" . substr(round($coord[1]), 4, 3) . "";
-            $myMaxx = "R " . substr(round($coord[2]), 0, 4) . "" . substr(round($coord[2]), 4, 3) . "";
-            $myMaxy = "H " . substr(round($coord[3]), 0, 4) . "" . substr(round($coord[3]), 4, 3) . "";
+            if ($isGeographic) {
+                $myMinx = "R " . number_format((float)$coord[0], 5, ',', '');
+                $myMiny = "H " . number_format((float)$coord[1], 5, ',', '');
+                $myMaxx = "R " . number_format((float)$coord[2], 5, ',', '');
+                $myMaxy = "H " . number_format((float)$coord[3], 5, ',', '');
+            } else {
+                $myMinx = "R " . substr(round($coord[0]), 0, 4) . "" . substr(round($coord[0]), 4, 3) . "";
+                $myMiny = "H " . substr(round($coord[1]), 0, 4) . "" . substr(round($coord[1]), 4, 3) . "";
+                $myMaxx = "R " . substr(round($coord[2]), 0, 4) . "" . substr(round($coord[2]), 4, 3) . "";
+                $myMaxy = "H " . substr(round($coord[3]), 0, 4) . "" . substr(round($coord[3]), 4, 3) . "";
+            }
 
             $this->pdf->objPdf->setTextColor(0, 0, 0);
             $this->pdf->objPdf->setFont($this->conf->coords_font_family, "", $this->conf->coords_font_size);
@@ -138,4 +147,5 @@ class mbMapDecorator extends mbTemplatePdfDecorator
 }
 
 ?>
+
 

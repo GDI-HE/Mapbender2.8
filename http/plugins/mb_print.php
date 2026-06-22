@@ -145,6 +145,107 @@ var PrintPDF = function (options) {
    * the movable printframe
    */
   var printBox = null;
+  var stopNormalSpotlight = null;
+  var normalPrintPixelCenter = null;   // fixed screen pixel [x,y] for normal-print screen-anchoring
+  var normalPollInterval = null;       // setInterval id for normal-print progress polling
+  var normalProgressToken = null;      // token for current normal-print job
+  var currentPrintIsFeatureInfo = false; // true only while a FeatureInfo-triggered submit is in flight
+
+  /**
+   * SVG spotlight overlay: dims everything outside the print rectangle and
+   * shows a red center dot.  Works for both normal print and featureInfo print.
+   * Returns a cleanup function that removes the overlay when called.
+   */
+  var startSpotlightOverlay = function (overlayId) {
+      overlayId = overlayId || 'pfi-spotlight-overlay';
+      var map = getMapObjByName(myTarget);
+      var $mapEl = $(map.getDomElement());
+      var ns = 'http://www.w3.org/2000/svg';
+      // Remove any existing overlay with the same id
+      $('#' + overlayId).remove();
+      // Ensure the map element is a positioning context so the absolute SVG stays inside it
+      if ($mapEl.css('position') === 'static') {
+        $mapEl.css('position', 'relative');
+      }
+      var svgEl = document.createElementNS(ns, 'svg');
+      svgEl.id = overlayId;
+      // width/height are set via SVG attributes inside updateOverlay — do NOT put them in the
+      // style string or CSS will override the attributes and the SVG may collapse to zero size.
+      svgEl.setAttribute('style',
+        'position:absolute;top:0;left:0;z-index:999;pointer-events:none;');
+      var pathEl = document.createElementNS(ns, 'path');
+      pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
+      pathEl.setAttribute('fill-rule', 'evenodd');
+      svgEl.appendChild(pathEl);
+
+      // Red dot at the print-box center
+      var circleEl = document.createElementNS(ns, 'circle');
+      circleEl.setAttribute('r', '4');
+      circleEl.setAttribute('fill', '#ff0000');
+      circleEl.setAttribute('stroke', '#ff0000');
+      circleEl.setAttribute('stroke-width', '2');
+      circleEl.setAttribute('fill-opacity', '0.5');
+      svgEl.appendChild(circleEl);
+
+      $mapEl[0].appendChild(svgEl);
+
+      function updateOverlay() {
+        // Use the configured map dimensions — these match the pixel space that
+        // makeRealWorld2mapPos / makeClickPos2RealWorldPos use internally.
+        var mapW = map.getWidth();
+        var mapH = map.getHeight();
+        svgEl.setAttribute('width',  mapW);
+        svgEl.setAttribute('height', mapH);
+
+        var coords = $('#printPDF_form #coordinates').val();
+        // Fall back to the PrintBox object directly (e.g. before coordinates form field is populated)
+        if (!coords && printBox) { coords = printBox.getStartCoordinates(); }
+        if (!coords) return;
+        var parts = coords.split(',');
+        var minx = parseFloat(parts[0]), miny = parseFloat(parts[1]);
+        var maxx = parseFloat(parts[2]), maxy = parseFloat(parts[3]);
+
+        var c0 = makeRealWorld2mapPos(myTarget, minx, miny);   // bottom-left
+        var c1 = makeRealWorld2mapPos(myTarget, maxx, miny);   // bottom-right
+        var c2 = makeRealWorld2mapPos(myTarget, maxx, maxy);   // top-right
+        var c3 = makeRealWorld2mapPos(myTarget, minx, maxy);   // top-left
+
+        var angle = parseFloat($('#printPDF_form #angle').val() || '0');
+        if (angle !== 0) {
+          var ctr = makeRealWorld2mapPos(myTarget, (minx + maxx) / 2, (miny + maxy) / 2);
+          var cx = ctr[0], cy = ctr[1];
+          // Negate rad so the SVG spotlight rotates CW for positive angle,
+          // matching printbox.js (negated rotate) and the PDF backend (Imagick CW).
+          var rad = -(angle * Math.PI / 180);
+          var cos = Math.cos(rad), sin = Math.sin(rad);
+          function rotPt(p) {
+            var dx = p[0] - cx, dy = p[1] - cy;
+            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
+          }
+          c0 = rotPt(c0); c1 = rotPt(c1); c2 = rotPt(c2); c3 = rotPt(c3);
+        }
+
+        var d = 'M0 0 L' + mapW + ' 0 L' + mapW + ' ' + mapH + ' L0 ' + mapH + ' Z ' +
+          'M' + c3[0] + ' ' + c3[1] +
+          ' L' + c2[0] + ' ' + c2[1] +
+          ' L' + c1[0] + ' ' + c1[1] +
+          ' L' + c0[0] + ' ' + c0[1] + ' Z';
+        pathEl.setAttribute('d', d);
+
+        var boxCx = (c0[0] + c1[0] + c2[0] + c3[0]) / 4;
+        var boxCy = (c0[1] + c1[1] + c2[1] + c3[1]) / 4;
+        circleEl.setAttribute('cx', boxCx);
+        circleEl.setAttribute('cy', boxCy);
+      }
+
+      var intervalId = setInterval(updateOverlay, 80);
+      updateOverlay();
+
+      return function () {
+        clearInterval(intervalId);
+        $('#' + overlayId).remove();
+      };
+  };
 
   eventAfterMapRequest.register(function () {
     if (printBox !== null) {
@@ -164,7 +265,22 @@ var PrintPDF = function (options) {
           $('#pfi_scale').val(newScale);
         }
       } else {
-        printBox.repaint();
+        // Normal print: same screen-anchor approach as FeatureInfo.
+        // The spotlight stays at a fixed screen position; the geographic centre
+        // is recalculated to whatever lies under that pixel after each pan/zoom.
+        if (stopNormalSpotlight && normalPrintPixelCenter) {
+          var nc = makeClickPos2RealWorldPos(myTarget, normalPrintPixelCenter[0], normalPrintPixelCenter[1]);
+          var rawMapScale = getMapObjByName(myTarget).getScale();
+          var magnitude = Math.pow(10, Math.floor(Math.log(rawMapScale) / Math.LN10));
+          var newScale = Math.round(rawMapScale / magnitude) * magnitude;
+          if (newScale > 0) {
+            printBox.setCenterMap({x: nc[0], y: nc[1]});
+            printBox.setScale(newScale);
+            $('#printPDF_form #scale').val(newScale);
+          }
+        } else {
+          printBox.repaint();
+        }
         if (!printBox.isVisible()) {
           $("#printPDF_form #scale").val("");
           $("#printPDF_form #coordinates").val("");
@@ -201,6 +317,7 @@ var PrintPDF = function (options) {
         target: myTarget,
         printWidth: getPDFMapSize("width") / 10,
         printHeight: getPDFMapSize("height") / 10,
+        noFrame: true,
         scale: $scaleInput.size() > 0 && !isNaN(parseInt($scaleInput.val(), 10)) ?
           parseInt($scaleInput.val(), 10) :
           Math.pow(10, Math.floor(Math.log(map.getScale()) / Math.LN10)),
@@ -263,11 +380,46 @@ var PrintPDF = function (options) {
           pointColour: 'transparent',
           circleColour: 'transparent'
         });
+      } else {
+        // Spotlight / screen-anchored mode: fixed:true makes setScale() respect
+        // setCenterMap() instead of re-deriving the centre from old coordinates.
+        options.fixed = true;
       }
       printBox = new Mapbender.PrintBox(options);
       printBox.paintPoints();
       printBox.paintBox();
       printBox.show();
+      // For normal (non-featureInfo) print: start SVG spotlight that replaces the old rectangle
+      if (!fixedPosition) {
+        // Hide the PrintBox canvas (eliminates the duplicate canvas center dot).
+        // The SVG overlay is the sole visual — same pattern as FeatureInfo print.
+        printBox.hide();
+        if (stopNormalSpotlight) { stopNormalSpotlight(); stopNormalSpotlight = null; }
+
+        // Initialise scale + center identically to what eventAfterMapRequest does on pan/zoom.
+        // Without this the constructor uses floor-to-order-of-magnitude (e.g. 25000→10000)
+        // while eventAfterMapRequest uses round-to-nearest (25000→30000), so the spotlight
+        // hole would be 3× too small until the first pan.
+        var _map     = getMapObjByName(myTarget);
+        var _raw     = _map.getScale();
+        var _mag     = Math.pow(10, Math.floor(Math.log(_raw) / Math.LN10));
+        var _scale   = Math.round(_raw / _mag) * _mag || _raw;
+        // Use the configured pixel dimensions — same coordinate space as makeClickPos2RealWorldPos.
+        normalPrintPixelCenter = [
+          Math.round(_map.getWidth()  / 2),
+          Math.round(_map.getHeight() / 2)
+        ];
+        var _nc = makeClickPos2RealWorldPos(
+          myTarget, normalPrintPixelCenter[0], normalPrintPixelCenter[1]
+        );
+        if (_scale > 0) {
+          printBox.setCenterMap({x: _nc[0], y: _nc[1]});
+          printBox.setScale(_scale);         // updates #coordinates via afterChangeSize
+          $('#printPDF_form #scale').val(_scale);
+        }
+
+        stopNormalSpotlight = startSpotlightOverlay('print-spotlight-overlay');
+      }
     }
   };
   
@@ -325,6 +477,8 @@ var PrintPDF = function (options) {
    */
   var destroyPrintBox = function () {
     if (printBox) {
+      if (stopNormalSpotlight) { stopNormalSpotlight(); stopNormalSpotlight = null; }
+      normalPrintPixelCenter = null;
       printBox.destroy();
       printBox = null;
       $("#printboxScale").val("");
@@ -357,10 +511,29 @@ var PrintPDF = function (options) {
     /* second we'd need to read the json configuration */
     that.loadConfig(mbPrintConfigFilenames[0]);
     /* than we need the translation of the print button */
-    $("#submit").val("<?php echo htmlentities(_mb("print"), ENT_QUOTES, "UTF-8");?>");
+    $("#submit").val("<?php echo htmlentities(_mb("Print"), ENT_QUOTES, "UTF-8");?>");
+
+    // Inject progress bar for normal print into the result area (hidden until print starts)
+    var $npResult = $('#' + myId + '_result');
+    if ($npResult.find('#np-progress-wrap').length === 0) {
+      $npResult.append(
+        '<div id="np-progress-wrap" style="display:none;margin-top:10px;">' +
+          '<div id="np-progress-label" style="font-size:12px;margin-bottom:4px;color:#333;"></div>' +
+          '<div style="background:#ddd;border-radius:4px;height:18px;overflow:hidden;">' +
+            '<div id="np-progress-bar" style="height:100%;width:0%;background:#4a90d9;border-radius:4px;transition:width 0.4s ease;"></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
 
     //show printBox for first entry in printTemplate selectbox
     $("." + myId + "-dialog").bind("dialogopen", function () {
+      // Reset the normal print progress bar each time the panel is opened
+      if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+      var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+      $npWrap.hide();
+      $npWrap.find('#np-progress-label').text('');
+      $npWrap.find('#np-progress-bar').css('width', '0%');
       printObj.createPrintBox();
     });
 
@@ -376,6 +549,13 @@ var PrintPDF = function (options) {
    * GETs the config, build corresponding form, remove an existing printBox
    */
   this.loadConfig = function (configFilename, callback) {
+    // When a new template is selected, hide the normal print progress bar / download link
+    if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+    var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+    $npWrap.hide();
+    $npWrap.find('#np-progress-label').text('');
+    $npWrap.find('#np-progress-bar').css('width', '0%');
+
     // the dataType to $.get is given explicitely, because there were instances of Mapbender that were returning
     // either json or a string, which trips up $.parseJSON which was being used in the callback
     $.get(mbPrintConfigPath + configFilename, function (json, status) {
@@ -405,6 +585,8 @@ var PrintPDF = function (options) {
       success: showResult,
       timeout: options.timeout ? options.timeout : 10000,
       error: function (xhr, textStatus) {
+        // Stop any active progress poll (normal print or featureInfo)
+        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
         showHideWorking("hide");
         var msg;
         if (textStatus === 'timeout') {
@@ -417,7 +599,16 @@ var PrintPDF = function (options) {
           pfiErrorCallback = null;
           cb(msg);
         } else {
-          alert(msg);
+          // Normal print: show error in progress bar area instead of alert
+          var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+          if ($npWrap.length) {
+            $npWrap.find('#np-progress-label').html(
+              '<span style="color:#c00;font-weight:bold;">' + msg + '</span>'
+            );
+            $npWrap.show();
+          } else {
+            alert(msg);
+          }
         }
       }
     };
@@ -521,12 +712,78 @@ var PrintPDF = function (options) {
    */
   var validate = function (formData, jqForm, params) {
     pfiCancelled = false;
-    showHideWorking("show");
+    // Only show the overlay spinner for FeatureInfo print; normal print uses the inline progress bar
+    if (currentPrintIsFeatureInfo) {
+      showHideWorking("show");
+    }
+
+    // Normal print: generate a progress token, start polling, show progress UI
+    if (!currentPrintIsFeatureInfo) {
+      var npToken = 'np' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+      normalProgressToken = npToken;
+      // Push token into POST data (formData is already serialised, so push rather than update)
+      formData.push({ name: 'pfi_progress_token', value: npToken });
+
+      // Reset progress bar UI
+      var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+      $npWrap.find('#np-progress-label').text('<?php echo _mb("Druck wird gestartet..."); ?>');
+      $npWrap.find('#np-progress-bar').css('width', '0%');
+      $npWrap.show();
+      // Scroll the progress bar into view so the user sees it without having to scroll manually
+      $npWrap[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Clear any left-over interval from a previous job
+      if (normalPollInterval) { clearInterval(normalPollInterval); }
+      var npLastPercent = 0;
+      normalPollInterval = setInterval(function () {
+        $.getJSON('../print/printProgress.php', { token: npToken }, function (data) {
+          var pct = Math.min(100, parseInt(data.percent, 10) || 0);
+          if (!data.done && !data.error) {
+            $npWrap.find('#np-progress-label').text(data.stepLabel || '');
+          }
+          if (pct >= npLastPercent) {
+            npLastPercent = pct;
+            $npWrap.find('#np-progress-bar').css('width', pct + '%');
+          }
+          if (data.error) {
+            clearInterval(normalPollInterval);
+            normalPollInterval = null;
+            $npWrap.find('#np-progress-label').html(
+              '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+            );
+            showHideWorking("hide");
+          } else if (data.done) {
+            clearInterval(normalPollInterval);
+            normalPollInterval = null;
+          }
+        });
+      }, 800);
+    }
+
+    // For normal (non-featureInfo) print with spotlight active: recompute the coordinates
+    // and scale fresh from the printBox state right now, rather than relying on field values
+    // written by async event handlers.  This guarantees the submitted BBOX always matches
+    // the spotlight regardless of event ordering after pan/zoom.
+    var f = jqForm[0];
+    if (stopNormalSpotlight && printBox && !currentPrintIsFeatureInfo) {
+      // NOTE: formData is already serialized by ajaxForm before beforeSubmit fires.
+      // f.xxx.value changes the DOM but NOT formData — must use updateFormField() for formData.
+      var _coords = printBox.getStartCoordinates();
+      if (_coords) {
+        // Patch both the DOM field (so f.scale read below works) and formData (what gets POSTed).
+        if (typeof f.coordinates !== 'undefined') { f.coordinates.value = _coords; }
+        updateFormField(formData, 'coordinates', _coords);
+      }
+      var _curScale = printBox.getScale();
+      if (_curScale > 0) {
+        if (typeof f.scale !== 'undefined') { f.scale.value = _curScale; }
+        updateFormField(formData, 'scale', _curScale);
+      }
+    }
 
     // map urls
     var ind = getMapObjIndexByName(myTarget);
     var mapObj = mb_mapObj[ind];
-    var f = jqForm[0];
     f.map_url.value = '';
     f.opacity.value = "";
 
@@ -540,7 +797,8 @@ var PrintPDF = function (options) {
     // Force-include cadastral layers in the printed map image even when unchecked in tree.
     // We temporarily set gui_layer_visible=1 so getLayers()/getMapUrl() picks them up.
     var pfiCadMapPatch = [];
-    if (printFeatureInfoData !== null &&
+    if (currentPrintIsFeatureInfo &&
+        printFeatureInfoData !== null &&
         printFeatureInfoData.pfiCadastralWmsId &&
         printFeatureInfoData.pfiCadastralLayerNames &&
         printFeatureInfoData.pfiCadastralLayerNames.length > 0) {
@@ -554,6 +812,30 @@ var PrintPDF = function (options) {
             }
           }
           break;
+        }
+      }
+    }
+
+    // When printing featureInfo, only show legend for layers checked in the dialog.
+    // printFeatureInfoData.urls already holds only the checked entries (unchecked
+    // items are spliced out by the checkbox handler).  Build a lookup set from the
+    // LAYERS= parameter of each request URL so we can filter both legend loops below.
+    var pfiCheckedLayerNames = null;
+    if (currentPrintIsFeatureInfo &&
+        printFeatureInfoData !== null &&
+        printFeatureInfoData.urls &&
+        printFeatureInfoData.urls.length > 0) {
+      pfiCheckedLayerNames = {};
+      for (var pci = 0; pci < printFeatureInfoData.urls.length; pci++) {
+        var pfiReq = printFeatureInfoData.urls[pci].request || '';
+        var pfiLyrMatch = pfiReq.match(/[?&]LAYERS=([^&]*)/i);
+        if (pfiLyrMatch) {
+          var pfiLyrList = decodeURIComponent(pfiLyrMatch[1]).split(',');
+          for (var pli = 0; pli < pfiLyrList.length; pli++) {
+            if (pfiLyrList[pli]) {
+              pfiCheckedLayerNames[pfiLyrList[pli]] = true;
+            }
+          }
         }
       }
     }
@@ -572,12 +854,16 @@ var PrintPDF = function (options) {
               var isVisible = (currentLayer.gui_layer_visible === 1);
               var hasNoChildren = (!currentLayer.has_childs);
               if (isVisible && hasNoChildren) {
+                // In print featureInfo mode, skip layers not checked in the dialog
+                if (pfiCheckedLayerNames !== null && !pfiCheckedLayerNames[currentLayer.layer_name]) {
+                  continue;
+                }
                 var layerLegendObj = {};
                 layerLegendObj.name = currentLayer.layer_name;
                 layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
                 var layerStyle = currentWms.getCurrentStyleByLayerName(currentLayer.layer_name);
                 if (layerStyle === false || layerStyle === "") {
-                  layerStyle = "default";
+                  layerStyle = "";
                 }
                 layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
                 // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
@@ -627,12 +913,16 @@ var PrintPDF = function (options) {
             var isVisible = (currentLayer.gui_layer_visible === 1);
             var hasNoChildren = (!currentLayer.has_childs);
             if (isVisible && hasNoChildren) {
+              // In print featureInfo mode, skip layers not checked in the dialog
+              if (pfiCheckedLayerNames !== null && !pfiCheckedLayerNames[currentLayer.layer_name]) {
+                continue;
+              }
               var layerLegendObj = {};
               layerLegendObj.name = currentLayer.layer_name;
               layerLegendObj.title = currentWms.getTitleByLayerName(currentLayer.layer_name);
               var layerStyle = currentWms.getCurrentStyleByLayerName(currentLayer.layer_name);
               if (layerStyle === false || layerStyle === "") {
-                layerStyle = "default";
+                layerStyle = "";
               }
               layerLegendObj.legendUrl = currentWms.getLegendUrlByGuiLayerStyle(currentLayer.layer_name, layerStyle);
               // Skip invalid/parent legend URLs that contain multiple '?' (concatenated URLs)
@@ -683,6 +973,9 @@ var PrintPDF = function (options) {
     }
 
     updateFormField(formData, "map_scale", mb_getScale(myTarget));
+    var mapObj = getMapObjByName(myTarget);
+    var mapSrs = mapObj ? (mapObj.getSrs ? mapObj.getSrs() : '') : '';
+    formData.push({ name: "map_srs", value: mapSrs });
     // write the measured coordinates
     if (typeof (mod_measure_RX) !== "undefined") {
       var tmp_x = '';
@@ -771,7 +1064,7 @@ var PrintPDF = function (options) {
     }
 
     // feature info data
-    if (printFeatureInfoData !== null) {
+    if (currentPrintIsFeatureInfo && printFeatureInfoData !== null) {
       updateFormField(formData, "printPDF_template", printFeatureInfoData.config);
       formData.push({
         name: 'featureInfo',
@@ -807,11 +1100,20 @@ var PrintPDF = function (options) {
           myId + "_frame' width='0' height='0' style='display:none'></iframe>"
         ).appendTo("body");
       }
-      var pdfUrl = stripslashes(res.outputFileName);
-      if (printFeatureInfoData !== null) {
+      var pdfUrl = (res && res.outputFileName) ? stripslashes(res.outputFileName) : '';
+      if (currentPrintIsFeatureInfo) {
         // FeatureInfo print: show a clickable download link in the progress area
         var $progressWrap = $("[id='pfi-progress-wrap']");
         var $progressLabel = $("[id='pfi-progress-label']");
+        if (!pdfUrl) {
+          // Backend returned HTTP 200 but no file URL — display inline error
+          $progressLabel.html(
+            '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen: Keine Datei erhalten. Bitte versuchen Sie es erneut."); ?></span>'
+          );
+          $progressWrap.show();
+          showHideWorking("hide");
+          return;
+        }
         $progressLabel.html(
           '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
           'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
@@ -823,31 +1125,54 @@ var PrintPDF = function (options) {
         );
         $progressWrap.show();
         showHideWorking("hide");
+        currentPrintIsFeatureInfo = false;
         $("#" + myId).trigger("load");
       } else {
-        // Normal print (Werkzeug/Drucken): restore original delivery behaviour
-        if ($.browser.msie) {
-          $('<div></div>')
-            .attr('id', 'ie-print')
-            .append($('<p>Ihr PDF wurde erstellt und kann nun heruntergeladen werden:</p>'))
-            .append($('<a>Zum Herunterladen hier klicken</a>')
-              .attr('href', pdfUrl)
-              .click(function () {
-                $(this).parent().dialog('destroy');
-              }))
-            .appendTo('body')
-            .dialog({
-              title: 'PDF-Druck'
-            });
-        } else {
-          window.frames[myId + "_frame"].location.href = pdfUrl;
+        // Normal print: stop poller and show a download link in the progress bar area
+        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+        var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+        $npWrap.find('#np-progress-bar').css('width', '100%');
+        if (!pdfUrl) {
+          $npWrap.find('#np-progress-label').html(
+            '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen: Keine Datei erhalten. Bitte versuchen Sie es erneut."); ?></span>'
+          );
+          $npWrap.show();
+          showHideWorking("hide");
+          return;
         }
+        $npWrap.find('#np-progress-label').html(
+          '<span><?php echo _mb("PDF fertig:"); ?></span> <a href="' + pdfUrl + '" target="_blank" ' +
+          'style="font-weight:bold;color:#1a5fa8;text-decoration:none;">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" style="margin-bottom:-3px;margin-right:3px;">' +
+            '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>' +
+            '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>' +
+          '</svg>' +
+          '<?php echo _mb("Herunterladen"); ?></a>'
+        );
+        $npWrap.show();
         showHideWorking("hide");
         $("#" + myId).trigger("load");
       }
     } else {
       /* something went wrong */
-      $("#" + myId + "_result").html(text);
+      showHideWorking("hide");
+      if (currentPrintIsFeatureInfo) {
+        currentPrintIsFeatureInfo = false;
+        var $progressWrap = $("[id='pfi-progress-wrap']");
+        var $progressLabel = $("[id='pfi-progress-label']");
+        $progressLabel.html(
+          '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+        );
+        $progressWrap.show();
+      } else {
+        // Normal print: show error in progress bar area
+        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+        var $npWrap = $('#' + myId + '_result').find('#np-progress-wrap');
+        $npWrap.find('#np-progress-label').html(
+          '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+        );
+        $npWrap.show();
+      }
     }
   };
 
@@ -1034,15 +1359,30 @@ var PrintPDF = function (options) {
     var scale = Math.round(rawScale / magnitude) * magnitude;
     $("#scale").val(scale.toString());
 
-    var realWidthInM = scale * getPDFMapSize("width") / 1000;
-    var realHeightInM = scale * getPDFMapSize("height") / 1000;
-
-    var bbox = [
-      printInfo.point.x - 0.5 * realWidthInM,
-      printInfo.point.y - 0.5 * realHeightInM,
-      printInfo.point.x + 0.5 * realWidthInM,
-      printInfo.point.y + 0.5 * realHeightInM
-    ];
+    var bbox;
+    var srs = map.getSrs ? map.getSrs() : '';
+    if (srs && srs.toUpperCase() === 'EPSG:4326') {
+      // geographic SRS: convert real-world metres to degrees using N-S scale only.
+      // No cos(lat) so bbox aspect ratio matches paper orientation.
+      var degPerMeter = 360.0 / (2.0 * Math.PI * 6378137.0);
+      var halfW = rawScale * getPDFMapSize("width")  / 1000.0 * degPerMeter;
+      var halfH = rawScale * getPDFMapSize("height") / 1000.0 * degPerMeter;
+      bbox = [
+        printInfo.point.x - 0.5 * halfW,
+        printInfo.point.y - 0.5 * halfH,
+        printInfo.point.x + 0.5 * halfW,
+        printInfo.point.y + 0.5 * halfH
+      ];
+    } else {
+      var realWidthInM  = rawScale * getPDFMapSize("width")  / 1000;
+      var realHeightInM = rawScale * getPDFMapSize("height") / 1000;
+      bbox = [
+        printInfo.point.x - 0.5 * realWidthInM,
+        printInfo.point.y - 0.5 * realHeightInM,
+        printInfo.point.x + 0.5 * realWidthInM,
+        printInfo.point.y + 0.5 * realHeightInM
+      ];
+    }
 
     $("#coordinates").val(bbox.join(","))
   }
@@ -1053,84 +1393,6 @@ var PrintPDF = function (options) {
     var $dialog;
     var stopSpotlight = null;
     var pfiRestoring = false;
-
-    function startSpotlightOverlay() {
-      var map = getMapObjByName(myTarget);
-      var $mapEl = $(map.getDomElement());
-      var mapW = $mapEl.width();
-      var mapH = $mapEl.height();
-      var ns = 'http://www.w3.org/2000/svg';
-      var svgEl = document.createElementNS(ns, 'svg');
-      svgEl.id = 'pfi-spotlight-overlay';
-      svgEl.setAttribute('style',
-        'position:absolute;top:0;left:0;width:' + mapW + 'px;height:' + mapH +
-        'px;z-index:999;pointer-events:none;');
-      var pathEl = document.createElementNS(ns, 'path');
-      pathEl.setAttribute('fill', 'rgba(0,0,0,0.45)');
-      pathEl.setAttribute('fill-rule', 'evenodd');
-      svgEl.appendChild(pathEl);
-
-      // Red circle marker at the center of the print box
-      var circleEl = document.createElementNS(ns, 'circle');
-      circleEl.setAttribute('r', '4');
-      circleEl.setAttribute('fill', '#ff0000');
-      circleEl.setAttribute('stroke', '#ff0000');
-      circleEl.setAttribute('stroke-width', '2');
-      circleEl.setAttribute('fill-opacity', '0.5');
-      circleEl.setAttribute('style', 'stroke-width: 2px; fill-opacity: 0.5;');
-      svgEl.appendChild(circleEl);
-
-      $mapEl[0].appendChild(svgEl);
-
-      function updateOverlay() {
-        var coords = $('#printPDF_form #coordinates').val();
-        if (!coords) return;
-        var parts = coords.split(',');
-        var minx = parseFloat(parts[0]), miny = parseFloat(parts[1]);
-        var maxx = parseFloat(parts[2]), maxy = parseFloat(parts[3]);
-
-        // Convert unrotated map corners to pixel positions
-        var c0 = makeRealWorld2mapPos(myTarget, minx, miny);   // bottom-left
-        var c1 = makeRealWorld2mapPos(myTarget, maxx, miny);   // bottom-right
-        var c2 = makeRealWorld2mapPos(myTarget, maxx, maxy);   // top-right
-        var c3 = makeRealWorld2mapPos(myTarget, minx, maxy);   // top-left
-
-        // Apply rotation (same formula as printbox.js rotate())
-        var angle = parseFloat($('#printPDF_form #angle').val() || '0');
-        if (angle !== 0) {
-          var ctr = makeRealWorld2mapPos(myTarget, (minx + maxx) / 2, (miny + maxy) / 2);
-          var cx = ctr[0], cy = ctr[1];
-          var rad = angle * Math.PI / 180;
-          var cos = Math.cos(rad), sin = Math.sin(rad);
-          function rotPt(p) {
-            var dx = p[0] - cx, dy = p[1] - cy;
-            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
-          }
-          c0 = rotPt(c0); c1 = rotPt(c1); c2 = rotPt(c2); c3 = rotPt(c3);
-        }
-
-        var d = 'M0 0 L' + mapW + ' 0 L' + mapW + ' ' + mapH + ' L0 ' + mapH + ' Z ' +
-          'M' + c3[0] + ' ' + c3[1] +
-          ' L' + c2[0] + ' ' + c2[1] +
-          ' L' + c1[0] + ' ' + c1[1] +
-          ' L' + c0[0] + ' ' + c0[1] + ' Z';
-        pathEl.setAttribute('d', d);
-
-        // Pin the red circle to the visual center of the print box rectangle
-        var boxCx = (c0[0] + c1[0] + c2[0] + c3[0]) / 4;
-        var boxCy = (c0[1] + c1[1] + c2[1] + c3[1]) / 4;
-        circleEl.setAttribute('cx', boxCx);
-        circleEl.setAttribute('cy', boxCy);
-      }
-
-      var intervalId = setInterval(updateOverlay, 80);
-      updateOverlay();
-
-      return function() {
-        clearInterval(intervalId);
-        $('#pfi-spotlight-overlay').remove();
-      };
-    }
 
     // Auto-inject Hintergrundkarte/Flurstücke as a permanent Abfragen entry.
     // Strategy: find the WMS titled "Hintergrundkarte", then find the "Flurstücke" sublayer within it.
@@ -1252,7 +1514,39 @@ var PrintPDF = function (options) {
 
     // feature info ebenen
 
-    $abfragenDiv.append($("<h3>Abzufragende Ebene:</h3>"));
+    var $abfragenH3 = $('<h3 style="margin-bottom:6px;">Abzufragende Ebene: </h3>');
+    var $pfiInfoBtn = $('<button type="button" title="Format-Vorschau anzeigen" ' +
+      'style="width:18px;height:18px;padding:0;line-height:1;font-size:12px;font-weight:bold;font-style:italic;' +
+      'border-radius:50%;border:1px solid #888;background:#fff;color:#555;cursor:pointer;' +
+      'vertical-align:middle;margin-left:4px;margin-bottom:2px;">i</button>');
+
+    $pfiInfoBtn.bind('click', function () {
+      var $infoDialog = $('<div style="overflow:auto;"></div>');
+      $infoDialog.append(
+        '<table style="border-collapse:collapse;width:100%;table-layout:fixed;"><tr>' +
+          '<td style="text-align:center;padding:0 8px 0 0;vertical-align:top;width:50%;">' +
+            '<div style="font-weight:bold;margin-bottom:6px;">HTML</div>' +
+            '<img src="../img/pfi-format-html.png" alt="HTML-Vorschau" ' +
+              'style="width:100%;height:auto;border:1px solid #ccc;">' +
+          '</td>' +
+          '<td style="text-align:center;padding:0 0 0 8px;vertical-align:top;width:50%;">' +
+            '<div style="font-weight:bold;margin-bottom:6px;">Text</div>' +
+            '<img src="../img/pfi-format-text.png" alt="Text-Vorschau" ' +
+              'style="width:100%;height:auto;border:1px solid #ccc;">' +
+          '</td>' +
+        '</tr></table>'
+      );
+      $infoDialog.dialog({
+        title: 'Format-Vorschau: HTML vs. Text',
+        modal: true,
+        resizable: true,
+        width: 700,
+        close: function () { $(this).dialog('destroy').remove(); }
+      });
+    });
+
+    $abfragenH3.append($pfiInfoBtn);
+    $abfragenDiv.append($abfragenH3);
 
     printInfo.urls.forEach(function (url, i) {
       var $checkBox = $('<input type="checkbox" checked>');
@@ -1292,11 +1586,15 @@ var PrintPDF = function (options) {
     });
 
     // Add input fields for print options (title, dpi, comment, scale)
-   
- 
-    // Scale field with proportional resize buttons
-   
-  
+
+    // Legend option checkbox
+    var $optionsDiv = $('<div class="pfi-options" style="margin-left:9px;font-size: 12px;">'
+      + '<label style="cursor:pointer;">'
+      + '<input type="checkbox" id="pfi_include_legend" checked style="margin-right:4px;">'
+      + 'Legende einschlie&szlig;en'
+      + '</label>'
+      + '</div>');
+    $dialogDiv.append($optionsDiv);
 
     function restore () {
       if (pfiRestoring) return;
@@ -1313,6 +1611,7 @@ var PrintPDF = function (options) {
       pfiPixelCenter = null;
       pfiSubmitting = false;
       pfiErrorCallback = null;
+      currentPrintIsFeatureInfo = false;
       // Reset progress bar for next use
       $dialogDiv.find('#pfi-progress-wrap').hide();
       $dialogDiv.find('#pfi-progress-bar').css('width', '0%');
@@ -1329,10 +1628,11 @@ var PrintPDF = function (options) {
     printObj.loadConfig(mbPrintConfigPath + printInfo.config, function () {
       $featureInfoDialog.dialog('close');
       buildForm();
-      fixMapFormValues(printInfo);
       printObj.createPrintBox(printInfo.point);
+      if (printBox) { printBox.hide(); }
+      fixMapFormValues(printInfo);
       pfiPixelCenter = makeRealWorld2mapPos(myTarget, printInfo.point.x, printInfo.point.y);
-      stopSpotlight = startSpotlightOverlay();
+      stopSpotlight = startSpotlightOverlay('pfi-spotlight-overlay');
       // Disable FeatureInfo clicks while the print dialog is open
       if (typeof Mapbender !== 'undefined' && Mapbender.disableFeatureInfo) {
         Mapbender.disableFeatureInfo();
@@ -1386,6 +1686,10 @@ var PrintPDF = function (options) {
             if (scaleVal) {
               $('#printPDF_form #scale').val(scaleVal);
             }
+
+            // Inject the legend include flag as a hidden field
+            $('#printPDF_form').find('[name="pfi_include_legend"]').remove();
+            $('<input type="hidden" name="pfi_include_legend">').val($dialogDiv.find('#pfi_include_legend').is(':checked') ? '1' : '0').appendTo('#printPDF_form');
 
             // Inject the progress token as a hidden field into the print form
             $('#printPDF_form').find('[name="pfi_progress_token"]').remove();
@@ -1513,8 +1817,10 @@ var PrintPDF = function (options) {
             pfiPollInterval = setInterval(function () {
               $.getJSON('../print/printProgress.php', { token: pfiProgressToken }, function (data) {
                 var pct = Math.min(100, parseInt(data.percent, 10) || 0);
-                // Update label always (to show latest status)
-                $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                // Only update label while not yet done — once done, showResult() writes the download link.
+                if (!data.done && !data.error) {
+                  $dialogDiv.find('#pfi-progress-label').text(data.stepLabel || '');
+                }
                 // Only update progress bar if moving forward
                 if (pct >= pfiLastPercent) {
                   pfiLastPercent = pct;
@@ -1523,8 +1829,9 @@ var PrintPDF = function (options) {
                 if (data.error) {
                   clearInterval(pfiPollInterval);
                   pfiErrorCallback = null;
-                  alert('<?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?>');
-                  restore();
+                  $dialogDiv.find('#pfi-progress-label').html(
+                    '<span style="color:#c00;font-weight:bold;"><?php echo _mb("PDF-Erstellung fehlgeschlagen. Bitte versuchen Sie es erneut."); ?></span>'
+                  );
                 } else if (data.done) {
                   clearInterval(pfiPollInterval);
                 }
@@ -1555,6 +1862,7 @@ var PrintPDF = function (options) {
             });
             // $("." + myId + "_working").show();
             // $("." + myId + "_working_bg").show();
+            currentPrintIsFeatureInfo = true;
             $('#printPDF_form').submit();
           },
           "<?php echo _mb("Cancel"); ?>": restore
@@ -1610,3 +1918,5 @@ var printObj = new PrintPDF(options);
 if (this instanceof HTMLElement) {
   $(this).data('printObj', printObj);
 }
+
+

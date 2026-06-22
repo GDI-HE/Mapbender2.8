@@ -75,10 +75,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 209.4,
+                    "x_ul" : 18.37,
+                    "y_ul" : 22.77,
+                    "width" : 180.09,
+                    "height" : 210.21,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8,
@@ -89,6 +89,24 @@
                     }
                 },
 
+				"nordpfeil" : {
+                    "type" : "image",
+                    "x_ul" : 186.0,
+                    "y_ul" : 36.0,
+                    "width" : 10,
+                    "height" : 12,
+                    "angle" : 0,
+                    "filename" : "./img/northarrow.png"
+                },
+				"scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 248.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
 				"scale" : {
                     "type" : "text",
                     "x_ul" : 106.0,
@@ -103,7 +121,24 @@
                     "y_ul" : 242.7,
                     "font_family" : "Arial",
                     "font_size" : 11,
-                    "value" : "date"
+                    "value" : "date"                },
+                "srs_label": {
+                    "type": "text",
+                    "x_ul": 175.0,
+                    "y_ul": 242.0,
+                    "font_family": "Arial",
+                    "font_size": 11,
+                    "font_style": "B",
+                    "value": "EPSG:"
+                },
+                "srs": {
+                    "type": "text",
+                    "x_ul": 189.0,
+                    "y_ul": 242.0,
+                    "font_family": "Arial",
+                    "font_size": 11,
+                    "font_style": "",
+                    "value": "srs_code"
                 }
             }
         },
@@ -116,10 +151,10 @@
                 "karte" : {
                     "type" : "map",
                     "res_dpi" : 144,
-                    "x_ul" : 18.5,
-                    "y_ul" : 22.8,
-                    "width" : 179.7,
-                    "height" : 209.4,
+                    "x_ul" : 18.37,
+                    "y_ul" : 22.77,
+                    "width" : 180.09,
+                    "height" : 210.21,
                     "coords" : 1,
                     "coords_font_family" : "Arial",
                     "coords_font_size" : 8,
@@ -128,6 +163,41 @@
                         "file": "../img/marker/red.png",
                         "size": [ 6.8, 6.8 ]
                     }
+                },
+                "nordpfeil" : {
+                    "type" : "image",
+                    "x_ul" : 134.0,
+                    "y_ul" : 35.0,
+                    "width" : 10,
+                    "height" : 12,
+                    "angle" : 0,
+                    "filename" : "./img/northarrow.png"
+                },
+                "scalebar" : {
+                    "type" : "scalebar",
+                    "x_ul" : 18.5,
+                    "y_ul" : 237.0,
+                    "width" : 80,
+                    "segments" : 4,
+                    "font_family" : "Arial",
+                    "font_size" : 7
+                },
+		"massstab_label" : {
+                    "type" : "text",
+                    "x_ul" : 84.0,
+                    "y_ul" : 250,
+                    "font_family" : "Arial",
+		    "font_style" : "B",
+                    "font_size" : 14,
+                    "value" : "Maßstab: "
+                },
+		"scale" : {
+                    "type" : "text",
+                    "x_ul" : 110.0,
+                    "y_ul" : 250,
+                    "font_family" : "Arial",
+                    "font_size" : 11,
+                    "value" : "scale"
                 },
                 "legende" : {
                     "type" : "legend",
@@ -138,8 +208,28 @@
                     "font_family" : "Arial",
                     "font_size" : 11,
                     "scale" : 0.5
+                },
+                "srs_label": {
+                    "type": "text",
+                    "x_ul": 175.0,
+                    "y_ul": 250.0,
+                    "font_family": "Arial",
+                    "font_size": 11,
+                    "font_style": "B",
+                    "value": "EPSG:"
+                },
+                "srs": {
+                    "type": "text",
+                    "x_ul": 189.0,
+                    "y_ul": 250.0,
+                    "font_family": "Arial",
+                    "font_size": 11,
+                    "font_style": "",
+                    "value": "srs_code"
                 }
-			}
+                        }
         }
     ]
 }
+
+

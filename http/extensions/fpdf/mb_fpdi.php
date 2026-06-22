@@ -15,6 +15,49 @@ class mb_fpdi extends FPDI {
     
 	//Private properties
 	var $tmpFiles = array();
+	var $extgstates = array();
+
+	function SetAlpha($alpha, $bm = 'Normal')
+	{
+	    $key = 'a' . round($alpha * 100);
+	    if (!isset($this->extgstates[$key])) {
+	        $this->extgstates[$key] = array(
+	            'parms' => sprintf('/ca %.3f /CA %.3f /BM /%s', $alpha, $alpha, $bm)
+	        );
+	    }
+	    $this->_out('/' . $key . ' gs');
+	    if ($alpha < 1.0) {
+	        $this->PDFVersion = max($this->PDFVersion, '1.4');
+	    }
+	}
+
+	function _putextgstates()
+	{
+	    foreach ($this->extgstates as $key => &$egstate) {
+	        $this->_newobj();
+	        $egstate['n'] = $this->n;
+	        $this->_out('<</Type /ExtGState ' . $egstate['parms'] . '>>');
+	        $this->_out('endobj');
+	    }
+	}
+
+	function _putresourcedict()
+	{
+	    parent::_putresourcedict();
+	    if (!empty($this->extgstates)) {
+	        $this->_out('/ExtGState <<');
+	        foreach ($this->extgstates as $key => $egstate) {
+	            $this->_out('/' . $key . ' ' . $egstate['n'] . ' 0 R');
+	        }
+	        $this->_out('>>');
+	    }
+	}
+
+	function _putresources()
+	{
+	    $this->_putextgstates();
+	    parent::_putresources();
+	}
 	
 	/*******************************************************************************
 	*                                                                              *
@@ -41,7 +84,7 @@ class mb_fpdi extends FPDI {
 	            $info=$this->_parsejpg($file);
 	        elseif($type=='png'){
 	            $info=$this->_parsepng($file);
-	            if ($info=='alpha') return $this->ImagePngWithAlpha($file,$x,$y,$w,$h,$link);
+            if ($info=='alpha') return $this->ImagePngWithAlpha($file,$x,$y,$w,$h,$link,$align,$angle);
 	        }
 	        else
 	        {
@@ -131,7 +174,7 @@ class mb_fpdi extends FPDI {
 	
 	// needs GD 2.x extension
 	// pixel-wise operation, not very fast
-	function ImagePngWithAlpha($file,$x,$y,$w=0,$h=0,$link='')
+	function ImagePngWithAlpha($file,$x,$y,$w=0,$h=0,$link='',$align='',$angle=0)
 	{
 	    $tmp_alpha = tempnam('.', 'mska');
 	    $this->tmpFiles[] = $tmp_alpha;
@@ -171,7 +214,7 @@ class mb_fpdi extends FPDI {
 	    $maskImg = $this->Image($tmp_alpha, 0,0,0,-$h*10, 'PNG', '', true);
 	    
 	    //embed image, masked with previously embedded mask
-	    $this->Image($tmp_plain,$x,$y,$w,$h,'PNG',$link, false, $maskImg);
+    $this->Image($tmp_plain,$x,$y,$w,$h,'PNG',$link, false, $maskImg, $align, $angle);
 	}
 	
 	function Close()
@@ -199,7 +242,10 @@ class mb_fpdi extends FPDI {
 	        $this->_out('/Width '.$info['w']);
 	        $this->_out('/Height '.$info['h']);
 	        
-	        if (isset($info["masked"])) $this->_out('/SMask '.($this->n-1).' 0 R'); ###
+	        if (isset($info["masked"])) {
+            $this->PDFVersion = max($this->PDFVersion, '1.4');
+            $this->_out('/SMask '.($this->n-1).' 0 R');
+        } ###
 	        
 	        if($info['cs']=='Indexed')
 	            $this->_out('/ColorSpace [/Indexed /DeviceRGB '.(strlen($info['pal'])/3-1).' '.($this->n+1).' 0 R]');
@@ -647,3 +693,5 @@ class mb_fpdi extends FPDI {
 }
 
 ?>
+
+

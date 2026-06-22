@@ -1058,6 +1058,9 @@ Mapbender.Map = function (options) {
 					featureInfoRequest = changeURLParameterValue(featureInfoRequest,"QUERY_LAYERS", featureInfoObj.names);
 					featureInfoRequest = changeURLParameterValue(featureInfoRequest,"STYLES", featureInfoObj.styles);
 					featureInfoObj.request = featureInfoRequest;
+					// At least one layer was in bbox (only in-bbox layers are added to names).
+					// Override any stale false value from the last layer's bbox check.
+					featureInfoObj.inBbox = true;
 					//give back objects
 					allRequests.push(featureInfoObj);
 				}

@@ -249,14 +249,8 @@ function makeDialog($content, title, dialogPosition, offset, printInfo) {
       height: parseInt(featureInfoPopupHeight, 10),
       position: dialogPosition,
       dialogClass: uniqueClass,
+      closeOnEscape: true,
       buttons: {
-        // "Ok": function() {
-         "<?php echo _mb("Ok"); ?>": function() {
-          if (standingHighlightFeatureInfo !== null) {
-            standingHighlightFeatureInfo.clean();
-          }
-          $(this).dialog('close').dialog('destroy').remove();
-        }
       },
       close: function(){
           if (standingHighlightFeatureInfo !== null) {
@@ -267,6 +261,8 @@ function makeDialog($content, title, dialogPosition, offset, printInfo) {
       open: function(){
           $('#tree2Container').hide() && $('a.toggleLayerTree').removeClass('activeToggle'),
           $('#toolsContainer').hide() && $('a.toggleToolsContainer').removeClass('activeToggle');
+	  $(this).closest('.ui-dialog').focus();
+          $(this).closest('.ui-dialog').find('.ui-dialog-buttonset button').blur();
       }
     };
     if (featureInfoPrint) {
@@ -584,3 +580,4 @@ if (!isDragging && featureInfoEnabled) {
             }
         }
 }
+
