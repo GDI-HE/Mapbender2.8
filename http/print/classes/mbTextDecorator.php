@@ -42,11 +42,6 @@ class mbTextDecorator extends mbTemplatePdfDecorator
                     $widthFactor = isset($mapInfoScale["pfi_map_width_factor"]) && $mapInfoScale["pfi_map_width_factor"] > 0
                         ? floatval($mapInfoScale["pfi_map_width_factor"]) : 1.0;
                     $correctedScale = $widthFactor != 1.0 ? $rawScale / $widthFactor : $rawScale;
-                    // Round to the same nearest power-of-10 magnitude as the JS printbox does
-                    if ($correctedScale > 0) {
-                        $magnitude = pow(10, floor(log10($correctedScale)));
-                        $correctedScale = round($correctedScale / $magnitude) * $magnitude;
-                    }
                     $this->{$overrideMemberFromRequest} = "1 : " . intval($correctedScale);
                     break;
                 default:
@@ -74,5 +69,6 @@ class mbTextDecorator extends mbTemplatePdfDecorator
 }
 
 ?>
+
 
 
