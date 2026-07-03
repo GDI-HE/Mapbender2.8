@@ -15,7 +15,7 @@
     	},
     	{
     		"id" : "dpi",
-    		"label" : "DPI",
+    		"label" : "Auflösung",
     		"type" : "select",
     		"size" : 20,
     		"pageElementsLink" : {
@@ -23,35 +23,28 @@
     		},
     		"options" : [
     			{
-    			"value" : "288",
-    			"label" : "hoch (288 dpi)"
+    			"value" : "144",
+    			"label" : "144 dpi"
     			},{
     			"value" : "72",
-    			"label" : "normal (72 dpi)"
+    			"label" : "72 dpi"
     			}
     		]
     	},
     	{
     		"id" : "comment1",
-    		"label" : "Kommentar 1 (30 Zeichen)",
-    		"type" : "textarea",
-    		"size" : 5,
+    		"label" : "Notiz",
+		"placeholder" : "max. 120 Zeichen",
+		"type" : "text",
+		"size": 30,
+		"maxCharacter": 120,
     		"pageElementsLink" : {
     			"kommentar1" : "value"
     		}
     	},
     	{
-    		"id" : "comment2",
-    		"label" : "Kommentar 2 (30 Zeichen)",
-    		"type" : "textarea",
-    		"size" : 5,
-    		"pageElementsLink" : {
-    			"kommentar2" : "value"
-    		}
-    	},
-    	{
     		"id" : "angle",
-    		"label" : "Winkel",
+    		"label" : "Drehwinkel",
     		"type" : "text",
     		"pageElementsLink" : {
     			"nordpfeil" : "angle",
@@ -143,26 +136,10 @@
     			"x_ul" : 108.6,
 	    		"y_ul" : 403.6,
 	    		"font_family" : "Arial",
-	    		"font_size" : 12,
-	    		"width" : 45,
-	    		"height" : 4,
-	    		"align" : "L",
-	    		"border" : 0,
-	    		"fill" : 1,
-	    		"border_width" : 0.1
-	   			},
-	   		"kommentar2" : {
-    			"type" : "para",
-    			"x_ul" : 108.6,
-	    		"y_ul" : 409.1,
-	    		"font_family" : "Arial",
-	    		"font_size" : 12,
-	    		"width" : 45,
-	    		"height" : 4,
-	    		"align" : "L",
-	    		"border" : 0,
-	    		"fill" : 1,
-	    		"border_width" : 0.1
+	    		"font_size" : 8,
+	    		"height" : 5,
+			"width": 90,
+	    		"fill" : 1
 	   			}
 	   		}
 	   	}
