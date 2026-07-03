@@ -151,6 +151,21 @@ var PrintPDF = function (options) {
   var normalProgressToken = null;      // token for current normal-print job
   var currentPrintIsFeatureInfo = false; // true only while a FeatureInfo-triggered submit is in flight
 
+  window.updateCharCount = function (input) {
+      var len = input.value.length;
+      var max = input.maxLength;
+      var container = document.getElementById('char_count_container');
+      document.getElementById('char_count_value').innerHTML = len;
+
+      container.classList.remove('warn', 'limit');
+      if (len >= max) {
+          container.classList.add('limit');
+      } else if (len >= max * 0.85) {
+          container.classList.add('warn');
+      }
+  };
+
+
   /**
    * SVG spotlight overlay: dims everything outside the print rectangle and
    * shows a red center dot.  Works for both normal print and featureInfo print.
@@ -1194,6 +1209,20 @@ var PrintPDF = function (options) {
     for (var item in actualConfig.controls) {
       var element = actualConfig.controls[item];
       var element_id = myId + "_" + element.id;
+      if (element.id === 'comment1') {
+          str += '<div class="print_option_dyn comment-row">\n';
+          str += '<label class="print_label" for="comment1">Notiz</label>\n';
+          str += '<input type="text" id="comment1" name="comment1" placeholder="max 120 Zeichen" maxlength="120" ' +
+                'class="comment1-input" onkeyup="updateCharCount(this)" />\n';
+          str += '<span id="char_count_container" class="char-badge">' +
+                '<span id="char_count_value">0</span>/120</span>\n';
+          str += '</div>\n';
+          continue;
+      }
+      if (element.id === 'comment2') {
+          // remove comment2
+          continue;
+      }
       if (element.type != "hidden") {
         str += '<div class="print_option_dyn">\n';
         str += '<label class="print_label" for="' + element.id + '">' + element.label + '</label>\n';
@@ -1918,5 +1947,6 @@ var printObj = new PrintPDF(options);
 if (this instanceof HTMLElement) {
   $(this).data('printObj', printObj);
 }
+
 
 

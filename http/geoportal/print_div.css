@@ -12,6 +12,36 @@
     margin-bottom: 8px;
     box-sizing: border-box;
 }
+#printPDF_input .print_option_dyn.comment-row {
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+#printPDF_input .print_option_dyn.comment-row .comment1-input {
+    flex: 1 1 150px;
+    min-width: 60px;
+    box-sizing: border-box;
+}
+
+#printPDF_input .print_option_dyn.comment-row .char-badge {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.char-badge {
+    font-size: 0.72em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #eef0f2;
+    border: 1px solid #dde3ee;
+    color: #667;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.char-badge.warn { background: #fff3cd; border-color: #f0dca0; color: #8a6500; }
+.char-badge.limit { background: #fde2e1; border-color: #f3b8b4; color: #b3261e; }
+
 #printPDF_selector {
     display: flex;
     align-items: center;
@@ -364,4 +394,5 @@
 .pfi-dialog .ui-dialog-buttonset button:last-child:hover {
     background: #f0f2f5 !important;
 }
+
 
