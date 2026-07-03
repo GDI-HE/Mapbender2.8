@@ -131,13 +131,16 @@
 	   		},
 			"scalebar" : {
                     	"type" : "scalebar",
-                   	"x_ul" : 30,
-                    	"y_ul" : 260.0,
+                   	"x_ul" : 26,
+                    	"y_ul" : 261.0,
                     	"width" : 80,
                     	"segments" : 4,
                     	"font_family" : "Arial",
-                    	"font_size" : 8
-                        }, 
+                    	"font_size" : 8,
+    			"background" : true,
+    			"background_color" : { "r" : 255, "g" : 255, "b" : 255 },
+    			"background_padding" : 1.5
+                        },
 	   		"kommentar1" : {
     			"type" : "para",
     			"x_ul" : 108.5,
