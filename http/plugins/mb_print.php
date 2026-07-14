@@ -601,7 +601,8 @@ var PrintPDF = function (options) {
       timeout: options.timeout ? options.timeout : 10000,
       error: function (xhr, textStatus) {
         // Stop any active progress poll (normal print or featureInfo)
-        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+      $('#submit').removeAttr('disabled').removeClass('ui-state-disabled');  
+      if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
         showHideWorking("hide");
         var msg;
         if (textStatus === 'timeout') {
@@ -726,6 +727,7 @@ var PrintPDF = function (options) {
    * @see jquery.forms#beforeSubmitHandler
    */
   var validate = function (formData, jqForm, params) {
+    $('#submit').attr('disabled', 'disabled').addClass('ui-state-disabled');
     pfiCancelled = false;
     // Only show the overlay spinner for FeatureInfo print; normal print uses the inline progress bar
     if (currentPrintIsFeatureInfo) {
@@ -1091,6 +1093,7 @@ var PrintPDF = function (options) {
       //all fields are ok wait for pdf
     } else {
       showHideWorking("hide");
+      $('#submit').removeAttr('disabled').removeClass('ui-state-disabled');
       alert('<?php echo _mb('No active maplayers in current print extent, please choose another extent/position for your template frame!'); ?>');
       return false;
     }
@@ -1103,6 +1106,7 @@ var PrintPDF = function (options) {
    * that triggers a download popup or is displayed in PDF plugin.
    */
   var showResult = function (res, text) {
+    $('#submit').removeAttr('disabled').removeClass('ui-state-disabled');
     if (pfiCancelled) {
       showHideWorking("hide");
       return;
@@ -1210,12 +1214,18 @@ var PrintPDF = function (options) {
       var element = actualConfig.controls[item];
       var element_id = myId + "_" + element.id;
       if (element.id === 'comment1') {
+          var maxChar = element.maxCharacter || 120;
           str += '<div class="print_option_dyn comment-row">\n';
-          str += '<label class="print_label" for="comment1">Notiz</label>\n';
-          str += '<input type="text" id="comment1" name="comment1" placeholder="max 120 Zeichen" maxlength="120" ' +
-                'class="comment1-input" onkeyup="updateCharCount(this)" />\n';
+          str += '<label class="print_label" for="comment1">' + element.label + '</label>\n';
+          if (element.type === 'textarea') {
+              str += '<textarea id="comment1" name="comment1" placeholder="max ' + maxChar + ' Zeichen" maxlength="' + maxChar + '" ' +
+                  'class="comment1-input" onkeyup="updateCharCount(this)"></textarea>\n';
+          } else {
+              str += '<input type="text" id="comment1" name="comment1" placeholder="max ' + maxChar + ' Zeichen" maxlength="' + maxChar + '" ' +
+                  'class="comment1-input" onkeyup="updateCharCount(this)" />\n';
+          }
           str += '<span id="char_count_container" class="char-badge">' +
-                '<span id="char_count_value">0</span>/120</span>\n';
+                '<span id="char_count_value">0</span>/' + maxChar + '</span>\n';
           str += '</div>\n';
           continue;
       }
