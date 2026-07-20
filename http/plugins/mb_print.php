@@ -152,19 +152,22 @@ var PrintPDF = function (options) {
   var currentPrintIsFeatureInfo = false; // true only while a FeatureInfo-triggered submit is in flight
 
   window.updateCharCount = function (input) {
-      var len = input.value.length;
-      var max = input.maxLength;
-      var container = document.getElementById('char_count_container');
-      document.getElementById('char_count_value').innerHTML = len;
-
-      container.classList.remove('warn', 'limit');
-      if (len >= max) {
-          container.classList.add('limit');
-      } else if (len >= max * 0.85) {
-          container.classList.add('warn');
-      }
+    var len = input.value.length;
+    var max = input.maxLength;
+    var container = input.parentNode.querySelector('.char-badge');
+    if (container) {
+        var valueSpan = container.querySelector('.char-count-value');
+        if (valueSpan) {
+            valueSpan.innerHTML = len;
+        }
+        container.classList.remove('warn', 'limit');
+        if (len >= max) {
+            container.classList.add('limit');
+        } else if (len >= max * 0.85) {
+            container.classList.add('warn');
+        }
+    }
   };
-
 
   /**
    * SVG spotlight overlay: dims everything outside the print rectangle and
@@ -1213,26 +1216,29 @@ var PrintPDF = function (options) {
     for (var item in actualConfig.controls) {
       var element = actualConfig.controls[item];
       var element_id = myId + "_" + element.id;
-      if (element.id === 'comment1') {
-          var maxChar = element.maxCharacter || 120;
-          str += '<div class="print_option_dyn comment-row">\n';
-          str += '<label class="print_label" for="comment1">' + element.label + '</label>\n';
-          if (element.type === 'textarea') {
-              str += '<textarea id="comment1" name="comment1" placeholder="max ' + maxChar + ' Zeichen" maxlength="' + maxChar + '" ' +
-                  'class="comment1-input" onkeyup="updateCharCount(this)"></textarea>\n';
-          } else {
-              str += '<input type="text" id="comment1" name="comment1" placeholder="max ' + maxChar + ' Zeichen" maxlength="' + maxChar + '" ' +
-                  'class="comment1-input" onkeyup="updateCharCount(this)" />\n';
-          }
-          str += '<span id="char_count_container" class="char-badge">' +
-                '<span id="char_count_value">0</span>/' + maxChar + '</span>\n';
-          str += '</div>\n';
-          continue;
-      }
+      // Build step — only ONE block handles both title and comment1 now
+      if (element.id === 'title' || element.id === 'comment1') {
+      var maxChar = element.maxCharacter || 120;
+      var rowClass = 'print_option_dyn ' + element.id + '-row';
+      str += '<div class="' + rowClass + '">\n';
+      str += '<span class="char-badge">' +
+          '<span class="char-count-value">0</span>/' + maxChar + '</span>\n';
+    str += '<label class="print_label" for="' + element.id + '">' + element.label + '</label>\n';
+
+    var commonAttributes = 'id="' + element.id + '" name="' + element.id + '" maxlength="' + maxChar + '" ' +
+            'class="' + element.id + '-input" onkeyup="updateCharCount(this)"';
+    if (element.type === 'textarea') {
+        str += '<textarea ' + commonAttributes + '></textarea>\n';
+    } else {
+        str += '<input type="text" ' + commonAttributes + ' />\n';
+    }
+    str += '</div>\n';
+    continue;
+}
       if (element.id === 'comment2') {
-          // remove comment2
-          continue;
-      }
+       // remove comment2
+       continue;
+      }  
       if (element.type != "hidden") {
         str += '<div class="print_option_dyn">\n';
         str += '<label class="print_label" for="' + element.id + '">' + element.label + '</label>\n';

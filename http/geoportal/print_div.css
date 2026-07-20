@@ -30,7 +30,7 @@
 
 .char-badge {
     font-size: 0.72em;
-    padding: 2px 8px;
+    padding: 2px 4px;
     border-radius: 10px;
     background: #eef0f2;
     border: 1px solid #dde3ee;
@@ -394,5 +394,22 @@
 .pfi-dialog .ui-dialog-buttonset button:last-child:hover {
     background: #f0f2f5 !important;
 }
+.print_option_dyn {
+    position: relative; /* anchor for the badge */
+}
 
+.title-row .char-badge,
+.comment1-row .char-badge {
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65em;
+    color: #666;
+}
+
+.title-row .print_label,
+.comment1-row .print_label {
+    margin-left: 33px; /* just enough to clear the badge width */
+}
 
