@@ -9,6 +9,7 @@
     		"label" : "Titel",
     		"type" : "text",
     		"size" : 20,
+		"maxCharacter": 40,
     		"pageElementsLink" : {
     			"titel" : "value"
     		}
@@ -23,18 +24,24 @@
     		},
     		"options" : [
     			{
-    			"value" : "144",
-    			"label" : "144 dpi"
+    			"value" : "96",
+    			"label" : "96 dpi"
     			},{
     			"value" : "72",
-    			"label" : "normal (72 dpi)"
-    			}
+    			"label" : "72 dpi"
+    			},
+		        {
+                          "value" : "144",
+                          "label" : "144 dpi"
+                         }
+
     		]
     	},
     	{
     		"id" : "comment1",
-    		"label" : "Kommentar 1 (30 Zeichen)",
+    		"label" : "Notiz",
     		"type" : "text",
+		"maxCharacter": 130,
     		"size" : 5,
     		"pageElementsLink" : {
     			"kommentar1" : "value"
@@ -99,10 +106,11 @@
 	   			},
 	   		"titel" : {
     			"type" : "text",
-    			"x_ul" : 127.5,
+    			"x_ul" : 93.5,
 	    		"y_ul" : 190.8,
 	    		"font_family" : "Arial",
-	    		"font_size" : 14
+	    		"font_size" : 14,
+                        "font_style": "B"
 	   			},
 	   		"scale" : {
     			"type" : "text",
@@ -148,7 +156,7 @@
 	    		"y_ul" : 192.7,
 	    		"font_family" : "Arial",
 	    		"font_size" : 8,
-	    		"width" : 90,
+	    		"width" : 100,
 	    		"height" : 5,
 	    		"align" : "L",
 	    		"border" : 0,

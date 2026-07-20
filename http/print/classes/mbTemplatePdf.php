@@ -14,15 +14,17 @@ class mbTemplatePdf extends mbPdf
     private $insertPages = array();
     private $appendFiles  = array();
     public $renderingFeatureInfo = false;
+    public $identifier = null;
 
-    public function __construct($jsonConf)
+    public function __construct($jsonConf, $identifier = null)
     {
         $this->confPdf = $jsonConf;
         if (!$this->confPdf->orientation || !$this->confPdf->units || !$this->confPdf->format) {
             die("no valid config");
         }
         $this->objPdf = new mb_fpdi($this->confPdf->orientation, $this->confPdf->units, $this->confPdf->format);
-        $this->outputFileName = $this->generateOutputFileName("map", "pdf");
+        $this->identifier = $identifier;
+        $this->outputFileName = $this->generateOutputFileName("map", "pdf", $identifier);
     }
 
     public function setMapInfo($x_ul, $y_ul, $width, $height, $aBboxString)

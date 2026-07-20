@@ -9,6 +9,7 @@
     		"label" : "Titel",
     		"type" : "text",
     		"size" : 20,
+                "maxCharacter": 40,
     		"pageElementsLink" : {
     			"titel" : "value"
     		}
@@ -22,12 +23,16 @@
     			"karte" : "res_dpi"
     		},
     		"options" : [
+			{
+                        "value" : "96",
+                        "label" : "96 dpi"
+                        },
     			{
-    			"value" : "144",
-    			"label" : "144 dpi"
-    			},{
     			"value" : "72",
     			"label" : "72 dpi"
+    			},{
+    			"value" : "144",
+    			"label" : "144 dpi"
     			}
     		]
     	},
@@ -37,7 +42,7 @@
 		"placeholder" : "max. 120 Zeichen",
 		"type" : "text",
 		"size": 30,
-		"maxCharacter": 120,
+		"maxCharacter": 130,
     		"pageElementsLink" : {
     			"kommentar1" : "value"
     		}
@@ -101,10 +106,11 @@
 			},
 	   		"titel" : {
     			"type" : "text",
-    			"x_ul" : 143.7,
+    			"x_ul" : 110,
 	    		"y_ul" : 401,
 	    		"font_family" : "Arial",
-	    		"font_size" : 14
+	    		"font_size" : 14, 
+			"font_style": "B"
 	   			},
 	   		"scale" : {
     			"type" : "text",

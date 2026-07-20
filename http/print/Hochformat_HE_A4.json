@@ -8,8 +8,8 @@
             "id" : "title",
             "label" : "Titel",
             "type" : "text",
-            "size" : 18,
-	    "maxCharacter" : 60,
+            "size" : 28,
+	    "maxCharacter" : 50,
             "pageElementsLink" : {
                 "titel" : "value"
             }
@@ -41,8 +41,8 @@
         {
             "id" : "comment1",
             "label" : "Notiz",
-	    "type" : "textarea",
-             "maxCharacter" : 350,
+	    "type" : "text",
+             "maxCharacter" : 400,
 	     "size" : 10,
             "pageElementsLink" : {
                 "kommentar1" : "value"
@@ -120,9 +120,10 @@
 		"titel" : {
                     "type" : "text",
                     "x_ul" : 58.6,
-                    "y_ul" : 20,
+                    "y_ul" : 17,
                     "font_family" : "Arial",
-                    "font_size" : 12
+                    "font_size" : 14, 
+		    "font_style": "B"
                 },
 		"messung" : {
                  "type" : "measure",
