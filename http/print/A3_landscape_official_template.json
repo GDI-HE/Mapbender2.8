@@ -107,8 +107,8 @@
     			"type" : "text",
     			"x_ul" : 110,
 	    		"y_ul" : 277.8,
-	    		"font_family" : "Arial",
-	    		"font_size" : 14,
+	    		"font_family" : "Courier",
+	    		"font_size" : 12,
 			"font_style": "B"
 	   			},
 	   		"scale" : {
@@ -152,8 +152,8 @@
     			"type" : "para",
     			"x_ul" : 108.5,
 	    		"y_ul" : 279.6,
-	    		"font_family" : "Arial",
-	    		"font_size" : 12,
+	    		"font_family" : "Courier",
+	    		"font_size" : 10,
 	    		"width" : 220,
 	    		"height" : 5,
 	    		"align" : "L",

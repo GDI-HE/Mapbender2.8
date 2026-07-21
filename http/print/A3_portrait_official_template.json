@@ -42,7 +42,7 @@
 		"placeholder" : "max. 120 Zeichen",
 		"type" : "text",
 		"size": 30,
-		"maxCharacter": 130,
+		"maxCharacter": 110,
     		"pageElementsLink" : {
     			"kommentar1" : "value"
     		}
@@ -108,8 +108,8 @@
     			"type" : "text",
     			"x_ul" : 110,
 	    		"y_ul" : 401,
-	    		"font_family" : "Arial",
-	    		"font_size" : 14, 
+	    		"font_family" : "Courier",
+	    		"font_size" : 10, 
 			"font_style": "B"
 	   			},
 	   		"scale" : {
@@ -153,10 +153,10 @@
     			"type" : "para",
     			"x_ul" : 108.6,
 	    		"y_ul" : 403.6,
-	    		"font_family" : "Arial",
+	    		"font_family" : "Courier",
 	    		"font_size" : 8,
 	    		"height" : 5,
-			"width": 90,
+			"width": 100,
 	    		"fill" : 1
 	   			}
 	   		}

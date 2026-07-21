@@ -9,7 +9,7 @@
             "label" : "Titel",
             "type" : "text",
             "size" : 28,
-	    "maxCharacter" : 50,
+	    "maxCharacter" : 40,
             "pageElementsLink" : {
                 "titel" : "value"
             }
@@ -42,7 +42,7 @@
             "id" : "comment1",
             "label" : "Notiz",
 	    "type" : "text",
-             "maxCharacter" : 400,
+             "maxCharacter" : 350,
 	     "size" : 10,
             "pageElementsLink" : {
                 "kommentar1" : "value"
@@ -121,7 +121,7 @@
                     "type" : "text",
                     "x_ul" : 58.6,
                     "y_ul" : 17,
-                    "font_family" : "Arial",
+                    "font_family" : "Courier",
                     "font_size" : 14, 
 		    "font_style": "B"
                 },
@@ -157,8 +157,8 @@
                     "type" : "para",
                     "x_ul" : 40,
                     "y_ul" : 247,
-                    "font_family" : "Arial",
-                    "font_size" : 11,
+                    "font_family" : "Courier",
+                    "font_size" : 8,
                     "width" : 158.4,
                     "height" : 5,
                     "align" : "L",
