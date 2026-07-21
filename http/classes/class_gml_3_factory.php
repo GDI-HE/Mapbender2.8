@@ -65,9 +65,84 @@ class Gml_3_Factory extends GmlFactory {
 	}
 	
 	function findNameSpace($s){
-		list($ns,$FeaturePropertyName) = explode(":",$s);
+		if (strpos($s, ":") === false) {
+			$ns = "";
+			$FeaturePropertyName = $s;
+		}
+		else {
+			list($ns,$FeaturePropertyName) = explode(":",$s, 2);
+		}
 		$nodeName = array('ns' => $ns, 'value' => $FeaturePropertyName);
 		return $nodeName;
+	}
+
+	private static function getNodeLocalName($domNode) {
+		if (!($domNode instanceof DOMNode)) {
+			return "";
+		}
+		if (!empty($domNode->localName)) {
+			return $domNode->localName;
+		}
+		$parts = explode(":", $domNode->nodeName, 2);
+		return (count($parts) === 2) ? $parts[1] : $parts[0];
+	}
+
+	private static function isKnownGeometryType($localName) {
+		$knownTypes = array(
+			"Point",
+			"LineString",
+			"Curve",
+			"Polygon",
+			"MultiPoint",
+			"MultiLineString",
+			"MultiCurve",
+			"MultiSurface",
+			"MultiPolygon"
+		);
+		return in_array($localName, $knownTypes, true);
+	}
+
+	private static function findFirstGeometryElement($domNode) {
+		if (!($domNode instanceof DOMNode) || !$domNode->hasChildNodes()) {
+			return null;
+		}
+		$currentChild = $domNode->firstChild;
+		while ($currentChild) {
+			if ($currentChild->nodeType === XML_ELEMENT_NODE) {
+				$localName = self::getNodeLocalName($currentChild);
+				if (self::isKnownGeometryType($localName)) {
+					return $currentChild;
+				}
+				$nestedGeom = self::findFirstGeometryElement($currentChild);
+				if ($nestedGeom instanceof DOMNode) {
+					return $nestedGeom;
+				}
+			}
+			$currentChild = $currentChild->nextSibling;
+		}
+		return null;
+	}
+
+	private static function getSrsFromGeometryContext($geomNode, $fallbackSrs) {
+		$currentNode = $geomNode;
+		while ($currentNode instanceof DOMNode) {
+			if ($currentNode->nodeType === XML_ELEMENT_NODE && $currentNode->hasAttributes() && $currentNode->attributes->getNamedItem("srsName")) {
+				$srs = $currentNode->getAttribute("srsName");
+				if ($srs !== "") {
+					return $srs;
+				}
+			}
+			$currentNode = $currentNode->parentNode;
+		}
+		return $fallbackSrs;
+	}
+
+	private static function xpathGeometryNodes($simpleXMLNode, $prefixedPath, $localNamePath) {
+		$nodes = $simpleXMLNode->xpath($prefixedPath);
+		if (count($nodes) === 0) {
+			$nodes = $simpleXMLNode->xpath($localNamePath);
+		}
+		return $nodes;
 	}
 
 	public static function parsePoint ($domNode) {
@@ -99,6 +174,42 @@ class Gml_3_Factory extends GmlFactory {
 		return $gmlLine;
 	}
 
+	public static function parseCurve ($domNode) {
+		$gmlLine = new GmlLine();
+		$simpleXMLNode = simplexml_import_dom($domNode);
+		$simpleXMLNode->registerXPathNamespace('gml', 'http://www.opengis.net/gml');
+
+		$allCoords = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:segments/gml:LineStringSegment/gml:posList",
+			"*[local-name()='segments']/*[local-name()='LineStringSegment']/*[local-name()='posList']"
+		);
+		if (count($allCoords) === 0) {
+			$allCoords = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:LineStringSegment/gml:posList",
+				"*[local-name()='LineStringSegment']/*[local-name()='posList']"
+			);
+		}
+
+		foreach ($allCoords as $coords) {
+			$coordsDom = dom_import_simplexml($coords);
+			$dim = self::getDimensionFromNode($coordsDom);
+			$coordArray = explode(' ', trim($coordsDom->nodeValue));
+			for ($i = 0; $i < count($coordArray); $i += $dim) {
+				$x = $coordArray[$i];
+				$y = $coordArray[$i+1];
+				$gmlLine->addPoint($x, $y);
+			}
+		}
+
+		if ($gmlLine->isEmpty()) {
+			return self::parseLine($domNode);
+		}
+
+		return $gmlLine;
+	}
+
 	public static function parsePolygon ($domNode) {
 		$gmlPolygon = new GmlPolygon();
 		
@@ -106,7 +217,11 @@ class Gml_3_Factory extends GmlFactory {
 
 		$simpleXMLNode->registerXPathNamespace('gml', 'http://www.opengis.net/gml');
 		
-		$allCoords = $simpleXMLNode->xpath("gml:exterior/gml:LinearRing/gml:posList");
+		$allCoords = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:exterior/gml:LinearRing/gml:posList",
+			"*[local-name()='exterior']/*[local-name()='LinearRing']/*[local-name()='posList']"
+		);
 			
 		$cnt=0;
 		foreach ($allCoords as $Coords) {
@@ -122,11 +237,19 @@ class Gml_3_Factory extends GmlFactory {
 			$cnt++;
 		}
 		
-		$innerRingNodeArray = $simpleXMLNode->xpath("gml:innerBoundaryIs/gml:LinearRing");
+		$innerRingNodeArray = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:innerBoundaryIs/gml:LinearRing",
+			"*[local-name()='innerBoundaryIs']/*[local-name()='LinearRing']"
+		);
 		if ($innerRingNodeArray) {
 			$ringCount = 0;
 			foreach ($innerRingNodeArray as $ringNode) {
-				$coordinates = $ringNode->xpath("gml:coordinates");
+				$coordinates = self::xpathGeometryNodes(
+					$ringNode,
+					"gml:coordinates",
+					"*[local-name()='coordinates']"
+				);
 				foreach ($coordinates as $coordinate) {
 					$coordsDom = dom_import_simplexml($coordinate);
 						
@@ -151,9 +274,17 @@ class Gml_3_Factory extends GmlFactory {
 
 		$simpleXMLNode->registerXPathNamespace('gml', 'http://www.opengis.net/gml');
 		
-		$allCoords = $simpleXMLNode->xpath("gml:lineStringMember/gml:LineString/gml:posList");
+		$allCoords = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:lineStringMember/gml:LineString/gml:posList",
+			"*[local-name()='lineStringMember']/*[local-name()='LineString']/*[local-name()='posList']"
+		);
 		if (count($allCoords) === 0) {
-			$allCoords = $simpleXMLNode->xpath("gml:lineStringMembers/gml:LineString/gml:posList");
+			$allCoords = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:lineStringMembers/gml:LineString/gml:posList",
+				"*[local-name()='lineStringMembers']/*[local-name()='LineString']/*[local-name()='posList']"
+			);
 		}
 			
 		$cnt=0;
@@ -182,9 +313,17 @@ class Gml_3_Factory extends GmlFactory {
 
 		$simpleXMLNode->registerXPathNamespace('gml', 'http://www.opengis.net/gml');
 		
-		$allCoords = $simpleXMLNode->xpath("gml:pointMember/gml:Point/gml:pos");
+		$allCoords = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:pointMember/gml:Point/gml:pos",
+			"*[local-name()='pointMember']/*[local-name()='Point']/*[local-name()='pos']"
+		);
 		if (count($allCoords) === 0) {
-			$allCoords = $simpleXMLNode->xpath("gml:pointMembers/gml:Point/gml:pos");
+			$allCoords = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:pointMembers/gml:Point/gml:pos",
+				"*[local-name()='pointMembers']/*[local-name()='Point']/*[local-name()='pos']"
+			);
 		}
 			
 		foreach ($allCoords as $Coords) {
@@ -210,9 +349,31 @@ class Gml_3_Factory extends GmlFactory {
 
 		$simpleXMLNode->registerXPathNamespace('gml', 'http://www.opengis.net/gml');
 		
-		$allCoords = $simpleXMLNode->xpath("gml:curveMembers/gml:LineString/gml:posList");
+		$allCoords = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:curveMembers/gml:LineString/gml:posList",
+			"*[local-name()='curveMembers']/*[local-name()='LineString']/*[local-name()='posList']"
+		);
 		if (count($allCoords) === 0) {
-			$allCoords = $simpleXMLNode->xpath("gml:curveMember/gml:LineString/gml:posList");
+			$allCoords = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:curveMember/gml:LineString/gml:posList",
+				"*[local-name()='curveMember']/*[local-name()='LineString']/*[local-name()='posList']"
+			);
+		}
+		if (count($allCoords) === 0) {
+			$allCoords = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:curveMember/gml:Curve/gml:segments/gml:LineStringSegment/gml:posList",
+				"*[local-name()='curveMember']/*[local-name()='Curve']/*[local-name()='segments']/*[local-name()='LineStringSegment']/*[local-name()='posList']"
+			);
+		}
+		if (count($allCoords) === 0) {
+			$allCoords = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:curveMembers/gml:Curve/gml:segments/gml:LineStringSegment/gml:posList",
+				"*[local-name()='curveMembers']/*[local-name()='Curve']/*[local-name()='segments']/*[local-name()='LineStringSegment']/*[local-name()='posList']"
+			);
 		}
 			
 		$cnt=0;
@@ -241,14 +402,26 @@ class Gml_3_Factory extends GmlFactory {
 
 		$simpleXMLNode->registerXPathNamespace('gml', 'http://www.opengis.net/gml');
 
-		$allPolygons = $simpleXMLNode->xpath("gml:surfaceMember/gml:Polygon");
+		$allPolygons = self::xpathGeometryNodes(
+			$simpleXMLNode,
+			"gml:surfaceMember/gml:Polygon",
+			"*[local-name()='surfaceMember']/*[local-name()='Polygon']"
+		);
 		if (count($allPolygons) === 0) {
-			$allPolygons = $simpleXMLNode->xpath("gml:surfaceMembers/gml:Polygon");
+			$allPolygons = self::xpathGeometryNodes(
+				$simpleXMLNode,
+				"gml:surfaceMembers/gml:Polygon",
+				"*[local-name()='surfaceMembers']/*[local-name()='Polygon']"
+			);
 		}
 		
 		$cnt=0;
 		foreach ($allPolygons as $polygon) {
-			$allCoords = $polygon->xpath("gml:exterior/gml:LinearRing/gml:posList");
+			$allCoords = self::xpathGeometryNodes(
+				$polygon,
+				"gml:exterior/gml:LinearRing/gml:posList",
+				"*[local-name()='exterior']/*[local-name()='LinearRing']/*[local-name()='posList']"
+			);
 				
 			$gmlMultiPolygon->polygonArray[$cnt] = array();
 			foreach ($allCoords as $Coords) {
@@ -265,13 +438,25 @@ class Gml_3_Factory extends GmlFactory {
 			}
 			
 			$gmlMultiPolygon->innerRingArray[$cnt] = array();
-			$innerRingNodeArray = $polygon->xpath("gml:interior");
+			$innerRingNodeArray = self::xpathGeometryNodes(
+				$polygon,
+				"gml:interior",
+				"*[local-name()='interior']"
+			);
 			if ($innerRingNodeArray) {
 				$ringCount = 0;
 				foreach ($innerRingNodeArray as $ringNode) {
-					$currentRingNode = $ringNode->xpath("gml:LinearRing");
+					$currentRingNode = self::xpathGeometryNodes(
+						$ringNode,
+						"gml:LinearRing",
+						"*[local-name()='LinearRing']"
+					);
 					foreach ($currentRingNode as $node) {
-						$coordinates = $node->xpath("gml:posList");
+						$coordinates = self::xpathGeometryNodes(
+							$node,
+							"gml:posList",
+							"*[local-name()='posList']"
+						);
 						foreach ($coordinates as $coordinate) {
 							$coordsDom = dom_import_simplexml($coordinate);
 								
@@ -368,59 +553,66 @@ class Gml_3_Factory extends GmlFactory {
 			// it has a child node, the text node!
 			// So we might need to do something more 
 			// sophisticated here...
-			if ($currentSibling->hasChildNodes() && $isGeomColumn){
-				$geomNode = $currentSibling->firstChild;
-				
-				if($geomNode->nodeType != XML_ELEMENT_NODE){
-                	while($geomNode = $geomNode->nextSibling){
-                		
-                		if($geomNode->nodeType == XML_ELEMENT_NODE){
-                        	break;
-                        }
-                    }
-                }
-               
-				$geomType = $geomNode->nodeName;
-				if ($geomNode->nodeType == XML_ELEMENT_NODE) {
-         				if ($geomNode->hasAttribute("srsName")) {
-						$srs = $geomNode->getAttribute("srsName");
-					}
+			if ($currentSibling->hasChildNodes()){
+				$geomNode = self::findFirstGeometryElement($currentSibling);
+				$canParseAsGeometry = (
+					$isGeomColumn ||
+					($geomNode instanceof DOMNode && ($feature->geometry === false || $feature->geometry === null))
+				);
+				if (!$canParseAsGeometry) {
+					$feature->properties[$columnName] = $value;
+					$currentSibling = $currentSibling->nextSibling;
+					continue;
 				}
+				if (!($geomNode instanceof DOMNode)) {
+					$feature->properties[$columnName] = $value;
+					$currentSibling = $currentSibling->nextSibling;
+					continue;
+				}
+				$geomType = self::getNodeLocalName($geomNode);
+				$srs = self::getSrsFromGeometryContext($geomNode, $gmlBoundedBySrs);
 //$e = new mb_exception("classes/class_gml_3_factory: found srs: ".$srs);				
 				//if srsName of featureMember is empty, use the srsName of node //gml:boundedBy/gml:Envelope
 				if($srs == "") {
 					$srs = $gmlBoundedBySrs;
 				}
 				switch ($geomType) {
-					case "gml:Polygon" :// untested!
+					case "Polygon" :// untested!
 						$feature->geometry = self::parsePolygon($geomNode);
 						if ($feature->geometry->isEmpty()) {
 							$feature->geometry = Gml_2_Factory::parsePolygon($geomNode);
 						}
 						$feature->geometry->srs = $srs;
 						break;
-					case "gml:LineString" :// untested!
+					case "LineString" :// untested!
 						$feature->geometry = self::parseLine($geomNode);
 						if ($feature->geometry->isEmpty()) {
 							$feature->geometry = Gml_2_Factory::parseLine($geomNode);
 						}
 						$feature->geometry->srs = $srs;
 						break;
-					case "gml:Point" :
+					case "Curve" :
+						$feature->geometry = self::parseCurve($geomNode);
+						if ($feature->geometry->isEmpty()) {
+							$feature->geometry = Gml_2_Factory::parseLine($geomNode);
+						}
+						$feature->geometry->srs = $srs;
+						break;
+					case "Point" :
 						$feature->geometry = self::parsePoint($geomNode);
 						if ($feature->geometry->isEmpty()) {
 							$feature->geometry = Gml_2_Factory::parsePoint($geomNode);
 						}
 						$feature->geometry->srs = $srs;
 						break;
-					case "gml:MultiPoint" :
+					case "MultiPoint" :
 						$feature->geometry = self::parseMultiPoint($geomNode);
 						if ($feature->geometry->isEmpty()) {
 							$feature->geometry = Gml_2_Factory::parseMultiPoint($geomNode);
 						}
 						$feature->geometry->srs = $srs;
 						break;
-					case "gml:MultiLineString" :
+					case "MultiLineString" :
 						new mb_exception("found multilinestring");
 						$feature->geometry = self::parseMultiLine($geomNode);
 						if ($feature->geometry->isEmpty()) {
@@ -428,14 +620,15 @@ class Gml_3_Factory extends GmlFactory {
 						}
 						$feature->geometry->srs = $srs;
 						break;
-					case "gml:MultiCurve" :
+					case "MultiCurve" :
 						$feature->geometry = self::parseMultiCurve($geomNode);
 						if ($feature->geometry->isEmpty()) {
 							$feature->geometry = Gml_2_Factory::parseMultiLine($geomNode);
 						}
 						$feature->geometry->srs = $srs;
 						break;
-					case "gml:MultiSurface" : 
+					case "MultiSurface" :
+					case "MultiPolygon" : 
 						$feature->geometry = self::parseMultiPolygon($geomNode);
 						if ($feature->geometry->isEmpty()) {
 							$feature->geometry = Gml_2_Factory::parseMultiPolygon($geomNode);
