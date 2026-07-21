@@ -682,11 +682,15 @@ class mbTemplatePdf extends mbPdf
                         return '';
                     }
                     $imgUrl = $srcMatch[1];
-                    // HTTPS-only: reject http://, file://, gopher://, data:, etc.
-                    if (!preg_match('/^https:\/\//i', $imgUrl)) {
-                        return '';
+                    // Change http to https which will be secured anyway
+                    if (strpos($imgUrl, 'http://') === 0) {
+                        $imgUrl = 'https://' . substr($imgUrl, 7);
                     }
-                    $imgConnector = new connector();
+
+                    // Anything that isn't https at this point (file://, gopher://, data:, etc.) is rejected.
+                    if (strpos($imgUrl, 'https://') !== 0) {
+                        return '';
+                    }                   $imgConnector = new connector();
                     $imgConnector->set('timeOut', '10');
                     $imgConnector->load($imgUrl);
                     $imgData = $imgConnector->file;
