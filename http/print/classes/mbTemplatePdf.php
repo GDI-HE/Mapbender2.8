@@ -690,7 +690,8 @@ class mbTemplatePdf extends mbPdf
                     // Anything that isn't https at this point (file://, gopher://, data:, etc.) is rejected.
                     if (strpos($imgUrl, 'https://') !== 0) {
                         return '';
-                    }                   $imgConnector = new connector();
+		    }                   
+		    $imgConnector = new connector();
                     $imgConnector->set('timeOut', '10');
                     $imgConnector->load($imgUrl);
                     $imgData = $imgConnector->file;
