@@ -18,8 +18,11 @@ abstract class mbPdf
 
     abstract public function save();
 
-    public function generateOutputFileName($prefix, $suffix)
+    public function generateOutputFileName($prefix, $suffix, $identifier = null)
     {
+        if ($identifier !== null && $identifier !== '') {
+            return $prefix . "_" . substr(md5($identifier . $prefix), 0, 13) . "." . $suffix;
+        }
         return $prefix . "_" . substr(md5(uniqid(rand())), 0, 7) . "." . $suffix;
     }
 
@@ -67,3 +70,4 @@ abstract class mbPdf
 
 
 ?>
+

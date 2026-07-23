@@ -17,7 +17,6 @@ function pfi_is_rendering_featureinfo($set = null) {
     }
     return $flag;
 }
-
 /**
  * Write a progress state to the temporary progress file for this print job.
  */
@@ -56,10 +55,11 @@ function pfi_write_progress($token, $step, $stepLabel, $percent, $done = false, 
     rename($tmpFile, $progressFile);
 }
 $gui_id = Mapbender::session()->get("mb_user_gui");
-
+$sessionId = session_id();
 // Release the session lock before starting the potentially long-running print job
 // so concurrent requests (for example, progress polling) are not blocked.
 session_write_close();
+
 
 //select all element_ids from database, if $_REQUEST['e_id'] is in this list - use this e_id for getting php_var
 $sql = "SELECT e_id FROM gui_element WHERE fkey_gui_id = $1";
@@ -88,7 +88,7 @@ if (!preg_match("/^[a-zA-Z0-9_-]+(\.[a-zA-Z0-9]+)$/", $confFile) ||
 	die;
 }
 
-$pdf = $pf->create($_REQUEST["printPDF_template"]);
+$pdf = $pf->create($_REQUEST["printPDF_template"], $sessionId);
 
 new mb_notice("REQUEST:".json_encode($_REQUEST));
 
@@ -111,7 +111,8 @@ pfi_write_progress($pfi_progress_token, 1, 'Kartendaten werden gesammelt...', 10
 ob_start();
 
 //element vars of print
-$pdf->unlinkFiles = isset($unlink) ? $unlink : false;
+//$pdf->unlinkFiles = isset($unlink) ? $unlink : false;
+$pdf->unlinkFiles = true;
 $pdf->logRequests = isset($logRequests) ? $logRequests : false;
 $pdf->logType = isset($logType) ? $logType : "file";
 
