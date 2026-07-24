@@ -2375,31 +2375,36 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 							// read geojson to calculate bboxes
 							foreach ( $geojsonList->features as $feature ) {
 								$featureBbox = calculateBboxFromGeojsonGeometry($feature->geometry);
-								if ($featureBbox === false) {
-									continue;
+								if ($featureBbox !== false) {
+									$minxF = $featureBbox->minx;
+									$minyF = $featureBbox->miny;
+									$maxxF = $featureBbox->maxx;
+									$maxyF = $featureBbox->maxy;
+									//$e = new mb_exception("bbox feature: minxF:".$minxF." minyF:".$minyF." maxxF:".$maxxF." maxyF:".$maxyF."");
+									if ($minxFC > $minxF) {
+										$minxFC = $minxF;
+									}
+									if ($minyFC > $minyF) {
+										$minyFC = $minyF;
+									}
+									if ($maxxFC < $maxxF) {
+										$maxxFC = $maxxF;
+									}
+									if ($maxyFC < $maxyF) {
+										$maxyFC = $maxyF;
+									}
+									$geojsonBbox [$geojsonIndex]->minx = $minxF;
+									$geojsonBbox [$geojsonIndex]->miny = $minyF;
+									$geojsonBbox [$geojsonIndex]->maxx = $maxxF;
+									$geojsonBbox [$geojsonIndex]->maxy = $maxyF;
+									$geomType = $feature->geometry->type;
 								}
-								$minxF = $featureBbox->minx;
-								$minyF = $featureBbox->miny;
-								$maxxF = $featureBbox->maxx;
-								$maxyF = $featureBbox->maxy;
-								//$e = new mb_exception("bbox feature: minxF:".$minxF." minyF:".$minyF." maxxF:".$maxxF." maxyF:".$maxyF."");
-								if ($minxFC > $minxF) {
-									$minxFC = $minxF;
+								else {
+									$geojsonBbox [$geojsonIndex]->minx = null;
+									$geojsonBbox [$geojsonIndex]->miny = null;
+									$geojsonBbox [$geojsonIndex]->maxx = null;
+									$geojsonBbox [$geojsonIndex]->maxy = null;
 								}
-								if ($minyFC > $minyF) {
-									$minyFC = $minyF;
-								}
-								if ($maxxFC < $maxxF) {
-									$maxxFC = $maxxF;
-								}
-								if ($maxyFC < $maxyF) {
-									$maxyFC = $maxyF;
-								}
-								$geojsonBbox [$geojsonIndex]->minx = $minxF;
-								$geojsonBbox [$geojsonIndex]->miny = $minyF;
-								$geojsonBbox [$geojsonIndex]->maxx = $maxxF;
-								$geojsonBbox [$geojsonIndex]->maxy = $maxyF;
-								$geomType = $feature->geometry->type;
 								$geojsonIndex ++;
 								// $e = new mb_exception("bbox featurecollection: minxFC:".$minxFC." minyFC:".$minyFC." maxxFC:".$maxxFC." maxyFC:".$maxyFC."");
 							}
@@ -2541,7 +2546,19 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 											$geojsonBbox [$geojsonIndex]->maxy = $featureBbox->maxy;
 											extendFeatureCollectionBbox($minxFC, $minyFC, $maxxFC, $maxyFC, $featureBbox);
 										}
+										else {
+											$geojsonBbox [$geojsonIndex]->minx = null;
+											$geojsonBbox [$geojsonIndex]->miny = null;
+											$geojsonBbox [$geojsonIndex]->maxx = null;
+											$geojsonBbox [$geojsonIndex]->maxy = null;
+										}
 										$geomType = $featureGeoJson->geometry->type;
+									}
+									else {
+										$geojsonBbox [$geojsonIndex]->minx = null;
+										$geojsonBbox [$geojsonIndex]->miny = null;
+										$geojsonBbox [$geojsonIndex]->maxx = null;
+										$geojsonBbox [$geojsonIndex]->maxy = null;
 									}
 									$geojsonList->features [] = $featureGeoJson;
     								// free memory
@@ -3585,6 +3602,10 @@ switch ($f) {
 					        $gmlId = $feature->id;
 					    }
 					    
+						$zoomLink = '';
+						if (isset($geojsonBbox [$objIndex]) && $geojsonBbox [$objIndex]->minx !== null && $geojsonBbox [$objIndex]->miny !== null && $geojsonBbox [$objIndex]->maxx !== null && $geojsonBbox [$objIndex]->maxy !== null) {
+							$zoomLink = '<a href=""  onclick="zoomToExtent(' . $geojsonBbox [$objIndex]->minx . "," . $geojsonBbox [$objIndex]->miny . "," . $geojsonBbox [$objIndex]->maxx . "," . $geojsonBbox [$objIndex]->maxy . ');return false;">' . _mb ( 'zoom to' ) . '</a>';
+						}
 						$html .= '                <li>' . $newline;
 						$html .= '                    <div>' . $newline;
 						$html .= '                        <h4 class="mt-3 mb-1"><a href="' . get2Rest ( delTotalFromQuery ( array (
@@ -3592,7 +3613,7 @@ switch ($f) {
 								'offset',
 								'limit',
 								'bbox' 
-						), $_SERVER ['REQUEST_URI'] ) . '&item=' . $gmlId ) . '" target="_blank"><span>' . $gmlId . '</span></a></h4><a href=""  onclick="zoomToExtent(' . $geojsonBbox [$objIndex]->minx . "," . $geojsonBbox [$objIndex]->miny . "," . $geojsonBbox [$objIndex]->maxx . "," . $geojsonBbox [$objIndex]->maxy . ');return false;">' . _mb ( 'zoom to' ) . '</a>' . $newline;
+						), $_SERVER ['REQUEST_URI'] ) . '&item=' . $gmlId ) . '" target="_blank"><span>' . $gmlId . '</span></a></h4>' . $zoomLink . $newline;
 						$html .= '                        <span class="d-none" itemprop="sameAs">https://www.ldproxy.nrw.de/topographie/collections/ax_bergbaubetrieb/items/DENWAT01D000CcF0</span>' . $newline;
 						// foreach attribute
 						foreach ( $feature->properties as $key => $value ) {
