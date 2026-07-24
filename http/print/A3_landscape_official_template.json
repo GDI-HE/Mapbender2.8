@@ -8,14 +8,15 @@
     		"id" : "title",
     		"label" : "Titel",
     		"type" : "text",
-    		"size" : 20,
+    		"maxCharacter": 40,
+		"size" : 20,
     		"pageElementsLink" : {
     			"titel" : "value"
     		}
     	},
     	{
     		"id" : "dpi",
-    		"label" : "DPI",
+    		"label" : "Auflösung",
     		"type" : "select",
     		"size" : 20,
     		"pageElementsLink" : {
@@ -23,35 +24,31 @@
     		},
     		"options" : [
     			{
-    			"value" : "288",
-    			"label" : "hoch (288 dpi)"
+    			"value" : "96",
+    			"label" : "96 dpi"
     			},{
     			"value" : "72",
-    			"label" : "normal (72 dpi)"
-    			}
+    			"label" : "72 dpi"
+    			},
+			{
+			"value" : "144",
+			"label" : "144 dpi"
+			}
     		]
     	},
     	{
     		"id" : "comment1",
-    		"label" : "Kommentar 1 (30 Zeichen)",
-    		"type" : "textarea",
+    		"label" : "Notiz",
+    		"type" : "text",
     		"size" : 5,
+		"maxCharacter": 200,
     		"pageElementsLink" : {
     			"kommentar1" : "value"
     		}
     	},
     	{
-    		"id" : "comment2",
-    		"label" : "Kommentar 2 (30 Zeichen)",
-    		"type" : "textarea",
-    		"size" : 5,
-    		"pageElementsLink" : {
-    			"kommentar2" : "value"
-    		}
-    	},
-    	{
     		"id" : "angle",
-    		"label" : "Winkel",
+    		"label" : "Drehwinkel",
     		"type" : "text",
     		"pageElementsLink" : {
     			"nordpfeil" : "angle",
@@ -108,10 +105,11 @@
 	   			},
 	   		"titel" : {
     			"type" : "text",
-    			"x_ul" : 142,
+    			"x_ul" : 110,
 	    		"y_ul" : 277.8,
-	    		"font_family" : "Arial",
-	    		"font_size" : 14
+	    		"font_family" : "Courier",
+	    		"font_size" : 12,
+			"font_style": "B"
 	   			},
 	   		"scale" : {
     			"type" : "text",
@@ -138,31 +136,29 @@
 	    		"angle" : 0,
 				"filename" : "../print/img/northarrow_simple.png"
 	   		},
+			"scalebar" : {
+                    	"type" : "scalebar",
+                   	"x_ul" : 26,
+                    	"y_ul" : 261.0,
+                    	"width" : 80,
+                    	"segments" : 4,
+                    	"font_family" : "Arial",
+                    	"font_size" : 8,
+    			"background" : true,
+    			"background_color" : { "r" : 255, "g" : 255, "b" : 255 },
+    			"background_padding" : 1.5
+                        },
 	   		"kommentar1" : {
     			"type" : "para",
     			"x_ul" : 108.5,
 	    		"y_ul" : 279.6,
-	    		"font_family" : "Arial",
-	    		"font_size" : 12,
-	    		"width" : 30,
+	    		"font_family" : "Courier",
+	    		"font_size" : 10,
+	    		"width" : 220,
 	    		"height" : 5,
 	    		"align" : "L",
 	    		"border" : 0,
-	    		"fill" : 1,
-	    		"border_width" : 0.5
-	   			},
-	   		"kommentar2" : {
-    			"type" : "para",
-    			"x_ul" : 108.5,
-	    		"y_ul" : 284.8,
-	    		"font_family" : "Arial",
-	    		"font_size" : 12,
-	    		"width" : 30,
-	    		"height" : 5,
-	    		"align" : "L",
-	    		"border" : 0,
-	    		"fill" : 1,
-	    		"border_width" : 0.5
+	    		"fill" : 1
 	   			}
 	   		}
 	   	}

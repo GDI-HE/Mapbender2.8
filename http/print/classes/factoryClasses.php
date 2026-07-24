@@ -7,11 +7,11 @@ require_once(dirname(__FILE__) . "/../../classes/class_administration.php");
 
 abstract class mbPrintFactory {
 
-	protected function createOutput($jsonConf, $concreteFactory) {
-		return $concreteFactory->create($jsonConf);
+	protected function createOutput($jsonConf, $concreteFactory, $identifier = null) {
+		return $concreteFactory->create($jsonConf, $identifier);
 	}
 	
-	abstract public function create($jsonConf);
+	abstract public function create($jsonConf, $identifier = null);
 
 }
 
@@ -29,7 +29,7 @@ class mbPdfFactory extends mbPrintFactory {
 		return $jsonConf;
 	}
 	
-	public function create($jsonConfFile) {
+	public function create($jsonConfFile, $identifier = null) {
  		$jsonConf = $this->readConfig($jsonConfFile);
  		
  		// For paper sizes other than the default FPDF sizes, give size in mm instead of name!
@@ -56,7 +56,7 @@ class mbPdfFactory extends mbPrintFactory {
 				default:
 					$e = new mb_exception("mbPdfFactory: output type not supported.");
 			}
-			return $this->createOutput($jsonConf, $factory);
+			return $this->createOutput($jsonConf, $factory, $identifier);
 		} catch (Exception $e){
 			$e = new mb_exception("mbPdfFactory: could not create PDF output.");
 		} 
@@ -68,16 +68,16 @@ class mbPdfFactory extends mbPrintFactory {
 
 class mbTemplatePdfFactory extends mbPrintFactory {
 
-	public function create($jsonConf) {
-		return new mbTemplatePdf($jsonConf);
+	public function create($jsonConf, $identifier = null) {
+		return new mbTemplatePdf($jsonConf, $identifier);
 	}
 
 }
 
 class mbDynamicPdfFactory extends mbPrintFactory {
 
-	public function create($jsonConf) {
-		return new mbDynamicPdf($jsonConf);
+	public function create($jsonConf, $identifier = null) {
+		return new mbDynamicPdf($jsonConf, $identifier);
 	}
 
 }

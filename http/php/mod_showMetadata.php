@@ -127,19 +127,19 @@ if (isset($_REQUEST["layout"]) & $_REQUEST["layout"] != "") {
 	$testMatch = NULL;
 }
 
-if (isset($_REQUEST["subscribe"]) & $_REQUEST["subscribe"] != "") {
-	//validate to csv integer list
-	$testMatch = $_REQUEST["subscribe"];
-	if (!($testMatch == '1' or $testMatch == '0')){ 
-		//echo 'layout: <b>'.$testMatch.'</b> is not valid.<br/>'; 
-		echo 'Parameter <b>subscribe</b> is not valid (0,1).<br/>'; 
-		die(); 		
- 	}
-	$subscribe = $testMatch;
-	$testMatch = NULL;
-}
+$subscribe = NULL; // explicit "no action" default, set once before the isset check
 
-$subscribe = intval($subscribe);
+if (isset($_REQUEST["subscribe"]) && $_REQUEST["subscribe"] != "") {  //should be logical AND (&&) instead of bitwise AND (&)
+    $testMatch = $_REQUEST["subscribe"];
+    if (!($testMatch == '1' or $testMatch == '0')){ 
+        echo 'Parameter <b>subscribe</b> is not valid (0,1).<br/>'; 
+        die(); 		
+    }
+    $subscribe = intval($testMatch);
+    $testMatch = NULL;
+}
+// remove intval($subscribe) which explicitly take subscribe as 0 and deleted the subscribe row 
+// $subscribe = intval($subscribe);
 
 $hostName = $_SERVER['HTTP_HOST'];
 
@@ -979,10 +979,10 @@ if ($resource == 'wms' or $resource == 'layer'){
 		$is_public = $user->isPublic();
 		//show abo function to registred and authorized users
 		if (!$is_public) {
-			if ($subscribe == 1) {
+			if ($subscribe === 1) {
 				$user->addSubscription($resourceMetadata['serviceid'], "WMS");
 			}
-			else if ($subscribe == 0) {
+			else if ($subscribe === 0) {
 				$user->cancelSubscription($resourceMetadata['serviceid'], "WMS");
 			}
 			$is_subscribed = $user->hasSubscription($resourceMetadata['serviceid'], "WMS");
@@ -1003,10 +1003,10 @@ if ($resource == 'wfs' or $resource == 'featuretype' or $resource == 'wfs-conf')
 		$is_public = $user->isPublic();
 		//show abo function to registred and authorized users
 		if (!$is_public) {
-			if ($subscribe == 1) {
+			if ($subscribe === 1) {
 				$user->addSubscription($resourceMetadata['serviceid'], "WFS");
 			}
-			else if ($subscribe == 0) {
+			else if ($subscribe === 0) {
 				$user->cancelSubscription($resourceMetadata['serviceid'], "WFS");
 			}
 			$e = new mb_exception("test subscription");

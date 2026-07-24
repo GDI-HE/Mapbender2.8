@@ -11,7 +11,6 @@ require_once(dirname(__FILE__) . "/../../classes/class_map.php");
 
 class mbMapDecorator extends mbTemplatePdfDecorator
 {
-
     protected $pageElementType = "map";
     protected $elementId;
     protected $filename;
@@ -24,10 +23,10 @@ class mbMapDecorator extends mbTemplatePdfDecorator
     {
         parent::__construct($pdfObj, $mapConf, $controls, $manualValues);
         $this->elementId = $elementId;
-        $this->filename = TMPDIR . "/" . parent::generateOutputFileName("map", "png");
-        $this->override();
+        $this->filename = TMPDIR . "/" . parent::generateOutputFileName("map", "png");	
+	$this->override();
         $this->decorate();
-    }
+    } 
 
     public function override()
     {

@@ -14,15 +14,17 @@ class mbTemplatePdf extends mbPdf
     private $insertPages = array();
     private $appendFiles  = array();
     public $renderingFeatureInfo = false;
+    public $identifier = null;
 
-    public function __construct($jsonConf)
+    public function __construct($jsonConf, $identifier = null)
     {
         $this->confPdf = $jsonConf;
         if (!$this->confPdf->orientation || !$this->confPdf->units || !$this->confPdf->format) {
             die("no valid config");
         }
         $this->objPdf = new mb_fpdi($this->confPdf->orientation, $this->confPdf->units, $this->confPdf->format);
-        $this->outputFileName = $this->generateOutputFileName("map", "pdf");
+        $this->identifier = $identifier;
+        $this->outputFileName = $this->generateOutputFileName("map", "pdf", $identifier);
     }
 
     public function setMapInfo($x_ul, $y_ul, $width, $height, $aBboxString)
@@ -151,6 +153,28 @@ class mbTemplatePdf extends mbPdf
                     $useKm  = ($segM >= 1000);
                     $divBy  = $useKm ? 1000.0 : 1.0;
                     $unit   = $useKm ? 'km' : 'm';
+
+                    // --- NEW: optional white background behind the whole scalebar ---
+                    $sbBg = isset($pageElementConf->background) ? (bool)$pageElementConf->background : false;
+                    if ($sbBg) {
+                        $bgPad = isset($pageElementConf->background_padding) ? floatval($pageElementConf->background_padding) : 1.5;
+                        $bgR = isset($pageElementConf->background_color->r) ? intval($pageElementConf->background_color->r) : 255;
+                        $bgG = isset($pageElementConf->background_color->g) ? intval($pageElementConf->background_color->g) : 255;
+                        $bgB = isset($pageElementConf->background_color->b) ? intval($pageElementConf->background_color->b) : 255;
+
+                        $labelRowH = 3.0; // matches the Cell height used for tick labels below
+                        $unitLabelW = 8.0; // matches the Cell width used for the unit label
+                        $unitLabelGap = 1.0; // matches the +1.0 offset before the unit label
+
+                        $bgX = $sbX - $bgPad;
+                        $bgY = $sbY - $bgPad;
+                        $bgW = $totalW + $unitLabelGap + $unitLabelW + ($bgPad * 2);
+                        $bgH = $barH + 0.3 + $labelRowH + $bgPad; // bar + tick-label offset + tick-label row + bottom pad
+
+                        $this->objPdf->SetFillColor($bgR, $bgG, $bgB);
+                        $this->objPdf->Rect($bgX, $bgY, $bgW, $bgH, 'F');
+                    }
+                    // --- end new code ---
 
                     // Alternating black/white filled segments with outline
                     $this->objPdf->SetLineWidth(0.2);
@@ -658,11 +682,16 @@ class mbTemplatePdf extends mbPdf
                         return '';
                     }
                     $imgUrl = $srcMatch[1];
-                    // HTTPS-only: reject http://, file://, gopher://, data:, etc.
-                    if (!preg_match('/^https:\/\//i', $imgUrl)) {
-                        return '';
+                    // Change http to https which will be secured anyway
+                    if (strpos($imgUrl, 'http://') === 0) {
+                        $imgUrl = 'https://' . substr($imgUrl, 7);
                     }
-                    $imgConnector = new connector();
+
+                    // Anything that isn't https at this point (file://, gopher://, data:, etc.) is rejected.
+                    if (strpos($imgUrl, 'https://') !== 0) {
+                        return '';
+		    }                   
+		    $imgConnector = new connector();
                     $imgConnector->set('timeOut', '10');
                     $imgConnector->load($imgUrl);
                     $imgData = $imgConnector->file;
@@ -831,3 +860,4 @@ class mbTemplatePdf extends mbPdf
 }
 
 ?>
+

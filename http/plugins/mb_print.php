@@ -151,6 +151,24 @@ var PrintPDF = function (options) {
   var normalProgressToken = null;      // token for current normal-print job
   var currentPrintIsFeatureInfo = false; // true only while a FeatureInfo-triggered submit is in flight
 
+  window.updateCharCount = function (input) {
+    var len = input.value.length;
+    var max = input.maxLength;
+    var container = input.parentNode.querySelector('.char-badge');
+    if (container) {
+        var valueSpan = container.querySelector('.char-count-value');
+        if (valueSpan) {
+            valueSpan.innerHTML = len;
+        }
+        container.classList.remove('warn', 'limit');
+        if (len >= max) {
+            container.classList.add('limit');
+        } else if (len >= max * 0.85) {
+            container.classList.add('warn');
+        }
+    }
+  };
+
   /**
    * SVG spotlight overlay: dims everything outside the print rectangle and
    * shows a red center dot.  Works for both normal print and featureInfo print.
@@ -586,7 +604,8 @@ var PrintPDF = function (options) {
       timeout: options.timeout ? options.timeout : 10000,
       error: function (xhr, textStatus) {
         // Stop any active progress poll (normal print or featureInfo)
-        if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
+      $('#submit').removeAttr('disabled').removeClass('ui-state-disabled');  
+      if (normalPollInterval) { clearInterval(normalPollInterval); normalPollInterval = null; }
         showHideWorking("hide");
         var msg;
         if (textStatus === 'timeout') {
@@ -711,6 +730,7 @@ var PrintPDF = function (options) {
    * @see jquery.forms#beforeSubmitHandler
    */
   var validate = function (formData, jqForm, params) {
+    $('#submit').attr('disabled', 'disabled').addClass('ui-state-disabled');
     pfiCancelled = false;
     // Only show the overlay spinner for FeatureInfo print; normal print uses the inline progress bar
     if (currentPrintIsFeatureInfo) {
@@ -1076,6 +1096,7 @@ var PrintPDF = function (options) {
       //all fields are ok wait for pdf
     } else {
       showHideWorking("hide");
+      $('#submit').removeAttr('disabled').removeClass('ui-state-disabled');
       alert('<?php echo _mb('No active maplayers in current print extent, please choose another extent/position for your template frame!'); ?>');
       return false;
     }
@@ -1088,6 +1109,7 @@ var PrintPDF = function (options) {
    * that triggers a download popup or is displayed in PDF plugin.
    */
   var showResult = function (res, text) {
+    $('#submit').removeAttr('disabled').removeClass('ui-state-disabled');
     if (pfiCancelled) {
       showHideWorking("hide");
       return;
@@ -1194,6 +1216,29 @@ var PrintPDF = function (options) {
     for (var item in actualConfig.controls) {
       var element = actualConfig.controls[item];
       var element_id = myId + "_" + element.id;
+      // Build step — only ONE block handles both title and comment1 now
+      if (element.id === 'title' || element.id === 'comment1') {
+      var maxChar = element.maxCharacter || 120;
+      var rowClass = 'print_option_dyn ' + element.id + '-row';
+      str += '<div class="' + rowClass + '">\n';
+      str += '<span class="char-badge">' +
+          '<span class="char-count-value">0</span>/' + maxChar + '</span>\n';
+    str += '<label class="print_label" for="' + element.id + '">' + element.label + '</label>\n';
+
+    var commonAttributes = 'id="' + element.id + '" name="' + element.id + '" maxlength="' + maxChar + '" ' +
+            'class="' + element.id + '-input" onkeyup="updateCharCount(this)"';
+    if (element.type === 'textarea') {
+        str += '<textarea ' + commonAttributes + '></textarea>\n';
+    } else {
+        str += '<input type="text" ' + commonAttributes + ' />\n';
+    }
+    str += '</div>\n';
+    continue;
+}
+      if (element.id === 'comment2') {
+       // remove comment2
+       continue;
+      }  
       if (element.type != "hidden") {
         str += '<div class="print_option_dyn">\n';
         str += '<label class="print_label" for="' + element.id + '">' + element.label + '</label>\n';
@@ -1918,5 +1963,6 @@ var printObj = new PrintPDF(options);
 if (this instanceof HTMLElement) {
   $(this).data('printObj', printObj);
 }
+
 
 

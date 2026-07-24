@@ -103,7 +103,7 @@ class mbLegendDecorator extends mbTemplatePdfDecorator
                     //$currentY += $mmPerPt * $this->conf->font_size;
                     $currentY += $this->conf->font_size;
                     // store current legend image temporarily
-                    $legendFilename = TMPDIR . "/legend_" . substr(md5(uniqid(rand())), 0, 7) . ".png";
+		    $legendFilename = TMPDIR . "/legend_" . substr(md5(uniqid(rand())), 0, 7) . ".png";
 
                     try {
                         $saveLegend = new SaveLegend(
