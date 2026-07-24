@@ -2198,11 +2198,11 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 								$filter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0">' . ( string ) $filter . ( string ) $textFilter . '</fes:Filter>';
 							}
 						}
-						if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion, "2.0") !== 0) {
-							$filter = str_replace("http://www.opengis.net/fes/2.0", "http://www.opengis.net/ogc", $filter);
-							$filter = str_replace("<fes", "<ogc", $filter);
-							$filter = str_replace("</fes", "</ogc", $filter);
-							$filter = str_replace("ValueReference", "PropertyName", $filter);
+if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion, "2.0") !== 0) {
+	$filter = str_replace('xmlns:fes="http://www.opengis.net/fes/2.0"', 'xmlns:ogc="http://www.opengis.net/ogc"', $filter);
+	$filter = str_replace("<fes", "<ogc", $filter);
+	$filter = str_replace("</fes", "</ogc", $filter);
+	$filter = str_replace("ValueReference", "PropertyName", $filter);
 						}
 						//
 						//$e = new mb_exception("filter: ".$filter);
