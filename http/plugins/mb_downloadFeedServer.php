@@ -13,6 +13,11 @@
 	if (file_exists ( dirname ( __FILE__ ) . "/../../conf/excludeFromAtomFeedClient.json" )) {
 	    $configObject = json_decode ( file_get_contents ( "../../conf/excludeFromAtomFeedClient.json" ) );
 	}
+	if (isset ( $configObject ) && isset ( $configObject->whitelist )) {
+	    $urlsWhitelist = $configObject->whitelist;
+	} else {
+	    $urlsWhitelist = false;
+	}
 	if (isset ( $configObject ) && isset ( $configObject->urls )) {
 	    $urlsBlacklist = $configObject->urls;
 	} else {
@@ -180,12 +185,35 @@ function DOMNodeListObjectAttributes($domNodeList) {
 	return $attributes;
 }
 
+function isWhitelistedDownloadFeedUrl($serviceFeedUrl) {
+	global $urlsWhitelist;
+	if ($urlsWhitelist === false || !is_array($urlsWhitelist) || count($urlsWhitelist) === 0) {
+		return false;
+	}
+	$parsedUrl = parse_url($serviceFeedUrl);
+	$host = isset($parsedUrl['host']) ? strtolower($parsedUrl['host']) : '';
+	foreach ($urlsWhitelist as $whitelistEntry) {
+		$whitelistEntry = strtolower(trim($whitelistEntry));
+		if ($whitelistEntry === '') {
+			continue;
+		}
+		if ($host !== '' && $host === $whitelistEntry) {
+			return true;
+		}
+		if (strpos(strtolower($serviceFeedUrl), $whitelistEntry) !== false) {
+			return true;
+		}
+	}
+	return false;
+}
+
 switch ($_REQUEST['method']) {
 	case "getServiceFeedObjectFromUrl" :
 		$serviceFeedUrl = htmlspecialchars_decode($_REQUEST['url']);//htmlspecialchars_decode is done to prohibit xss vulnerability of the client, which allows url as a get parameter
+		$isWhitelistedUrl = isWhitelistedDownloadFeedUrl($serviceFeedUrl);
         //secure client by use of blacklist
         //TODO: give back clean json - so that the client can generate a usefull message!
-		if ($urlsBlacklist != false) {
+		if ($urlsBlacklist != false && !$isWhitelistedUrl) {
 		    foreach ($urlsBlacklist as $urlPart) {
 		        if (strpos($serviceFeedUrl, $urlPart) !== false) {
 		            $e = new mb_exception("http/plugins/mb_downloadFeedServer.php:".'Found blacklist entry in downloadfeed url!');

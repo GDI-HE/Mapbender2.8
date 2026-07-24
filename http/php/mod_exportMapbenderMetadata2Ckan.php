@@ -50,11 +50,6 @@ while ($row = db_fetch_array($res)){
     $inspireCatHash[$row['inspire_category_code_en']] = $row['inspire_category_uri'];
     //$e = new mb_exception("inspireCatHash: ".$row['inspire_category_code_en'] ." : ". $row['inspire_category_id'] );
 }
-$sql = "SELECT inspire_category_uri, inspire_category_code_de FROM inspire_category";
-$res = db_query($sql);
-while ($row = db_fetch_array($res)){
-    $inspireCatHash[$row['inspire_category_code_de']] = $row['inspire_category_uri'];
-}
 /*categories from https://tpp.rlp.de - ckan 2.9
  * [
   {
@@ -1080,11 +1075,13 @@ if ($outputFormat == 'rdfxml') {
                                 }
                                 break;
                             case "inspireAtomFeeds":
+                                // INSPIRE AtomFeed-bezogene Ressourcen; jedes resourceArray-Element kann spaeter eine RDF-Distribution werden.
                                 foreach ($value as $key1 => $value1) {
                                     $inspireAtomFeedsLicenseId = $value1->licenseId;
                                     if (is_null($inspireAtomFeedsLicenseId) || $inspireAtomFeedsLicenseId == false) {
                                         $inspireAtomFeedsLicenseId = "other-closed";
                                     }
+                                    // Nur diese Typen werden in RDF-Distributionen ueberfuehrt; unbekannte Typen (z.B. downloadlink) fallen aktuell heraus.
                                     switch ($value1->type) {
                                         case "ogcapifeatures":
                                             $featuretypeAccessResource_1 = array("name" => "OGC API Features (REST)",
@@ -1109,7 +1106,19 @@ if ($outputFormat == 'rdfxml') {
                                                 );
                                                 $resourceArray[] = $featuretypeAccessResource_2;
                                                 break; 
+                                            case "downloadlink":
+                                                $atomFeedAccessResource_0 = array("name" => $value1->serviceTitle,
+                                                "description" => "Oeffnen im HTML Viewer",
+                                                "format" => "HTML",
+                                                "url" => str_replace($mapbenderWebserviceUrl, $mapbenderBaseUrl, $value1->accessClient),
+                                                "id" => $gpDataset->uuid . "_atom_feed_metadata_" . md5($value1->accessClient),
+                                                "license_id" => $inspireAtomFeedsLicenseId,
+                                                "license_source_note" => $value1->licenseSourceNote
+                                                );
+                                                $resourceArray[] = $atomFeedAccessResource_0;
+                                                break;
                                         case "wfsrequest":
+                                            // Dateibasierter Vektordownload (Atom/WFS-Request) -> Kandidat fuer dcat:distribution.
                                             $atomFeedAccessResource_1 = array("name" => "Vektordownload nach EU-Standard",
                                             "description" => $value1->serviceTitle,
                                             "format" => "HTML",
@@ -1121,6 +1130,7 @@ if ($outputFormat == 'rdfxml') {
                                             $resourceArray[] = $atomFeedAccessResource_1;
                                             break;
                                         case "wmslayergetmap":
+                                            // Dateibasierter Rasterdownload (Atom/WMS-GetMap) -> Kandidat fuer dcat:distribution.
                                             $atomFeedAccessResource_2 = array("name" => "Rasterdownload nach EU-Standard",
                                             "description" => $value1->serviceTitle,
                                             "format" => "HTML",
@@ -1132,11 +1142,12 @@ if ($outputFormat == 'rdfxml') {
                                             $resourceArray[] = $atomFeedAccessResource_2;
                                             break;
                                         case "remotelist":
-                                            $atomFeedAccessResource_3 = array("name" => "Download nach EU-Standard",
-                                            "description" => $value1->serviceTitle,
+                                            // Dateibasierte Remote-Liste/Linksammlung -> Kandidat fuer dcat:distribution.
+                                            $atomFeedAccessResource_3 = array("name" => $value1->serviceTitle,
+                                            "description" => "Oeffnen im HTML Viewer",
                                             "format" => "HTML",
                                             "url" => str_replace($mapbenderWebserviceUrl, $mapbenderBaseUrl, $value1->accessClient),
-                                            "id" => $gpDataset->uuid . "_atom_feed_remotelist_" . $value1->serviceId,
+                                            "id" => $gpDataset->uuid . "_atom_feed_remotelist_" . md5($value1->accessClient),
                                             "license_id" => $inspireAtomFeedsLicenseId,
                                             "license_source_note" => $value1->licenseSourceNote
                                             );
