@@ -50,6 +50,11 @@ while ($row = db_fetch_array($res)){
     $inspireCatHash[$row['inspire_category_code_en']] = $row['inspire_category_uri'];
     //$e = new mb_exception("inspireCatHash: ".$row['inspire_category_code_en'] ." : ". $row['inspire_category_id'] );
 }
+$sql = "SELECT inspire_category_uri, inspire_category_code_de FROM inspire_category";
+$res = db_query($sql);
+while ($row = db_fetch_array($res)){
+    $inspireCatHash[$row['inspire_category_code_de']] = $row['inspire_category_uri'];
+}
 /*categories from https://tpp.rlp.de - ckan 2.9
  * [
   {
