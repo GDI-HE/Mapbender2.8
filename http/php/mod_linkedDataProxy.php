@@ -3604,7 +3604,7 @@ switch ($f) {
 					    
 						$zoomLink = '';
 						if (isset($geojsonBbox [$objIndex]) && $geojsonBbox [$objIndex]->minx !== null && $geojsonBbox [$objIndex]->miny !== null && $geojsonBbox [$objIndex]->maxx !== null && $geojsonBbox [$objIndex]->maxy !== null) {
-							$zoomLink = '<a href=""  onclick="window.scrollTo(0, 0); zoomToExtent(' . $geojsonBbox [$objIndex]->minx . "," . $geojsonBbox [$objIndex]->miny . "," . $geojsonBbox [$objIndex]->maxx . "," . $geojsonBbox [$objIndex]->maxy . ');return false;">' . _mb ( 'zoom to' ) . '</a>';
+							$zoomLink = '<a href=""  onclick="window.parent.scrollTo(0, 0); zoomToExtent(' . $geojsonBbox [$objIndex]->minx . "," . $geojsonBbox [$objIndex]->miny . "," . $geojsonBbox [$objIndex]->maxx . "," . $geojsonBbox [$objIndex]->maxy . ');return false;">' . _mb ( 'zoom to' ) . '</a>';
 						}
 						$html .= '                <li>' . $newline;
 						$html .= '                    <div>' . $newline;
