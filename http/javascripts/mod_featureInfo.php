@@ -307,8 +307,18 @@ function featureInfoDialog(featureInfo, dialogPosition, offset, printInfo) {
 
 function ownDataDialog(ownData, dialogPosition, offset, printInfo) {
     if (printInfo !== undefined) {
-      console.error('kml data is not printable');
-      printInfo = undefined
+      // console.error('kml data is not printable');
+      // printInfo = undefined
+          printInfo = $.extend({}, printInfo, {
+          urls: [] 
+          });
+          // push a mock url object which contains the html content
+          printInfo.urls.push({
+           title: ownData.title,
+           htmlContent: btoa(unescape(encodeURIComponent(ownData.content))),
+           isBase64: true,
+           inBbox: true
+          });
     }
     var $box = $('<div>').html(ownData.content);
     return makeDialog($box,

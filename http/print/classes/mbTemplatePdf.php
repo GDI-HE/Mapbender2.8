@@ -318,105 +318,124 @@ class mbTemplatePdf extends mbPdf
                 continue;
             }
 
-            $featureInfoConnector = new connector();
-            $featureInfoConnector->set("timeOut", "10");
+            $featureInfoResult = '';
+            $isGeoJsonFeature = false;
+	    $httpCode = 200; //default for GeoJSON path, no HTTP call is made
+            if (isset($url->htmlContent)) {
+                $featureInfoResult = $url->htmlContent;
+                if (isset($url->isBase64) && $url->isBase64) {
+                    $featureInfoResult = base64_decode($featureInfoResult);
+                }
+                $isGeoJsonFeature = true;
+            } else {
+                $featureInfoConnector = new connector();
+                $featureInfoConnector->set("timeOut", "10");
 
-            // Update progress: fetching feature info for this layer
-            $urlIndex++;
-            if ($totalUrls > 0 && $pfi_token) {
-                $fetchPercent = 46 + (int)(($urlIndex / ($totalUrls + 1)) * 14);
-                pfi_write_progress($pfi_token, 2,
-                    'Sachdaten werden abgerufen (' . $urlIndex . '/' . $totalUrls . '): ' . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8'),
-                    $fetchPercent);
+                // Update progress: fetching feature info for this layer
+                $urlIndex++;
+                if ($totalUrls > 0 && $pfi_token) {
+                    $fetchPercent = 46 + (int)(($urlIndex / ($totalUrls + 1)) * 14);
+                    pfi_write_progress($pfi_token, 2,
+                        'Sachdaten werden abgerufen (' . $urlIndex . '/' . $totalUrls . '): ' . htmlspecialchars($url->title, ENT_QUOTES, 'UTF-8'),
+                        $fetchPercent);
+                }
+
+                $featureInfoConnector->load($url->request);
+                $featureInfoResult = $featureInfoConnector->file;
+		$httpCode = intval($featureInfoConnector->getHttpCode());
             }
 
-            $featureInfoConnector->load($url->request);
-            $featureInfoResult = $featureInfoConnector->file;
-
-            $httpCode = intval($featureInfoConnector->getHttpCode());
+            // $httpCode = intval($featureInfoConnector->getHttpCode());
 
             if (!trim($featureInfoResult) || preg_match("/<body>\s*<\/body>/i", $featureInfoResult)) {
                 continue;
             }
 
-            if ($httpCode >= 400) {
+            if (!$isGeoJsonFeature && $httpCode >= 400) {
                 continue;
             }
-
-            // extract specific wms layer(s) from feature info request
-
-            $matches = array();
-            preg_match("/^[^?]*/", $url->request, $matches);
-            $host = $matches[0];
-            // Use QUERY_LAYERS if present (only the actually queried layer(s)),
-            // fall back to LAYERS if QUERY_LAYERS is absent.
-            if (preg_match("/QUERY_LAYERS=([^&]*)/i", $url->request, $matches) && !empty($matches[1])) {
-                $queryLayers = explode(",", urldecode($matches[1]));
+            
+            if ($isGeoJsonFeature) {
+                $mapUrl = join("___", $backgroundUrls);
             } else {
-                preg_match("/LAYERS=([^&]*)/", $url->request, $matches);
-                $queryLayers = explode(",", urldecode($matches[1]));
-            }
+                // extract specific wms layer(s) from feature info request
+                $matches = array();
+                preg_match("/^[^?]*/", $url->request, $matches);
+                $host = $matches[0];
+                // Use QUERY_LAYERS if present (only the actually queried layer(s)),
+                // fall back to LAYERS if QUERY_LAYERS is absent.
+                if (preg_match("/QUERY_LAYERS=([^&]*)/i", $url->request, $matches) && !empty($matches[1])) {
+                    $queryLayers = explode(",", urldecode($matches[1]));
+                } else {
+                    preg_match("/LAYERS=([^&]*)/", $url->request, $matches);
+                    $queryLayers = explode(",", urldecode($matches[1]));
+                }
 
 
-            // find wms url in mapUrls that contains any of the queried layers
-            // Pass 1: strict host match (direct WMS URL)
-            // Pass 2: fallback layer-only match (handles owsproxy / URL rewriting)
+                // find wms url in mapUrls that contains any of the queried layers
+                // Pass 1: strict host match (direct WMS URL)
+                // Pass 2: fallback layer-only match (handles owsproxy / URL rewriting)
 
-            $matchedMapUrl = null;
-            $matchedLayers = array();
-            $matchedStyles = array();
-            $candidateLayers = array();
+                $matchedMapUrl = null;
+                $matchedLayers = array();
+                $matchedStyles = array();
+                $candidateLayers = array();
 
-            foreach (array(true, false) as $requireHostMatch) {
-                foreach ($mapUrls as $candidateUrl) {
-                    if ($requireHostMatch && strpos($candidateUrl, $host) !== 0) {
-                        continue;
-                    }
-                    if (!preg_match("/LAYERS=([^&]*)/", $candidateUrl, $lm)) {
-                        continue;
-                    }
-                    $cLayers = explode(",", urldecode($lm[1]));
-                    $found = array_intersect($queryLayers, $cLayers);
-                    if (!empty($found)) {
-                        $matchedMapUrl = $candidateUrl;
-                        $matchedLayers = $found;
-                        $candidateLayers = $cLayers;
-                        // Extract corresponding styles
-                        if (preg_match("/STYLES=([^&]*)/", $candidateUrl, $sm)) {
-                            $allStyles = explode(",", $sm[1]);
-                            foreach ($found as $layer) {
-                                $pos = array_search($layer, $cLayers);
-                                $matchedStyles[] = isset($allStyles[$pos]) ? $allStyles[$pos] : "";
-                            }
+                foreach (array(true, false) as $requireHostMatch) {
+                    foreach ($mapUrls as $candidateUrl) {
+                        if ($requireHostMatch && strpos($candidateUrl, $host) !== 0) {
+                            continue;
                         }
-                        break 2;
+                        if (!preg_match("/LAYERS=([^&]*)/", $candidateUrl, $lm)) {
+                            continue;
+                        }
+                        $cLayers = explode(",", urldecode($lm[1]));
+                        $found = array_intersect($queryLayers, $cLayers);
+                        if (!empty($found)) {
+                            $matchedMapUrl = $candidateUrl;
+                            $matchedLayers = $found;
+                            $candidateLayers = $cLayers;
+                            // Extract corresponding styles
+                            if (preg_match("/STYLES=([^&]*)/", $candidateUrl, $sm)) {
+                                $allStyles = explode(",", $sm[1]);
+                                foreach ($found as $layer) {
+                                    $pos = array_search($layer, $cLayers);
+                                    $matchedStyles[] = isset($allStyles[$pos]) ? $allStyles[$pos] : "";
+                                }
+                            }
+                            break 2;
+                        }
                     }
                 }
+
+                if (!$matchedMapUrl) {
+                    new mb_exception("print featureinfo: Found no fitting layer for feature info request.");
+                    continue;
+                }
+
+
+                // Add page only after we know we have a valid match — avoids blank pages on failure
+                $this->objPdf->addPage();
+                $this->objPdf->useTemplate($tplidx);
+
+
+                // construct new map url with only the matched layers
+                $layersStr = implode(",", $matchedLayers);
+                $mapUrl = preg_replace("/LAYERS=[^&]*/", "LAYERS=$layersStr", $matchedMapUrl);
+                if (!empty($matchedStyles)) {
+                    $stylesStr = implode(",", $matchedStyles);
+                    $mapUrl = preg_replace("/STYLES=[^&]*/", "STYLES=$stylesStr", $mapUrl);
+                }
+
+                // construct new map url
+
+                $mapUrl = join("___", array_merge($backgroundUrls, array($mapUrl)));
             }
-
-            if (!$matchedMapUrl) {
-                new mb_exception("print featureinfo: Found no fitting layer for feature info request.");
-                continue;
-            }
-
-
-            // Add page only after we know we have a valid match — avoids blank pages on failure
-            $this->objPdf->addPage();
-            $this->objPdf->useTemplate($tplidx);
-
-
-            // construct new map url with only the matched layers
-            $layersStr = implode(",", $matchedLayers);
-            $mapUrl = preg_replace("/LAYERS=[^&]*/", "LAYERS=$layersStr", $matchedMapUrl);
-            if (!empty($matchedStyles)) {
-                $stylesStr = implode(",", $matchedStyles);
-                $mapUrl = preg_replace("/STYLES=[^&]*/", "STYLES=$stylesStr", $mapUrl);
-            }
-
-            // construct new map url
-
-            $mapUrl = join("___", array_merge($backgroundUrls, array($mapUrl)));
-
+			
+			if ($isGeoJsonFeature) {
+				$this->objPdf->addPage();
+                $this->objPdf->useTemplate($tplidx);
+			}
 
             // $url->legendurl is a comma-separated string built in map_obj.js
             // (one entry per in-bbox layer, trailing comma, entries may be "empty").
@@ -682,7 +701,8 @@ class mbTemplatePdf extends mbPdf
                         return '';
                     }
                     $imgUrl = $srcMatch[1];
-                    // Change http to https which will be secured anyway
+                    // Upgrade http -> https; the domain is already SSL-secured now, so we no
+                    // longer need to keep the http variant around at all.
                     if (strpos($imgUrl, 'http://') === 0) {
                         $imgUrl = 'https://' . substr($imgUrl, 7);
                     }
@@ -690,8 +710,8 @@ class mbTemplatePdf extends mbPdf
                     // Anything that isn't https at this point (file://, gopher://, data:, etc.) is rejected.
                     if (strpos($imgUrl, 'https://') !== 0) {
                         return '';
-		    }                   
-		    $imgConnector = new connector();
+                    }
+                    $imgConnector = new connector();
                     $imgConnector->set('timeOut', '10');
                     $imgConnector->load($imgUrl);
                     $imgData = $imgConnector->file;
