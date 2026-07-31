@@ -413,3 +413,25 @@
     margin-left: 33px; /* just enough to clear the badge width */
 }
 
+.feature-info-table {
+    border-collapse: collapse;
+    width: 100%;
+    border: 1px solid #ccc;
+    background-color: #fff; /* Ensure table has a background */
+}
+
+.feature-info-table tr.even {
+    background-color: #f2f2f2;
+}
+
+.feature-info-table td {
+    padding: 6px;
+    border: 1px solid #ccc;
+    color: #000; /* Ensure text is black */
+    background-color: transparent; /* Prevent inheriting a white background */
+}
+
+.feature-info-key {
+    font-weight: 700; /* Bolder */
+}
+

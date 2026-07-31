@@ -636,6 +636,9 @@ class mbTemplatePdf extends mbPdf
                 }
                 $featureInfoResult = '<html><head>' . $headContent . '</head><body>' . $allBodies . '</body></html>';
             }
+            
+            $css = file_get_contents(dirname(__FILE__) . "/../../css/print_div.css");
+            $featureInfoResult = "<style>" . $css . "</style>" . $featureInfoResult;
 
             if (!empty($pageConf->titleHTML)) {
                 if (preg_match("/<body>/i", $featureInfoResult)) {
