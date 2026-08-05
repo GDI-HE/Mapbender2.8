@@ -607,11 +607,23 @@ class mbTemplatePdf extends mbPdf
             $orientation = $orientationMap[$this->confPdf->orientation];
 
             $dompdf->setPaper($format, $orientation);
-
-            if (preg_match("/[?&]INFO_FORMAT=text\/plain/i", $url->request)) {
+            
+            // Check if it's a GeoJSON feature and if its format is 'text'
+            if ($isGeoJsonFeature && isset($url->format) && $url->format === 'text') {
+                // It's a GeoJSON feature, and text format is requested.
+                // Convert the HTML table to a readable plain text format.
+                $plainText = $featureInfoResult;
+                // Add a colon and space between table cells
+                $plainText = preg_replace('/<\/td>\s*<td[^>]*>/i', ': ', $plainText);
+                // Add a newline after each table row
+                $plainText = preg_replace('/<\/tr>/i', "\n", $plainText);
+                // Strip remaining HTML tags and decode entities
+                $plainText = trim(html_entity_decode(strip_tags($plainText)));
+                $featureInfoResult = nl2br(wordwrap($plainText, 75, "\n", true));
+            } else if (!$isGeoJsonFeature && preg_match("/[?&]INFO_FORMAT=text\/plain/i", $url->request)) {
                 $featureInfoResult = nl2br(wordwrap($featureInfoResult, 75, "\n", true));
-            }
-
+            }            
+           
             // The WMS may return multiple full HTML documents concatenated together
             // (one per feature). Dompdf only renders the first <html> block and
             // ignores the rest. Merge all body contents into one valid HTML document.

@@ -1605,31 +1605,42 @@ var PrintPDF = function (options) {
       });
 
       $abfragenDiv.append($("<label class='pfi-abfragen-check'>" + url.title + "</label>").prepend($checkBox));
-
-      var htmlRegex = /([?&]INFO_FORMAT=text\/)html/i;
-      var textRegex = /([?&]INFO_FORMAT=text\/)plain/i;
-
       var $radioHTML = $('<input type="radio" name="pfi-print-format-' + i + '">');
       $abfragenDiv.append($("<label class='pfi-abfragen-radio'>HTML</label>").prepend($radioHTML));
 
       var $radioText = $('<input type="radio" name="pfi-print-format-' + i + '">');
       $abfragenDiv.append($("<label class='pfi-abfragen-radio'>Text</label>").prepend($radioText));
-
-      if (htmlRegex.test(url.request)) {
+       if (url.htmlContent) { // It's a GeoJSON feature
+        url.format = 'html'; // Default to html
         $radioHTML.attr('checked', 'checked');
-      } else if (textRegex.test(url.request)) {
-        $radioText.attr('checked', 'checked');
+
+        $radioHTML.bind('change', function () {
+          url.format = 'html';
+        });
+
+        $radioText.bind('change', function () {
+          url.format = 'text';
+        });
+
+      } else { // It's a WMS feature
+        var htmlRegex = /([?&]INFO_FORMAT=text\/)html/i;
+        var textRegex = /([?&]INFO_FORMAT=text\/)plain/i;
+
+        if (htmlRegex.test(url.request)) {
+          $radioHTML.attr('checked', 'checked');
+        } else if (textRegex.test(url.request)) {
+          $radioText.attr('checked', 'checked');
+        }
+
+        $radioHTML.bind('change', function () {
+          url.request = url.request.replace(textRegex, '$1html');
+        });
+
+        $radioText.bind('change', function () {
+          url.request = url.request.replace(htmlRegex, '$1plain');
+        });
       }
-
-      $radioHTML.bind('change', function () {
-        url.request = url.request.replace(textRegex, '$1html');
-      });
-
-      $radioText.bind('change', function () {
-        url.request = url.request.replace(htmlRegex, '$1plain');
-      });
     });
-
     // Add input fields for print options (title, dpi, comment, scale)
 
     // Legend option checkbox
