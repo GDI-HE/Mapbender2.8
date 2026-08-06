@@ -416,7 +416,7 @@ function featureInfoListDialog(urls, ownDataInfos, printInfo) {
 
     if (printInfo !== undefined) {
         printInfo = $.extend({}, printInfo, {
-          urls: urls
+          urls: urls.concat(ownDataInfos)
         });
     }
 
