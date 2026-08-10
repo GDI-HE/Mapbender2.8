@@ -475,6 +475,14 @@ class mbTemplatePdf extends mbPdf
             $mapY   = null;
             $mapH   = null;
             $padding = 1.5;
+
+            // Track north arrow (nordpfeil) element if defined on this page
+            $nordpfeilElementConf = null;
+            $savedNordpfeilX = null;
+            if (isset($pageConf->elements->nordpfeil)) {
+                $nordpfeilElementConf = $pageConf->elements->nordpfeil;
+                $savedNordpfeilX = $nordpfeilElementConf->x_ul;
+            }
             if ($includeLegend && !empty($legendUrls)) {
                 foreach ($pageConf->elements as $pageElementConf) {
                     if ($pageElementConf->type === 'map') {
@@ -485,6 +493,15 @@ class mbTemplatePdf extends mbPdf
                 if ($mapElementConf !== null) {
                     $savedMapWidth = $mapElementConf->width;
                     $mapElementConf->width = $mapElementConf->width * 0.70;
+
+                    // If north arrow exists and its position is set for full-width map (e.g. x_ul >= 150),
+                    // shift it left so it sits at the top-right corner of the narrowed 70% map.
+                    if ($nordpfeilElementConf !== null) {
+                        $shiftX = floatval($savedMapWidth) * 0.30;
+                        if (floatval($savedNordpfeilX) >= 150) {
+                            $nordpfeilElementConf->x_ul = floatval($savedNordpfeilX) - $shiftX;
+                        }
+                    }
 
                     // Compute panel geometry here so the white background can be
                     // drawn BEFORE renderElements() — overview and other decorators
@@ -507,7 +524,23 @@ class mbTemplatePdf extends mbPdf
                     $this->objPdf->SetLineWidth(0.5);
                     $this->objPdf->Line($fillX, $mapY, $fillX, $mapY + $mapH);
                 }
+                          } else {
+                // If legend is absent/disabled, ensure north arrow is at full-width position.
+                // If template has a legacy 70% position (e.g. x_ul < 150 like 134.0), shift it right to full-width.
+                if ($nordpfeilElementConf !== null && floatval($savedNordpfeilX) < 150) {
+                    foreach ($pageConf->elements as $pageElementConf) {
+                        if ($pageElementConf->type === 'map') {
+                            $mapElementConf = $pageElementConf;
+                            break;
+                        }
+                    }
+                    if ($mapElementConf !== null) {
+                        $shiftX = floatval($mapElementConf->width) * 0.30;
+                        $nordpfeilElementConf->x_ul = floatval($savedNordpfeilX) + $shiftX;
+                    }
+                }
             }
+
 
             // Store the map-narrowing factor so the scalebar element can derive
             // the true paper scale (actual_scale = requested_scale / width_factor).
@@ -524,6 +557,9 @@ class mbTemplatePdf extends mbPdf
             // Restore original map width (so subsequent pages are unaffected).
             if ($savedMapWidth !== null && $mapElementConf !== null) {
                 $mapElementConf->width = $savedMapWidth;
+            }
+            if ($savedNordpfeilX !== null && $nordpfeilElementConf !== null) {
+                $nordpfeilElementConf->x_ul = $savedNordpfeilX;
             }
 
             // Draw legend heading and images AFTER renderElements() so they appear
