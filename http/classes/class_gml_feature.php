@@ -54,7 +54,7 @@ class Feature {
 			$str .= $this->geometry->toGeoJSON();
 		}
 		else {
-			$str .= "\"\"";
+			$str .= "null";
 		}
 
 		

@@ -173,21 +173,24 @@ abstract class Wfs extends Ows {
 		switch ($this->getVersion()) {
 			case "2.0.2":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				break;
 			case "2.0.0":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				break;
 			default:
 				$typeNameParameterName = "typeName";
+				$typeNameRequestParameterName = "TYPENAME";
 				$maxFeaturesParameterName = "MAXFEATURES";
 				break;
 		}
 		$url = $this->getFeature .
 				$this->getConjunctionCharacter($this->getFeature) . 
-				"service=WFS&request=getFeature&version=" . 
-				$this->getVersion() . "&".strtolower($typeNameParameterName)."=" . $featureTypeName;
+				"SERVICE=WFS&REQUEST=GetFeature&VERSION=" . 
+				$this->getVersion() . "&".$typeNameRequestParameterName."=" . $featureTypeName;
 		if ($maxFeatures != null) {
 			$url .= "&".$maxFeaturesParameterName."=".$maxFeatures;
 		}
@@ -456,22 +459,26 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 		switch ($version) {
 			case "2.0.2":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				$srsName = "http://www.opengis.net/def/crs/EPSG/0/".$srsId;
 				break;
 			case "2.0.0":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				$srsName = "urn:ogc:def:crs:EPSG::".$srsId; //mapserver error when requesting this?
 				//$srsName = "EPSG:".$srsId;
 				break;
 			case "1.1.0":
 				$typeNameParameterName = "typeName";
+				$typeNameRequestParameterName = "TYPENAME";
 				$maxFeaturesParameterName = "MAXFEATURES";
 				$srsName = "urn:ogc:def:crs:EPSG::".$srsId;
 				break;
 			default:
 				$typeNameParameterName = "typeName";
+				$typeNameRequestParameterName = "TYPENAME";
 				$maxFeaturesParameterName = "MAXFEATURES";
 				$srsName = "EPSG:".$srsId;
 				break;
@@ -559,7 +566,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 			    return $this->post($this->getFeature, $postData);
 			    break;
 		        case "GET":
-		            $getRequest = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."SERVICE=wfs&VERSION=".$version."&REQUEST=GetFeature"."&".$typeNameParameterName."=".$featureTypeName."&".$maxFeaturesParameterName."=".$maxFeatures."&STARTINDEX=".$startIndex."&".$maxFeaturesParameterName."=".$maxFeatures;
+		            $getRequest = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."SERVICE=WFS&VERSION=".$version."&REQUEST=GetFeature"."&".$typeNameRequestParameterName."=".$featureTypeName."&".$maxFeaturesParameterName."=".$maxFeatures."&STARTINDEX=".$startIndex;
 		            if ($outputFormat != false) {
 			        $getRequest .= "&outputFormat=".$outputFormat;
 		            }
@@ -593,14 +600,17 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 	    switch ($version) {
 	        case "2.0.2":
 	            $typeNameParameterName = "typeNames";
+	            $typeNameRequestParameterName = "TYPENAMES";
 	            $maxFeaturesParameterName = "COUNT";
 	            break;
 	        case "2.0.0":
 	            $typeNameParameterName = "typeNames";
+	            $typeNameRequestParameterName = "TYPENAMES";
 	            $maxFeaturesParameterName = "COUNT";
 	            break;
 	        default:
 	            $typeNameParameterName = "typeName";
+	            $typeNameRequestParameterName = "TYPENAME";
 	            $maxFeaturesParameterName = "MAXFEATURES";
 	            break;
 	    }
@@ -616,10 +626,10 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 	        case "GET":
 	            if (is_array($featureTypeElementName)) {
 	                $e = new mb_exception("is_array!");
-	                $url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."service=WFS&request=GetFeature&version=".$version."&".strtolower($typeNameParameterName)."=".$featureTypeName."&PropertyName=".implode(',', $featureTypeElementName);
+	                $url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."SERVICE=WFS&REQUEST=GetFeature&VERSION=".$version."&".$typeNameRequestParameterName."=".$featureTypeName."&PropertyName=".implode(',', $featureTypeElementName);
 	            
 	            } else { 
-	               $url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."service=WFS&request=GetFeature&version=".$version."&".strtolower($typeNameParameterName)."=".$featureTypeName."&PropertyName=".$featureTypeElementName;
+	               $url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."SERVICE=WFS&REQUEST=GetFeature&VERSION=".$version."&".$typeNameRequestParameterName."=".$featureTypeName."&PropertyName=".$featureTypeElementName;
 	            }
 	            if ($filter != null) {
 	                $url .= "&FILTER=".urlencode($filter);
@@ -736,14 +746,17 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 		switch ($version) {
 			case "2.0.2":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				break;
 			case "2.0.0":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				break;
 			default:
 				$typeNameParameterName = "typeName";
+				$typeNameRequestParameterName = "TYPENAME";
 				$maxFeaturesParameterName = "MAXFEATURES";
 				break;
 		}
@@ -813,7 +826,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
     			} else {
 					$namespaces = "";
 				}
-    			$url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."service=WFS&request=GetFeature&version=".$version."&".strtolower($typeNameParameterName)."=".$featureTypeName."&resultType=hits".$namespaces;
+	    		$url = $this->getFeature.$this->getConjunctionCharacter($this->getFeature)."SERVICE=WFS&REQUEST=GetFeature&VERSION=".$version."&".$typeNameRequestParameterName."=".$featureTypeName."&resultType=hits".$namespaces;
     			
 				if ($filter != null) {
 					//Ticket: 7322 - Due to registration issues with complex wfs services
@@ -1053,6 +1066,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 		switch ($version) {
 			case "2.0.2":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				$featureIdParameterName = $prioritizeResourceId ? "resourceID" : "featureID";
 	
@@ -1068,6 +1082,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 	
 			case "2.0.0":
 				$typeNameParameterName = "typeNames";
+				$typeNameRequestParameterName = "TYPENAMES";
 				$maxFeaturesParameterName = "COUNT";
 				$featureIdParameterName = $prioritizeResourceId ? "resourceID" : "featureID";
 	
@@ -1083,6 +1098,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 	
 			default:
 				$typeNameParameterName = "typeName";
+				$typeNameRequestParameterName = "TYPENAME";
 				$maxFeaturesParameterName = "MAXFEATURES";
 				$featureIdParameterName = "featureID";
 				break;
@@ -1090,7 +1106,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 	
 		$getRequest = $this->getFeature .
 			$this->getConjunctionCharacter($this->getFeature) .
-			"service=WFS&request=GetFeature&version=" .
+			"SERVICE=WFS&REQUEST=GetFeature&VERSION=" .
 			$version;
 	
 		if ($outputFormat != false) {
@@ -1121,7 +1137,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 		if ($prioritizeResourceId) {
 			//Make sure max. 2 Features are requested (avoiding long execution time if ID-Parameter is not working)
 			
-			$getRequestPrioritized = $getRequest . "&" . strtolower($typeNameParameterName) . "=" . $featureTypeName .
+			$getRequestPrioritized = $getRequest . "&" . $typeNameRequestParameterName . "=" . $featureTypeName .
 			"&" . $featureIdParameterName . "=" . $id ."&". $maxFeaturesParameterName ."=2";
 
 			// Execute the request with resourceId prioritization

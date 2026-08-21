@@ -10,8 +10,14 @@
 	require_once(dirname(__FILE__)."/../classes/class_rss_factory.php");
 	require_once(dirname(__FILE__)."/../classes/class_iso19139.php");
 	
-	if (file_exists ( dirname ( __FILE__ ) . "/../../conf/excludeFromAtomFeedClient.json" )) {
-	    $configObject = json_decode ( file_get_contents ( "../../conf/excludeFromAtomFeedClient.json" ) );
+	$configPath = dirname(__FILE__) . "/../../conf/excludeFromAtomFeedClient.json";
+	if (file_exists($configPath)) {
+	    $configObject = json_decode(file_get_contents($configPath));
+	}
+	if (isset ( $configObject ) && isset ( $configObject->whitelist )) {
+	    $urlsWhitelist = $configObject->whitelist;
+	} else {
+	    $urlsWhitelist = false;
 	}
 	if (isset ( $configObject ) && isset ( $configObject->urls )) {
 	    $urlsBlacklist = $configObject->urls;
@@ -180,12 +186,42 @@ function DOMNodeListObjectAttributes($domNodeList) {
 	return $attributes;
 }
 
+function isWhitelistedDownloadFeedUrl($serviceFeedUrl) {
+	global $urlsWhitelist;
+	if ($urlsWhitelist === false || !is_array($urlsWhitelist) || count($urlsWhitelist) === 0) {
+		return false;
+	}
+
+	$parsedUrl = parse_url($serviceFeedUrl);
+	$host = (is_array($parsedUrl) && isset($parsedUrl['host'])) ? strtolower($parsedUrl['host']) : '';
+	if ($host === '') {
+		return false;
+	}
+
+	foreach ($urlsWhitelist as $whitelistEntry) {
+		$whitelistEntry = strtolower(trim((string)$whitelistEntry));
+		if ($whitelistEntry === '') {
+			continue;
+		}
+		// Support exact host matches and suffix matches like ".example.com"
+		if ($whitelistEntry[0] === '.') {
+			if (substr($host, -strlen($whitelistEntry)) === $whitelistEntry) {
+				return true;
+			}
+		} elseif ($host === $whitelistEntry) {
+			return true;
+		}
+	}
+	return false;
+}
+
 switch ($_REQUEST['method']) {
 	case "getServiceFeedObjectFromUrl" :
 		$serviceFeedUrl = htmlspecialchars_decode($_REQUEST['url']);//htmlspecialchars_decode is done to prohibit xss vulnerability of the client, which allows url as a get parameter
+		$isWhitelistedUrl = isWhitelistedDownloadFeedUrl($serviceFeedUrl);
         //secure client by use of blacklist
         //TODO: give back clean json - so that the client can generate a usefull message!
-		if ($urlsBlacklist != false) {
+		if ($urlsBlacklist != false && !$isWhitelistedUrl) {
 		    foreach ($urlsBlacklist as $urlPart) {
 		        if (strpos($serviceFeedUrl, $urlPart) !== false) {
 		            $e = new mb_exception("http/plugins/mb_downloadFeedServer.php:".'Found blacklist entry in downloadfeed url!');

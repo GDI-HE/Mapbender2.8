@@ -265,88 +265,106 @@ function gdalGml2geojson($features) {
     return $ogr->gml2Geojson($features);
 }
 
+function isWfsExceptionResponse($response) {
+	if ($response === false || $response === null || trim((string)$response) === "") {
+		return true;
+	}
+	if (stripos($response, "ExceptionReport") !== false || stripos($response, "ServiceExceptionReport") !== false || stripos($response, "ExceptionText") !== false) {
+		return true;
+	}
+	return false;
+}
+
+function updateBboxAccumulatorFromCoordinates($coordinates, &$minLat, &$minLon, &$maxLat, &$maxLon) {
+	if (!is_array($coordinates) || count($coordinates) === 0) {
+		return;
+	}
+	if (!is_array($coordinates[0]) && count($coordinates) >= 2 && is_numeric($coordinates[0]) && is_numeric($coordinates[1])) {
+		$lon = floatval($coordinates[0]);
+		$lat = floatval($coordinates[1]);
+		if ($minLat > $lat) { $minLat = $lat; }
+		if ($minLon > $lon) { $minLon = $lon; }
+		if ($maxLat < $lat) { $maxLat = $lat; }
+		if ($maxLon < $lon) { $maxLon = $lon; }
+		return;
+	}
+	foreach ($coordinates as $coordinatePart) {
+		updateBboxAccumulatorFromCoordinates($coordinatePart, $minLat, $minLon, $maxLat, $maxLon);
+	}
+}
+
+function calculateBboxFromGeojsonGeometry($geometry) {
+	if (!is_object($geometry) || !isset($geometry->type)) {
+		return false;
+	}
+	$minLat = 90;
+	$minLon = 180;
+	$maxLat = -90;
+	$maxLon = -180;
+
+	if ($geometry->type === "GeometryCollection" && isset($geometry->geometries) && is_array($geometry->geometries)) {
+		foreach ($geometry->geometries as $geometryPart) {
+			$bboxPart = calculateBboxFromGeojsonGeometry($geometryPart);
+			if ($bboxPart !== false) {
+				if ($minLat > $bboxPart->minx) { $minLat = $bboxPart->minx; }
+				if ($minLon > $bboxPart->miny) { $minLon = $bboxPart->miny; }
+				if ($maxLat < $bboxPart->maxx) { $maxLat = $bboxPart->maxx; }
+				if ($maxLon < $bboxPart->maxy) { $maxLon = $bboxPart->maxy; }
+			}
+		}
+	}
+	else if (isset($geometry->coordinates)) {
+		$coords = json_decode(json_encode($geometry->coordinates), true);
+		updateBboxAccumulatorFromCoordinates($coords, $minLat, $minLon, $maxLat, $maxLon);
+	}
+
+	if ($minLat > $maxLat || $minLon > $maxLon) {
+		return false;
+	}
+
+	$bbox = new stdClass();
+	$bbox->minx = $minLat;
+	$bbox->miny = $minLon;
+	$bbox->maxx = $maxLat;
+	$bbox->maxy = $maxLon;
+	return $bbox;
+}
+
+function extendFeatureCollectionBbox(&$minxFC, &$minyFC, &$maxxFC, &$maxyFC, $featureBbox) {
+	if (!is_object($featureBbox)) {
+		return;
+	}
+	if ($minxFC > $featureBbox->minx) {
+		$minxFC = $featureBbox->minx;
+	}
+	if ($minyFC > $featureBbox->miny) {
+		$minyFC = $featureBbox->miny;
+	}
+	if ($maxxFC < $featureBbox->maxx) {
+		$maxxFC = $featureBbox->maxx;
+	}
+	if ($maxyFC < $featureBbox->maxy) {
+		$maxyFC = $featureBbox->maxy;
+	}
+}
+
 function calculateBboxFromGeojsonFcObject($geojsonList) {    
+	$minxFC = 90;
+	$minyFC = 180;
+	$maxxFC = -90;
+	$maxyFC = -180;
     foreach ( $geojsonList->features as $feature ) {
-        $minxF = 90;
-        $minyF = 180;
-        $maxxF = - 90;
-        $maxyF = - 180;
-        switch ($feature->geometry->type) {
-            case "Polygon" :
-                foreach ( $feature->geometry->coordinates [0] as $lonLat ) {
-                    $lon = $lonLat [0];
-                    $lat = $lonLat [1];
-                    if ($minxF > $lat) {
-                        $minxF = $lat;
-                    }
-                    if ($minyF > $lon) {
-                        $minyF = $lon;
-                    }
-                    if ($maxxF < $lat) {
-                        $maxxF = $lat;
-                    }
-                    if ($maxyF < $lon) {
-                        $maxyF = $lon;
-                    }
-                }
-                break;
-            case "Point" :
-                $lon = $feature->geometry->coordinates [0];
-                $lat = $feature->geometry->coordinates [1];
-                if ($minxF > $lat) {
-                    $minxF = $lat;
-                }
-                if ($minyF > $lon) {
-                    $minyF = $lon;
-                }
-                if ($maxxF < $lat) {
-                    $maxxF = $lat;
-                }
-                if ($maxyF < $lon) {
-                    $maxyF = $lon;
-                }
-                break;
-            case "LineString" :
-                foreach ( $feature->geometry->coordinates as $lonLat ) {
-                    $lon = $lonLat [0];
-                    $lat = $lonLat [1];
-                    if ($minxF > $lat) {
-                        $minxF = $lat;
-                    }
-                    if ($minyF > $lon) {
-                        $minyF = $lon;
-                    }
-                    if ($maxxF < $lat) {
-                        $maxxF = $lat;
-                    }
-                    if ($maxyF < $lon) {
-                        $maxyF = $lon;
-                    }
-                }
-                break;
-        }
-        if ($minxFC > $minxF) {
-            $minxFC = $minxF;
-        }
-        if ($minyFC > $minyF) {
-            $minyFC = $minyF;
-        }
-        if ($maxxFC < $maxxF) {
-            $maxxFC = $maxxF;
-        }
-        if ($maxyFC < $maxyF) {
-            $maxyFC = $maxyF;
-        }
-        /*$geojsonBbox [$geojsonIndex]->minx = $minxF;
-        $geojsonBbox [$geojsonIndex]->miny = $minyF;
-        $geojsonBbox [$geojsonIndex]->maxx = $maxxF;
-        $geojsonBbox [$geojsonIndex]->maxy = $maxyF;*/
-        $bboxFc = array($minxFC, $minyFC, $maxxFC, $maxyFC);
-        
-        //return array("bbxFc"=>$bboxFc, "bbxArray"=>);
-        return $bboxFc;
-        // $e = new mb_exception("bbox featurecollection: minxFC:".$minxFC." minyFC:".$minyFC." maxxFC:".$maxxFC." maxyFC:".$maxyFC."");
+		if (isset($feature->geometry)) {
+			$bboxFeature = calculateBboxFromGeojsonGeometry($feature->geometry);
+			if ($bboxFeature !== false) {
+				extendFeatureCollectionBbox($minxFC, $minyFC, $maxxFC, $maxyFC, $bboxFeature);
+			}
+		}
     }
+	if ($minxFC > $maxxFC || $minyFC > $maxyFC) {
+		return false;
+	}
+	return array($minxFC, $minyFC, $maxxFC, $maxyFC);
 }
 
 // for digest authentication
@@ -1109,6 +1127,18 @@ if (isset ( $_REQUEST ["offset"] ) & $_REQUEST ["offset"] != "") {
 	$offset = ( integer ) $testMatch;
 	$testMatch = NULL;
 }
+// Compatibility alias for WFS-style paging parameter.
+if (! isset ( $offset ) && isset ( $_REQUEST ["STARTINDEX"] ) && $_REQUEST ["STARTINDEX"] != "") {
+	$testMatch = $_REQUEST ["STARTINDEX"];
+	$pattern = '/^[\d]*$/';
+	if (! preg_match ( $pattern, $testMatch )) {
+		echo 'Parameter <b>STARTINDEX</b> is not valid (integer).<br/>';
+		$e = new mb_exception("php/mod_linkedDataProxy.php: Parameter STARTINDEX is not valid ");
+		die ();
+	}
+	$offset = ( integer ) $testMatch;
+	$testMatch = NULL;
+}
 if (isset ( $_REQUEST ["collection"] ) & $_REQUEST ["collection"] != "") {
 	// validate to csv integer list
 	$testMatch = $_REQUEST ["collection"];
@@ -1537,6 +1567,13 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 		$returnObject->success = false;
 		$returnObject->message = "Wfs object could not be created from db!";
 	} else {
+		$wfsDetectedVersion = $wfs->getVersion();
+		$wfsRequestVersions = array($wfsDetectedVersion);
+		if ($wfsDetectedVersion == "2.0.0" || $wfsDetectedVersion == "2.0.2") {
+			$wfsRequestVersions[] = "1.1.0";
+		}
+		$wfsRequestVersions = array_values(array_unique($wfsRequestVersions));
+		$e = new mb_notice("php/mod_linkedDataProxy.php: detected wfs version: " . $wfsDetectedVersion . " - request fallback chain: " . implode(",", $wfsRequestVersions));
 		// $e = new mb_exception($wfs->providerName." - ".$wfs->summary." - ".$wfs->electronicMailAddress." - ".$wfs->fees);
 		// repair some missing wfs data
 		if (! isset ( $wfs->summary ) || $wfs->summary == null || $wfs->summary == "") {
@@ -2161,27 +2198,50 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 								$filter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0">' . ( string ) $filter . ( string ) $textFilter . '</fes:Filter>';
 							}
 						}
+if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion, "2.0") !== 0) {
+	$filter = str_replace('xmlns:fes="http://www.opengis.net/fes/2.0"', 'xmlns:ogc="http://www.opengis.net/ogc"', $filter);
+	$filter = str_replace("<fes", "<ogc", $filter);
+	$filter = str_replace("</fes", "</ogc", $filter);
+	$filter = str_replace("ValueReference", "PropertyName", $filter);
+						}
 						//
 						//$e = new mb_exception("filter: ".$filter);
 						// write number of features to ram cache:
 						/*
 						 * Cache of feature count, cause this may take very long when more than 1 mio features are served
 						 */
+						$countCacheKey = md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) );
+						$numberOfObjectsFromCache = false;
 						if ($cache->isActive) {
 							// if (false) {
-							if ($cache->cachedVariableExists ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ) ) == false) {
-								$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
-								$cache->cachedVariableAdd ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ), $numberOfObjects );
+							if ($cache->cachedVariableExists ( $countCacheKey ) == false) {
+								$numberOfObjects = false;
+								foreach ($wfsRequestVersions as $wfsRequestVersion) {
+									$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", $wfsRequestVersion, false, $wfs_http_method );
+									if ($numberOfObjects !== false && $numberOfObjects !== null) {
+										break;
+									}
+									$e = new mb_notice("php/mod_linkedDataProxy.php: countFeatures failed for version " . $wfsRequestVersion . " - trying fallback");
+								}
+								$cache->cachedVariableAdd ( $countCacheKey, $numberOfObjects );
 							} else {
 								// $e = new mb_exception("read count from cache!");
-								$numberOfObjects = $cache->cachedVariableFetch ( md5 ( "count_" . $wfsid . "_" . $collection . "_" . md5 ( $filter ) ) );
+								$numberOfObjects = $cache->cachedVariableFetch ( $countCacheKey );
+								$numberOfObjectsFromCache = true;
 							}
 							// $e = new mb_notice("http/classes/class_crs.php - store crs info to cache!");
 							// return true;
 						} else {
 							// TODO - define post/get central
 							// $numberOfObjects = $wfs->countFeatures($collection, $filter, "2.0.0");
-							$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", "2.0.0", false, $wfs_http_method );
+							$numberOfObjects = false;
+							foreach ($wfsRequestVersions as $wfsRequestVersion) {
+								$numberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", $wfsRequestVersion, false, $wfs_http_method );
+								if ($numberOfObjects !== false && $numberOfObjects !== null) {
+									break;
+								}
+								$e = new mb_notice("php/mod_linkedDataProxy.php: countFeatures failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
 						}
 						// $numberOfObjects = 1000;
 						//$e = new mb_exception("counted features: ".$numberOfObjects);
@@ -2189,6 +2249,35 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						// Check offset: return 404 if offset is beyond available features
 						if (! isset ( $offset )) {
 							$offset = 0;
+						}
+						$needsRecount = false;
+						if ($cache->isActive && $numberOfObjectsFromCache) {
+							if ($numberOfObjects === false || $numberOfObjects === null || !is_numeric($numberOfObjects) || intval($numberOfObjects) < 0) {
+								$needsRecount = true;
+							}
+							if ($numberOfObjects !== false && $numberOfObjects !== null && is_numeric($numberOfObjects) && intval($numberOfObjects) > 0 && $offset > 0 && $offset >= intval($numberOfObjects)) {
+								$needsRecount = true;
+							}
+						}
+						if ($needsRecount) {
+							$recountNumberOfObjects = false;
+							foreach ($wfsRequestVersions as $wfsRequestVersion) {
+								$recountNumberOfObjects = $wfs->countFeatures ( $ftName, $filter, "EPSG:4326", $wfsRequestVersion, false, $wfs_http_method );
+								if ($recountNumberOfObjects !== false && $recountNumberOfObjects !== null && is_numeric($recountNumberOfObjects) && intval($recountNumberOfObjects) >= 0) {
+									break;
+								}
+								$e = new mb_notice("php/mod_linkedDataProxy.php: recount countFeatures failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
+							if ($recountNumberOfObjects !== false && $recountNumberOfObjects !== null && is_numeric($recountNumberOfObjects) && intval($recountNumberOfObjects) >= 0) {
+								$numberOfObjects = intval($recountNumberOfObjects);
+								if ($cache->isActive) {
+									if ($cache->cachedVariableExists($countCacheKey)) {
+										$cache->cachedVariableDelete($countCacheKey);
+									}
+									$cache->cachedVariableAdd($countCacheKey, $numberOfObjects);
+								}
+								$e = new mb_notice("php/mod_linkedDataProxy.php: implausible cached count corrected by recount");
+							}
 						}
 						$offsetExceeded = false;
 							
@@ -2255,7 +2344,14 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						// number of hits per page? - how to get it from geojson result?
 						if (in_array ( 'application/json; subtype=geojson', explode ( ',', $ftOutputFormats ) ) && $nativeJson == true) {
 							// if (false) {
-							$features = $wfs->getFeaturePaging ( $ftName, $filter, "EPSG:4326", null, null, $limit, $startIndex, "2.0.0", 'application/json; subtype=geojson', $wfs_http_method );
+							$features = false;
+							foreach ($wfsRequestVersions as $wfsRequestVersion) {
+								$features = $wfs->getFeaturePaging ( $ftName, $filter, "EPSG:4326", null, null, $limit, $startIndex, $wfsRequestVersion, 'application/json; subtype=geojson', $wfs_http_method );
+								if (!isWfsExceptionResponse($features)) {
+									break;
+								}
+								$e = new mb_notice("php/mod_linkedDataProxy.php: getFeaturePaging(nativeJson) failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
 							$gmlFeatureCache = $features;
 							$geojsonList = json_decode ( $features );
 							// native json from wfs may not have bbox and gml_id attribute !!!!!!!!!
@@ -2278,82 +2374,37 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 							}
 							// read geojson to calculate bboxes
 							foreach ( $geojsonList->features as $feature ) {
-								$minxF = 90;
-								$minyF = 180;
-								$maxxF = - 90;
-								$maxyF = - 180;
-								switch ($feature->geometry->type) {
-									case "Polygon" :
-										foreach ( $feature->geometry->coordinates [0] as $lonLat ) {
-											$lon = $lonLat [0];
-											$lat = $lonLat [1];
-											if ($minxF > $lat) {
-												$minxF = $lat;
-											}
-											if ($minyF > $lon) {
-												$minyF = $lon;
-											}
-											if ($maxxF < $lat) {
-												$maxxF = $lat;
-											}
-											if ($maxyF < $lon) {
-												$maxyF = $lon;
-											}
-										}
-										break;
-									case "Point" :
-										$lon = $feature->geometry->coordinates [0];
-										$lat = $feature->geometry->coordinates [1];
-										if ($minxF > $lat) {
-											$minxF = $lat;
-										}
-										if ($minyF > $lon) {
-											$minyF = $lon;
-										}
-										if ($maxxF < $lat) {
-											$maxxF = $lat;
-										}
-										if ($maxyF < $lon) {
-											$maxyF = $lon;
-										}
-										break;
-									case "LineString" :
-										foreach ( $feature->geometry->coordinates as $lonLat ) {
-											$lon = $lonLat [0];
-											$lat = $lonLat [1];
-											if ($minxF > $lat) {
-												$minxF = $lat;
-											}
-											if ($minyF > $lon) {
-												$minyF = $lon;
-											}
-											if ($maxxF < $lat) {
-												$maxxF = $lat;
-											}
-											if ($maxyF < $lon) {
-												$maxyF = $lon;
-											}
-										}
-										break;
+								$featureBbox = calculateBboxFromGeojsonGeometry($feature->geometry);
+								if ($featureBbox !== false) {
+									$minxF = $featureBbox->minx;
+									$minyF = $featureBbox->miny;
+									$maxxF = $featureBbox->maxx;
+									$maxyF = $featureBbox->maxy;
+									//$e = new mb_exception("bbox feature: minxF:".$minxF." minyF:".$minyF." maxxF:".$maxxF." maxyF:".$maxyF."");
+									if ($minxFC > $minxF) {
+										$minxFC = $minxF;
+									}
+									if ($minyFC > $minyF) {
+										$minyFC = $minyF;
+									}
+									if ($maxxFC < $maxxF) {
+										$maxxFC = $maxxF;
+									}
+									if ($maxyFC < $maxyF) {
+										$maxyFC = $maxyF;
+									}
+									$geojsonBbox [$geojsonIndex]->minx = $minxF;
+									$geojsonBbox [$geojsonIndex]->miny = $minyF;
+									$geojsonBbox [$geojsonIndex]->maxx = $maxxF;
+									$geojsonBbox [$geojsonIndex]->maxy = $maxyF;
+									$geomType = $feature->geometry->type;
 								}
-								//$e = new mb_exception("bbox feature: minxF:".$minxF." minyF:".$minyF." maxxF:".$maxxF." maxyF:".$maxyF."");
-								if ($minxFC > $minxF) {
-									$minxFC = $minxF;
+								else {
+									$geojsonBbox [$geojsonIndex]->minx = null;
+									$geojsonBbox [$geojsonIndex]->miny = null;
+									$geojsonBbox [$geojsonIndex]->maxx = null;
+									$geojsonBbox [$geojsonIndex]->maxy = null;
 								}
-								if ($minyFC > $minyF) {
-									$minyFC = $minyF;
-								}
-								if ($maxxFC < $maxxF) {
-									$maxxFC = $maxxF;
-								}
-								if ($maxyFC < $maxyF) {
-									$maxyFC = $maxyF;
-								}
-								$geojsonBbox [$geojsonIndex]->minx = $minxF;
-								$geojsonBbox [$geojsonIndex]->miny = $minyF;
-								$geojsonBbox [$geojsonIndex]->maxx = $maxxF;
-								$geojsonBbox [$geojsonIndex]->maxy = $maxyF;
-								$geomType = $feature->geometry->type;
 								$geojsonIndex ++;
 								// $e = new mb_exception("bbox featurecollection: minxFC:".$minxFC." minyFC:".$minyFC." maxxFC:".$maxxFC." maxyFC:".$maxyFC."");
 							}
@@ -2381,7 +2432,14 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						    
 							$timeBeforeWfsRequest = microtime(true);
 						    //$e = new mb_exception("php/mod_linkedDataProxy.php: supported output formats: ".json_encode($ftOutputFormats));
-							$features = $wfs->getFeaturePaging ( $ftName, $filter, "EPSG:4326", null, null, $limit, $startIndex, "2.0.0", false, $wfs_http_method );
+							$features = false;
+							foreach ($wfsRequestVersions as $wfsRequestVersion) {
+								$features = $wfs->getFeaturePaging ( $ftName, $filter, "EPSG:4326", null, null, $limit, $startIndex, $wfsRequestVersion, false, $wfs_http_method );
+								if (!isWfsExceptionResponse($features)) {
+									break;
+								}
+								$e = new mb_notice("php/mod_linkedDataProxy.php: getFeaturePaging(gml) failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
 							//$features = $wfs->getFeaturePaging ( $ftName, $filter, "urn:ogc:def:crs:EPSG::4326", null, null, $limit, $startIndex, "1.1.0", false, $wfs_http_method );
 							$gmlFeatureCache = $features;
 							// transform to geojson to allow rendering !
@@ -2474,39 +2532,35 @@ if (! isset ( $wfsid ) || $wfsid == "") {
     							foreach ( $gml3Object->featureCollection->featureArray as $mbFeature ) {
     								// $e = new mb_exception("geojson from mb feature exporthandler: ".json_encode($mbFeature));
     								// $e = new mb_exception("geoJson object no.: ".$geojsonIndex." - current Memory usage: ".((memory_get_usage() - $startmem) / 1000)." MB");
-    								// bbox
-    								try {
-    									$geojsonBbox [$geojsonIndex]->mbBbox = $mbFeature->getBbox ();
-    									// $e = new mb_exception('bbox: '.$geojsonBbox[$geojsonIndex]->mbBbox);
-    								} catch ( Exception $e ) {
-    									$e = new mb_exception ( 'Problem to resolve bbox from gml - set to default values!', $e->getMessage () );
-    									$geojsonBbox [$geojsonIndex]->mbBbox = "[(" . $minxFC . "," . $minyFC . ",,urn:ogc:def:crs:EPSG::4326)(" . $maxxFC . "," . $maxyFC . ",,urn:ogc:def:crs:EPSG::4326) urn:ogc:def:crs:EPSG::4326]";
-    								}
-    								// $e = new mb_exception('bbox: '.$geojsonBbox[$geojsonIndex]->mbBbox);
-    								// transform to simple bbox object for leaflet
-    								$bbox_new = explode ( ' ', str_replace ( ']', '', str_replace ( '[', '', $geojsonBbox [$geojsonIndex]->mbBbox ) ) );
-    								$bbox_new = explode ( '|', str_replace ( ')', '', str_replace ( '(', '', str_replace ( ')(', '|', $bbox_new [0] ) ) ) );
-    								$bbox_min = explode ( ',', $bbox_new [0] );
-    								$bbox_max = explode ( ',', $bbox_new [1] );
-    								$geojsonBbox [$geojsonIndex]->minx = $bbox_min [0];
-    								$geojsonBbox [$geojsonIndex]->miny = $bbox_min [1];
-    								$geojsonBbox [$geojsonIndex]->maxx = $bbox_max [0];
-    								$geojsonBbox [$geojsonIndex]->maxy = $bbox_max [1];
-    								if ($minxFC > $geojsonBbox [$geojsonIndex]->minx) {
-    									$minxFC = $geojsonBbox [$geojsonIndex]->minx;
-    								}
-    								if ($minyFC > $geojsonBbox [$geojsonIndex]->miny) {
-    									$minyFC = $geojsonBbox [$geojsonIndex]->miny;
-    								}
-    								if ($maxxFC < $geojsonBbox [$geojsonIndex]->maxx) {
-    									$maxxFC = $geojsonBbox [$geojsonIndex]->maxx;
-    								}
-    								if ($maxyFC < $geojsonBbox [$geojsonIndex]->maxy) {
-    									$maxyFC = $geojsonBbox [$geojsonIndex]->maxy;
-    								}
-    								// get geomtype
-    								$geomType = json_decode ( $mbFeature->toGeoJSON () )->geometry->type;
-    								$geojsonList->features [] = json_decode ( $mbFeature->toGeoJSON () );
+									$featureGeoJson = json_decode($mbFeature->toGeoJSON());
+									if (!is_object($featureGeoJson) || !property_exists($featureGeoJson, 'geometry')) {
+										unset ( $gml3Object->featureCollection->featureArray [$geojsonIndex] );
+										continue;
+									}
+									if (is_object($featureGeoJson->geometry) && isset($featureGeoJson->geometry->type)) {
+										$featureBbox = calculateBboxFromGeojsonGeometry($featureGeoJson->geometry);
+										if ($featureBbox !== false) {
+											$geojsonBbox [$geojsonIndex]->minx = $featureBbox->minx;
+											$geojsonBbox [$geojsonIndex]->miny = $featureBbox->miny;
+											$geojsonBbox [$geojsonIndex]->maxx = $featureBbox->maxx;
+											$geojsonBbox [$geojsonIndex]->maxy = $featureBbox->maxy;
+											extendFeatureCollectionBbox($minxFC, $minyFC, $maxxFC, $maxyFC, $featureBbox);
+										}
+										else {
+											$geojsonBbox [$geojsonIndex]->minx = null;
+											$geojsonBbox [$geojsonIndex]->miny = null;
+											$geojsonBbox [$geojsonIndex]->maxx = null;
+											$geojsonBbox [$geojsonIndex]->maxy = null;
+										}
+										$geomType = $featureGeoJson->geometry->type;
+									}
+									else {
+										$geojsonBbox [$geojsonIndex]->minx = null;
+										$geojsonBbox [$geojsonIndex]->miny = null;
+										$geojsonBbox [$geojsonIndex]->maxx = null;
+										$geojsonBbox [$geojsonIndex]->maxy = null;
+									}
+									$geojsonList->features [] = $featureGeoJson;
     								// free memory
     								unset ( $gml3Object->featureCollection->featureArray [$geojsonIndex] );
     								$geojsonIndex ++;
@@ -2578,7 +2632,14 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 					// ************************************************************************************************************************************
 					// $e = new mb_exception("wfsid: ".$wfsid." - collection: ".$collection." - item: ".$item);
 					if (in_array ( 'application/json; subtype=geojson', explode ( ',', $ftOutputFormats ) ) && $nativeJson == true) {
-						$features = $wfs->getFeatureById ( $collection, 'application/json; subtype=geojson', $item, "2.0.0", "EPSG:4326" );
+						$features = false;
+						foreach ($wfsRequestVersions as $wfsRequestVersion) {
+							$features = $wfs->getFeatureById ( $collection, 'application/json; subtype=geojson', $item, $wfsRequestVersion, "EPSG:4326" );
+							if (!isWfsExceptionResponse($features)) {
+								break;
+							}
+							$e = new mb_notice("php/mod_linkedDataProxy.php: getFeatureById(nativeJson) failed for version " . $wfsRequestVersion . " - trying fallback");
+						}
 						$gmlFeatureCache = $features;
 						$geojsonList = json_decode ( $features );
 						$geojsonBbox = array ();
@@ -2597,64 +2658,14 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						}
 						// read geojson to calculate bboxes
 						foreach ( $geojsonList->features as $feature ) {
-							$minxF = 90;
-							$minyF = 180;
-							$maxxF = - 90;
-							$maxyF = - 180;
-							switch ($feature->geometry->type) {
-								case "Polygon" :
-									foreach ( $feature->geometry->coordinates [0] as $lonLat ) {
-										$lon = $lonLat [0];
-										$lat = $lonLat [1];
-										if ($minxF > $lat) {
-											$minxF = $lat;
-										}
-										if ($minyF > $lon) {
-											$minyF = $lon;
-										}
-										if ($maxxF < $lat) {
-											$maxxF = $lat;
-										}
-										if ($maxyF < $lon) {
-											$maxyF = $lon;
-										}
-									}
-									break;
-								case "Point" :
-									$lon = $feature->geometry->coordinates [0];
-									$lat = $feature->geometry->coordinates [1];
-									if ($minxF > $lat) {
-										$minxF = $lat;
-									}
-									if ($minyF > $lon) {
-										$minyF = $lon;
-									}
-									if ($maxxF < $lat) {
-										$maxxF = $lat;
-									}
-									if ($maxyF < $lon) {
-										$maxyF = $lon;
-									}
-									break;
-								case "LineString" :
-									foreach ( $feature->geometry->coordinates as $lonLat ) {
-										$lon = $lonLat [0];
-										$lat = $lonLat [1];
-										if ($minxF > $lat) {
-											$minxF = $lat;
-										}
-										if ($minyF > $lon) {
-											$minyF = $lon;
-										}
-										if ($maxxF < $lat) {
-											$maxxF = $lat;
-										}
-										if ($maxyF < $lon) {
-											$maxyF = $lon;
-										}
-									}
-									break;
+							$featureBbox = calculateBboxFromGeojsonGeometry($feature->geometry);
+							if ($featureBbox === false) {
+								continue;
 							}
+							$minxF = $featureBbox->minx;
+							$minyF = $featureBbox->miny;
+							$maxxF = $featureBbox->maxx;
+							$maxyF = $featureBbox->maxy;
 							if ($minxFC > $minxF) {
 								$minxFC = $minxF;
 							}
@@ -2755,32 +2766,33 @@ if (! isset ( $wfsid ) || $wfsid == "") {
     						}
     						//$e = new mb_exception("number of features: ".count($gml3Object->featureCollection->featureArray));
     						foreach ( $gml3Object->featureCollection->featureArray as $mbFeature ) {
-    							// bbox
-    							$geojsonBbox [$geojsonIndex]->mbBbox = $mbFeature->getBbox ();
-    							// transform to simple bbox object for leaflet
-    							$bbox_new = explode ( ' ', str_replace ( ']', '', str_replace ( '[', '', $geojsonBbox [$geojsonIndex]->mbBbox ) ) );
-    							$bbox_new = explode ( '|', str_replace ( ')', '', str_replace ( '(', '', str_replace ( ')(', '|', $bbox_new [0] ) ) ) );
-    							$bbox_min = explode ( ',', $bbox_new [0] );
-    							$bbox_max = explode ( ',', $bbox_new [1] );
-    							$geojsonBbox [$geojsonIndex]->minx = $bbox_min [0];
-    							$geojsonBbox [$geojsonIndex]->miny = $bbox_min [1];
-    							$geojsonBbox [$geojsonIndex]->maxx = $bbox_max [0];
-    							$geojsonBbox [$geojsonIndex]->maxy = $bbox_max [1];
-    							if ($minxFC > $geojsonBbox [$geojsonIndex]->minx) {
-    								$minxFC = $geojsonBbox [$geojsonIndex]->minx;
-    							}
-    							if ($minyFC > $geojsonBbox [$geojsonIndex]->miny) {
-    								$minyFC = $geojsonBbox [$geojsonIndex]->miny;
-    							}
-    							if ($maxxFC < $geojsonBbox [$geojsonIndex]->maxx) {
-    								$maxxFC = $geojsonBbox [$geojsonIndex]->maxx;
-    							}
-    							if ($maxyFC < $geojsonBbox [$geojsonIndex]->maxy) {
-    								$maxyFC = $geojsonBbox [$geojsonIndex]->maxy;
-    							}
-    							// get geomtype
-    							$geomType = json_decode ( $mbFeature->toGeoJSON () )->geometry->type;
-    							$geojsonList->features [] = json_decode ( $mbFeature->toGeoJSON () );
+				    					$featureGeoJson = json_decode ( $mbFeature->toGeoJSON () );
+				    					if (!is_object($featureGeoJson) || !property_exists($featureGeoJson, 'geometry')) {
+				    						continue;
+				    					}
+				    					if (is_object($featureGeoJson->geometry) && isset($featureGeoJson->geometry->type)) {
+				    						$featureBbox = calculateBboxFromGeojsonGeometry($featureGeoJson->geometry);
+				    						if ($featureBbox !== false) {
+				    							$geojsonBbox [$geojsonIndex]->minx = $featureBbox->minx;
+				    							$geojsonBbox [$geojsonIndex]->miny = $featureBbox->miny;
+				    							$geojsonBbox [$geojsonIndex]->maxx = $featureBbox->maxx;
+				    							$geojsonBbox [$geojsonIndex]->maxy = $featureBbox->maxy;
+				    							if ($minxFC > $geojsonBbox [$geojsonIndex]->minx) {
+				    								$minxFC = $geojsonBbox [$geojsonIndex]->minx;
+				    							}
+				    							if ($minyFC > $geojsonBbox [$geojsonIndex]->miny) {
+				    								$minyFC = $geojsonBbox [$geojsonIndex]->miny;
+				    							}
+				    							if ($maxxFC < $geojsonBbox [$geojsonIndex]->maxx) {
+				    								$maxxFC = $geojsonBbox [$geojsonIndex]->maxx;
+				    							}
+				    							if ($maxyFC < $geojsonBbox [$geojsonIndex]->maxy) {
+				    								$maxyFC = $geojsonBbox [$geojsonIndex]->maxy;
+				    							}
+				    						}
+				    						$geomType = $featureGeoJson->geometry->type;
+				    					}
+				    					$geojsonList->features [] = $featureGeoJson;
     							$geojsonIndex ++;
     						}
     						$e = new mb_exception("php/mod_linkedDataProxy.php: memory usage with parsing gml3 by mapbender: ".memory_get_usage() / 1000000);
@@ -3021,17 +3033,7 @@ switch ($f) {
         $js2 .= "	format: 'image/png8',";
         $js2 .= "	attribution: 'BKG - 2021 - <a href=\'https://sg.geodatenzentrum.de/web_public/Datenquellen_TopPlus_Open.pdf\'  target=\'_blank\'>Datenquellen<a>'";
         $js2 .= "}).addTo(map);";
-		/*
-		$js2 .= "	var map = L.map('map').setView([50, 7.44], 7);";
-		$js2 .= "	L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?";
-		$js2 .= "access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {";
-		$js2 .= "		maxZoom: 18,";
-		$js2 .= "		attribution: 'Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, ' +";
-		$js2 .= "			'<a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, ' +";
-		$js2 .= "			'Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>',";
-		$js2 .= "		id: 'mapbox.light'";
-		$js2 .= "	}).addTo(map);";*/
-
+		
 		if (! isset ( $wfsid ) || ! isset ( $ft )) {
 			$js2 .= 'document.getElementById("map").style.display = "none"; ';
 			// $js2 .= 'document.getElementById("bboxButtons").style.display = "none"; ';
@@ -3600,6 +3602,10 @@ switch ($f) {
 					        $gmlId = $feature->id;
 					    }
 					    
+						$zoomLink = '';
+						if (isset($geojsonBbox [$objIndex]) && $geojsonBbox [$objIndex]->minx !== null && $geojsonBbox [$objIndex]->miny !== null && $geojsonBbox [$objIndex]->maxx !== null && $geojsonBbox [$objIndex]->maxy !== null) {
+							$zoomLink = '<a href=""  onclick="zoomToExtent(' . $geojsonBbox [$objIndex]->minx . "," . $geojsonBbox [$objIndex]->miny . "," . $geojsonBbox [$objIndex]->maxx . "," . $geojsonBbox [$objIndex]->maxy . ');return false;">' . _mb ( 'zoom to' ) . '</a>';
+						}
 						$html .= '                <li>' . $newline;
 						$html .= '                    <div>' . $newline;
 						$html .= '                        <h4 class="mt-3 mb-1"><a href="' . get2Rest ( delTotalFromQuery ( array (
@@ -3607,7 +3613,7 @@ switch ($f) {
 								'offset',
 								'limit',
 								'bbox' 
-						), $_SERVER ['REQUEST_URI'] ) . '&item=' . $gmlId ) . '" target="_blank"><span>' . $gmlId . '</span></a></h4><a href=""  onclick="zoomToExtent(' . $geojsonBbox [$objIndex]->minx . "," . $geojsonBbox [$objIndex]->miny . "," . $geojsonBbox [$objIndex]->maxx . "," . $geojsonBbox [$objIndex]->maxy . ');return false;">' . _mb ( 'zoom to' ) . '</a>' . $newline;
+						), $_SERVER ['REQUEST_URI'] ) . '&item=' . $gmlId ) . '" target="_blank"><span>' . $gmlId . '</span></a></h4>' . $zoomLink . $newline;
 						$html .= '                        <span class="d-none" itemprop="sameAs">https://www.ldproxy.nrw.de/topographie/collections/ax_bergbaubetrieb/items/DENWAT01D000CcF0</span>' . $newline;
 						// foreach attribute
 						foreach ( $feature->properties as $key => $value ) {
@@ -3765,16 +3771,7 @@ switch ($f) {
         		$js2 .= "	format: 'image/png8',";
         		$js2 .= "	attribution: 'BKG - 2021 - <a href=\'https://sg.geodatenzentrum.de/web_public/Datenquellen_TopPlus_Open.pdf\'  target=\'_blank\'>Datenquellen<a>'";
         		$js2 .= "}).addTo(map);";
-				/*
-				$js2 .= "	var map = L.map('map').setView([50, 7.44], 7);";
-				$js2 .= "	L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?";
-				$js2 .= "access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {";
-				$js2 .= "		maxZoom: 18,";
-				$js2 .= "		attribution: 'Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, ' +";
-				$js2 .= "			'<a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, ' +";
-				$js2 .= "			'Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>',";
-				$js2 .= "		id: 'mapbox.light'";
-				$js2 .= "	}).addTo(map);";*/
+				
 				if (! isset ( $wfsid ) || ! isset ( $collection )) {
 					$js2 .= 'document.getElementById("map").style.display = "none"; ';
 					// $js2 .= 'document.getElementById("bboxButtons").style.display = "none"; ';
