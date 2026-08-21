@@ -1561,7 +1561,7 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 				foreach ($this->hvdCustomCats as $customCatId) {
 					$hvdFilter .= " md_custom_cats like '%{" . $customCatId . "}%' OR";
 				}
-				$hvdFilter = rtrim($hvdFilter, " OR");
+				$hvdFilter = (substr($hvdFilter, -3) === " OR") ? substr($hvdFilter, 0, -3) : $hvdFilter;
 				if ($hvdFilter !== "") {
 					array_push($whereCondArray, '(' . $hvdFilter . ')');
 				}
