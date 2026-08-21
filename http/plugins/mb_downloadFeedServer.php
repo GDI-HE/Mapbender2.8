@@ -190,17 +190,24 @@ function isWhitelistedDownloadFeedUrl($serviceFeedUrl) {
 	if ($urlsWhitelist === false || !is_array($urlsWhitelist) || count($urlsWhitelist) === 0) {
 		return false;
 	}
+
 	$parsedUrl = parse_url($serviceFeedUrl);
-	$host = isset($parsedUrl['host']) ? strtolower($parsedUrl['host']) : '';
+	$host = (is_array($parsedUrl) && isset($parsedUrl['host'])) ? strtolower($parsedUrl['host']) : '';
+	if ($host === '') {
+		return false;
+	}
+
 	foreach ($urlsWhitelist as $whitelistEntry) {
-		$whitelistEntry = strtolower(trim($whitelistEntry));
+		$whitelistEntry = strtolower(trim((string)$whitelistEntry));
 		if ($whitelistEntry === '') {
 			continue;
 		}
-		if ($host !== '' && $host === $whitelistEntry) {
-			return true;
-		}
-		if (strpos(strtolower($serviceFeedUrl), $whitelistEntry) !== false) {
+		// Support exact host matches and suffix matches like ".example.com"
+		if ($whitelistEntry[0] === '.') {
+			if (substr($host, -strlen($whitelistEntry)) === $whitelistEntry) {
+				return true;
+			}
+		} elseif ($host === $whitelistEntry) {
 			return true;
 		}
 	}
