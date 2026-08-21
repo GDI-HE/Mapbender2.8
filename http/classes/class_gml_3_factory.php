@@ -195,10 +195,14 @@ class Gml_3_Factory extends GmlFactory {
 		foreach ($allCoords as $coords) {
 			$coordsDom = dom_import_simplexml($coords);
 			$dim = self::getDimensionFromNode($coordsDom);
-			$coordArray = explode(' ', trim($coordsDom->nodeValue));
-			for ($i = 0; $i < count($coordArray); $i += $dim) {
+			$coordArray = preg_split('/\s+/', trim($coordsDom->nodeValue));
+			$coordCount = count($coordArray);
+			for ($i = 0; $i + 1 < $coordCount; $i += $dim) {
+				if (!isset($coordArray[$i + 1])) {
+					break;
+				}
 				$x = $coordArray[$i];
-				$y = $coordArray[$i+1];
+				$y = $coordArray[$i + 1];
 				$gmlLine->addPoint($x, $y);
 			}
 		}
