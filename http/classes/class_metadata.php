@@ -2361,11 +2361,9 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 	/**
 	 * Computes whether a resource is a High-Value Dataset (HVD)
 	 * based on the hvd_cats.json configuration.
-	 * Checks if any of the resource's custom or inspire category IDs
-	 * match those configured as HVD categories.
+	 * Checks if any of the resource's custom category IDs match those configured as HVD categories.
 	 *
 	 * @param array $customCats Array of custom category IDs (strings)
-	 * @param array $inspireCats Array of inspire category IDs (strings)
 	 * @return bool true if the resource qualifies as HVD
 	 */
 	private function computeIsHVD($customCats) {
