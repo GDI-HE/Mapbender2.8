@@ -10,8 +10,9 @@
 	require_once(dirname(__FILE__)."/../classes/class_rss_factory.php");
 	require_once(dirname(__FILE__)."/../classes/class_iso19139.php");
 	
-	if (file_exists ( dirname ( __FILE__ ) . "/../../conf/excludeFromAtomFeedClient.json" )) {
-	    $configObject = json_decode ( file_get_contents ( "../../conf/excludeFromAtomFeedClient.json" ) );
+	$configPath = dirname(__FILE__) . "/../../conf/excludeFromAtomFeedClient.json";
+	if (file_exists($configPath)) {
+	    $configObject = json_decode(file_get_contents($configPath));
 	}
 	if (isset ( $configObject ) && isset ( $configObject->whitelist )) {
 	    $urlsWhitelist = $configObject->whitelist;
