@@ -42,8 +42,8 @@ var jst_data = "arrNodes"
 var jst_expandAll_warning = "Expanding all nodes can take a while depending on your hardware! Continue?"
 var jst_target
 var jst_context_menu
-var jst_display_root = true
-var jst_highlight = true
+var jst_display_root = false
+var jst_highlight = false
 var jst_highlight_color = "white"
 var jst_highlight_bg = "navy"
 var jst_highlight_padding = "1px"
@@ -628,6 +628,190 @@ function renderChildren(strData, tblCls, menu){
 			code.push((n == nodes.length - 1 ? "last_closed" : "closed") + '.png" onClick="renderNode(' + "'" + strData + "[" + n + "][2]" + "'" + ',this,event)" class="action"')
 		}else{
 			code.push((n == nodes.length - 1 ? "last_leaf" : "leaf") + '.png"')
+				fldImg.src = jst_image_folder + "/closed_folder.png";
+		}
+	}
+
+	var newTr = tr.parentNode.insertRow((tr.rowIndex?tr.rowIndex:0) + 1)
+
+	if(ctlImg.id != "rootFolder"){
+		newTr.style.display = "none";
+	}
+
+	newTr.appendChild(document.createElement('td'))
+	newTr.appendChild(document.createElement('td'))
+		
+	if(newTr.nextSibling)
+		newTr.firstChild.setAttribute("background", jst_image_folder + "/branch.png", "false")
+	
+	newTr.childNodes[1].innerHTML = renderChildren(strData)
+	
+	var nodes = eval(strData)
+
+	var ndWithChildren = 0;
+	for(var n in nodes){
+		var n0 = nodes[n]
+		var n1 = n0[2]
+
+		if(n1){
+			renderNode(strData + "[" + n + "][2]" ,newTr.childNodes[1].firstChild.firstChild.childNodes[parseInt(n)+ndWithChildren].firstChild.firstChild);
+			ndWithChildren++;
+		}
+	}
+	
+	jst_loaded = true
+}
+
+window.mbTreeDragSource = null;
+
+window.mbTreeDragStart = function(e, strData) {
+	window.mbTreeDragSource = strData;
+	if (e && e.dataTransfer) {
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', strData);
+	}
+	var tr = (e && e.currentTarget) ? e.currentTarget : null;
+	if (tr) {
+		tr.classList.add('mb-dragging-row');
+	}
+};
+
+window.mbTreeDragOver = function(e) {
+	if (e && e.preventDefault) {
+		e.preventDefault();
+	}
+	if (e && e.dataTransfer) {
+		e.dataTransfer.dropEffect = 'move';
+	}
+	var tr = (e && e.currentTarget) ? e.currentTarget : null;
+	if (!tr) return false;
+
+	var rect = tr.getBoundingClientRect();
+	var midY = rect.top + (rect.height / 2);
+	if (e.clientY < midY) {
+		tr.classList.add('mb-drag-over-above');
+		tr.classList.remove('mb-drag-over-below');
+	} else {
+		tr.classList.add('mb-drag-over-below');
+		tr.classList.remove('mb-drag-over-above');
+	}
+	return false;
+};
+
+window.mbTreeDragLeave = function(e) {
+	var tr = (e && e.currentTarget) ? e.currentTarget : null;
+	if (tr) {
+		tr.classList.remove('mb-drag-over-above', 'mb-drag-over-below');
+	}
+};
+
+window.mbTreeDragEnd = function(e) {
+	var tr = (e && e.currentTarget) ? e.currentTarget : null;
+	if (tr) {
+		tr.classList.remove('mb-dragging-row', 'mb-drag-over-above', 'mb-drag-over-below');
+	}
+	var els = document.querySelectorAll('.mb-drag-over-above, .mb-drag-over-below, .mb-dragging-row');
+	for (var i = 0; i < els.length; i++) {
+		els[i].classList.remove('mb-drag-over-above', 'mb-drag-over-below', 'mb-dragging-row');
+	}
+};
+
+window.mbTreeDrop = function(e, targetStrData) {
+	if (e && e.preventDefault) e.preventDefault();
+	if (e && e.stopPropagation) e.stopPropagation();
+
+	var srcStr = window.mbTreeDragSource;
+	window.mbTreeDragEnd(e);
+
+	if (!srcStr || srcStr === targetStrData) {
+		return false;
+	}
+
+	try {
+		var srcNode = eval(srcStr);
+		var targetNode = eval(targetStrData);
+
+		if (!srcNode || !targetNode) return false;
+
+		var srcIds = (srcNode[1] && srcNode[1][7]) ? srcNode[1][7] : null;
+		var targetIds = (targetNode[1] && targetNode[1][7]) ? targetNode[1][7] : null;
+
+		if (!srcIds || !targetIds) return false;
+
+		var mapIdx = srcIds[0];
+		if (typeof mb_mapObj === 'undefined' || !mb_mapObj[mapIdx]) return false;
+		var mapObj = mb_mapObj[mapIdx];
+
+		var getIdx = function(s) {
+			var m = String(s).match(/\[(\d+)\]$/);
+			return m ? parseInt(m[1], 10) : null;
+		};
+
+		var srcIdx = getIdx(srcStr);
+		var targetIdx = getIdx(targetStrData);
+
+		if (srcIdx === null || targetIdx === null) return false;
+
+		var diff = targetIdx - srcIdx;
+		if (diff === 0) return false;
+
+		var isReverse = (typeof reverse !== 'undefined' && String(reverse) === 'true');
+		var moveUp = isReverse ? (diff > 0) : (diff < 0);
+		var steps = Math.abs(diff);
+
+		var srcWmsIdx = srcIds[1];
+		var srcWmsObj = mapObj.wms[srcWmsIdx];
+		if (!srcWmsObj) return false;
+
+		var srcWmsId = srcWmsObj.wms_id;
+		var srcLayerIdx = srcIds[2];
+		var srcLayerId = (srcWmsObj.objLayer && srcWmsObj.objLayer[srcLayerIdx]) ? srcWmsObj.objLayer[srcLayerIdx].layer_id : srcWmsObj.objLayer[0].layer_id;
+
+		for (var s = 0; s < steps; s++) {
+			mapObj.move(srcWmsId, srcLayerId, moveUp);
+		}
+
+		if (typeof getState === 'function') {
+			treeState = getState();
+		}
+
+		if (typeof reloadTree === 'function') {
+			reloadTree();
+		}
+
+		if (typeof setState === 'function' && typeof treeState !== 'undefined' && treeState) {
+			setState(treeState);
+		}
+
+		if (typeof mod_treeGDE_map !== 'undefined' && typeof Mapbender !== 'undefined' && Mapbender.modules && Mapbender.modules[mod_treeGDE_map]) {
+			Mapbender.modules[mod_treeGDE_map].setMapRequest();
+		} else if (mapObj.setMapRequest) {
+			mapObj.setMapRequest();
+		}
+	} catch (err) {
+		console.log("Drag & drop reorder error: ", err);
+	}
+	return false;
+};
+
+function renderChildren(strData, tblCls, menu){
+
+	var code = Array()
+
+	code.push('<table cellspacing="0" cellpadding="0" border="0" class="' + tblCls + '">')
+	
+	var nodes = eval(strData)
+
+	for(var n in nodes){
+		var n0 = nodes[n]
+		var n1 = n0[2]
+
+		code.push('<tr' + ((strData == jst_data && !jst_display_root) ? ' style="display:none;"' : '') + ' class="treeGDE3_tr" id="' + n0[0] + '" draggable="true" ondragstart="mbTreeDragStart(event, \'' + strData + '[' + n + ']\')" ondragover="mbTreeDragOver(event)" ondragleave="mbTreeDragLeave(event)" ondrop="mbTreeDrop(event, \'' + strData + '[' + n + ']\')" ondragend="mbTreeDragEnd(event)"><td><img' + (strData == jst_data ? ' style="display:none" id="rootImage"' : '') + ' src="' + jst_image_folder + '/')
+
+		if(n1){
+			code.push((n == nodes.length - 1 ? "last_closed" : "closed") + '.png" onClick="renderNode(' + "'" + strData + "[" + n + "][2]" + "'" + ',this,event)" class="action"')
+		}else{
+			code.push((n == nodes.length - 1 ? "last_leaf" : "leaf") + '.png"')
 		}
 		
 		if(jst_context_menu && !n0[1][5] && !menu)
@@ -641,15 +825,15 @@ function renderChildren(strData, tblCls, menu){
 						' style="display:none"' : ''
 					) +  
 				(n0[1][5] ? 
-					' class="action" onClick="showMenu(\'' + 
+					' class="action" title="Einstellungen" onClick="showMenu(\'' + 
 					strData + '[' + n + ']\', this, event)"' : ''
 				) + 
 				' src="' + jst_image_folder + '/' + 
 				(n1 ? 
 					(n0[1][3]?
-						n0[1][3]:"closed_folder.png"
+						n0[1][3]:(n0[1][5] ? "gear.svg" : "closed_folder.png")
 					) : n0[1][3] ? 
-						n0[1][3] : "node.png"
+						n0[1][3] : "gear.svg"
 				) + '" alt="">':''
 			)+
 			(
@@ -681,41 +865,167 @@ function renderChildren(strData, tblCls, menu){
 	}
 	code.push('</table>')
 	
-	
 	return code.join("")
 }
 
-function showMenu(strData, img, event){
-	var o = window.pageYOffset
-	var offY = o ? o : document.body.scrollTop
-	var offX = o ? window.pageXOffset : document.body.scrollLeft
+if (typeof window.mbUpdateOpacitySlider === 'undefined') {
+	window.mbUpdateOpacitySlider = function(mapObj_id, wms_id, val) {
+		var labelEl = document.getElementById('mb_op_val_' + mapObj_id + '_' + wms_id);
+		if (labelEl) {
+			labelEl.innerHTML = val + '%';
+		}
+		if (typeof mb_mapObj !== 'undefined' && mb_mapObj[mapObj_id] && mb_mapObj[mapObj_id].wms && mb_mapObj[mapObj_id].wms[wms_id]) {
+			var opacityPercent = 100 - parseInt(val, 10);
+			if (isNaN(opacityPercent)) opacityPercent = 100;
+			mb_mapObj[mapObj_id].wms[wms_id].setOpacity(opacityPercent);
+		}
+	};
+	window.mbApplyOpacitySlider = function(mapObj_id, wms_id, val) {
+		window.mbUpdateOpacitySlider(mapObj_id, wms_id, val);
+		if (typeof Mapbender !== 'undefined' && Mapbender.modules && typeof mod_treeGDE_map !== 'undefined' && Mapbender.modules[mod_treeGDE_map]) {
+			Mapbender.modules[mod_treeGDE_map].setMapRequest();
+		}
+	};
+}
+
+function renderSettingsPanel(strData) {
+	var n0 = eval(strData);
+	var title = (n0 && n0[1] && n0[1][0]) ? n0[1][0] : "Optionen";
+	var menuItems = (n0 && n0[1] && n0[1][5]) ? n0[1][5] : [];
+	var ids = (n0 && n0[1] && n0[1][7]) ? n0[1][7] : null;
+
+	var code = [];
+	code.push('<div class="mb-tree-settings-panel">');
 	
-	jst_cm.innerHTML = renderChildren(strData + "[1][5]", "menu", true)
-	
-	//TODO find a proper solution for this
-	var treeGDE = jst_cm.parentNode.parentNode;
-	if(treeGDE.id=="treeGDE"){
-		offX -= parseInt(treeGDE.style.left, 10);
-		offY -= parseInt(treeGDE.style.top, 10);
-		if(treeGDE.scrollTop)
-			offY += treeGDE.scrollTop;
-		if(treeGDE.scrollLeft)
-			offX += treeGDE.scrollLeft;
+	// Header
+	code.push('<div class="mb-tree-settings-header">');
+	code.push('<div class="mb-tree-settings-title-container">');
+	code.push('<img class="mb-tree-settings-icon" src="' + jst_image_folder + '/gear.svg" alt="Settings" />');
+	code.push('<span class="mb-tree-settings-title" title="' + String(title).replace(/"/g, '&quot;') + '">' + title + '</span>');
+	code.push('</div>');
+	code.push('<button class="mb-tree-settings-close" onclick="hideMenu(); if(event && event.stopPropagation) event.stopPropagation();" title="Schließen">&times;</button>');
+	code.push('</div>');
+
+	// Check if opacity option exists in menuItems
+	var hasOpacityOption = false;
+	for (var i = 0; i < menuItems.length; i++) {
+		if (menuItems[i][0] === 'menu_opacity_up' || menuItems[i][0] === 'menu_opacity_down') {
+			hasOpacityOption = true;
+			break;
+		}
 	}
+
+	if (hasOpacityOption && ids && typeof mb_mapObj !== 'undefined' && mb_mapObj[ids[0]] && mb_mapObj[ids[0]].wms && mb_mapObj[ids[0]].wms[ids[1]]) {
+		var wmsObj = mb_mapObj[ids[0]].wms[ids[1]];
+		var opacityRaw = parseFloat(wmsObj.gui_wms_mapopacity);
+		if (isNaN(opacityRaw)) opacityRaw = 1.0;
+		var transparencyVal = 100 - Math.round(opacityRaw * 100);
+
+		code.push('<div class="mb-tree-opacity-section">');
+		code.push('<div class="mb-tree-opacity-label">');
+		code.push('<span>Transparenz</span>');
+		code.push('<span class="mb-tree-opacity-value" id="mb_op_val_' + ids[0] + '_' + ids[1] + '">' + transparencyVal + '%</span>');
+		code.push('</div>');
+		code.push('<input type="range" id="mb_slider_' + ids[0] + '_' + ids[1] + '" class="mb-opacity-slider" min="0" max="100" value="' + transparencyVal + '" ');
+		code.push('oninput="mbUpdateOpacitySlider(' + ids[0] + ',' + ids[1] + ', this.value);" ');
+		code.push('onchange="mbApplyOpacitySlider(' + ids[0] + ',' + ids[1] + ', this.value);" />');
+		code.push('<div class="mb-tree-opacity-presets">');
+		code.push('<button type="button" class="mb-opacity-preset-btn" onclick="var s=document.getElementById(\'mb_slider_' + ids[0] + '_' + ids[1] + '\'); if(s){s.value=0; mbApplyOpacitySlider(' + ids[0] + ',' + ids[1] + ', 0);}">0%</button>');
+		code.push('<button type="button" class="mb-opacity-preset-btn" onclick="var s=document.getElementById(\'mb_slider_' + ids[0] + '_' + ids[1] + '\'); if(s){s.value=50; mbApplyOpacitySlider(' + ids[0] + ',' + ids[1] + ', 50);}">50%</button>');
+		code.push('<button type="button" class="mb-opacity-preset-btn" onclick="var s=document.getElementById(\'mb_slider_' + ids[0] + '_' + ids[1] + '\'); if(s){s.value=100; mbApplyOpacitySlider(' + ids[0] + ',' + ids[1] + ', 100);}">100%</button>');
+		code.push('</div>');
+		code.push('</div>');
+	}
+
+	// Actions List
+	code.push('<div class="mb-tree-settings-actions">');
+	for (var i = 0; i < menuItems.length; i++) {
+		var item = menuItems[i];
+		var itemId = item[0];
+		if (itemId === 'menu_opacity_up' || itemId === 'menu_opacity_down' || itemId === 'menu_hide' || itemId === 'menu_move_up' || itemId === 'menu_move_down') {
+			continue;
+		}
+
+		var itemData = item[1];
+		var label = itemData[0].replace(/&nbsp;/g, '').trim();
+		var actionJs = String(itemData[1]).replace(/{@strData}/g, strData);
+		var iconFile = itemData[3] ? itemData[3] : 'gear.svg';
+		var isDelete = (itemId === 'menu_delete');
+
+		var cleanJs = '';
+		if (isDelete && ids) {
+			cleanJs = 'remove_wms(' + ids[0] + ',' + ids[1] + ',' + (ids[2] || 0) + ');';
+		} else {
+			cleanJs = actionJs.replace(/^javascript:/i, '').replace(/"/g, '&quot;');
+		}
+		code.push('<button class="mb-tree-action-btn' + (isDelete ? ' mb-tree-action-delete' : '') + '" ');
+		code.push('onclick="hideMenu(); ' + cleanJs + ';">');
+		code.push('<img class="mb-tree-action-icon" src="' + jst_image_folder + '/' + iconFile + '" alt="" />');
+		code.push('<span>' + label + '</span>');
+		code.push('</button>');
+	}
+	code.push('</div>'); // end actions
+	code.push('</div>'); // end panel
+
+	return code.join("");
+}
+
+function showMenu(strData, img, event){
+	if (!jst_cm) {
+		jst_cm = document.getElementById("contextMenu");
+	}
+
+	var rect = (img && img.getBoundingClientRect) ? img.getBoundingClientRect() : null;
+	var top = 100;
+	var left = 100;
 	
-	jst_cm.style.top = (offY + event.clientY) + "px";
-	jst_cm.style.left = (offX + event.clientX) + "px";
-	jst_cm.style.visibility = ""
+	if (rect) {
+		top = rect.bottom + 4;
+		left = rect.left;
+	} else if (event) {
+		top = event.clientY + 4;
+		left = event.clientX;
+	}
+
+	var cardWidth = 250;
+	var cardHeight = 220;
 	
-	event.cancelBubble = true
+	if (left + cardWidth > window.innerWidth - 10) {
+		left = Math.max(10, window.innerWidth - cardWidth - 10);
+	}
+	if (top + cardHeight > window.innerHeight - 10) {
+		if (rect && rect.top - cardHeight > 10) {
+			top = rect.top - cardHeight - 4;
+		} else {
+			top = Math.max(10, window.innerHeight - cardHeight - 10);
+		}
+	}
+
+	jst_cm.style.position = "fixed";
+	jst_cm.style.top = top + "px";
+	jst_cm.style.left = left + "px";
+	jst_cm.style.zIndex = "999999";
+	jst_cm.innerHTML = renderSettingsPanel(strData);
+	jst_cm.style.visibility = "visible";
+
+	setTimeout(function() {
+		document.body.addEventListener('click', hideMenu);
+	}, 10);
+
+	if (event) {
+		if (event.stopPropagation) event.stopPropagation();
+		event.cancelBubble = true;
+	}
 }
 
 function hideMenu(){
-	jst_cm.style.visibility = "hidden"
+	if (jst_cm) {
+		jst_cm.style.visibility = "hidden";
+	}
+	document.body.removeEventListener('click', hideMenu);
 }
 
 function renderTree(){
-//	TestDate = new Date();TestStartZeit=TestDate.getTime();
 	eval(jst_container).innerHTML = '<table cellspacing="0" cellpadding="0" border="0"><tr id="'+eval(jst_data + "[0][0]")+'"><td colspan="2"><span id="rootFolder"></span></td></tr></table><div style="position:absolute;top:-100;left:-100" id="contextMenu"></div>'
 	renderNode(jst_data, document.getElementById("rootFolder"))
 	renderNode(jst_data + "[0][2]", document.getElementById("rootImage"))
@@ -723,5 +1033,5 @@ function renderTree(){
 	jst_cm = document.getElementById("contextMenu")
 	document.body.onclick = hideMenu
 	jst_loaded = true
-//	TestDate=new Date();TestStopZeit=TestDate.getTime();alert(TestStopZeit-TestStartZeit);
 }
+

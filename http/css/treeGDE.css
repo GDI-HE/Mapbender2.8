@@ -1,20 +1,241 @@
-body{
-  font-size: 13px;
-  line-height: 15px;
-  font-family: "Verdana","Arial",sans-serif;
+#treeGDE a {
+	text-decoration:none;
+	color:black;
+	font-size:12px;
 }
-/* links */
-a {
-  text-decoration:none;
-  color:black;
+#treeGDE a.node
+{
+	vertical-align:middle;
 }
-a:visited {
-  color:black;
+#treeGDE a:link
+{
+	color: #000000;
 }
-a:active {
-  color:black;
+#treeGDE a:visited
+{
+	color: #000000;
+}
+#treeGDE a:hover
+{
+	color: #8080FF;
+	text-decoration:underline;
+}
+#treeGDE table
+{
+	font-size:8pt;
+	line-height:8pt;
+	margin: 0px;
+	padding: 0px;
+}
+#treeGDE table.menu
+{
+	background-color: #fff;
+	border: 1px solid #999999
+}
+#treeGDE tr td
+{
+	color: #000000;
+	font-family: Verdana;
+	padding: 0px;
+}
+#treeGDE img
+{
+	border:none;
+	padding:0px;
+	margin:0px;
+	vertical-align:middle;		
+}
+#treeGDE input
+{
+	margin-top:0px;
+	margin-bottom:0px;
+	margin-left:0px;
+	margin-right:3px;
+	padding:0px;
+	vertical-align:middle;
+}
 
+#treeGDE span {
+  font-size: 15px;
 }
-a:hover {
-  color:black;
+#treeGDE .action {
+
+  cursor:pointer;
 }
+
+#contextMenu {
+	position: fixed !important;
+	z-index: 999999 !important;
+}
+
+/* Modern Layer Settings Popover Card */
+.mb-tree-settings-panel {
+	background: #ffffff;
+	border-radius: 10px;
+	box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.25), 0 4px 10px -2px rgba(0, 0, 0, 0.1);
+	border: 1px solid #cbd5e1;
+	padding: 14px;
+	width: 250px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+	box-sizing: border-box;
+	color: #1e293b;
+	position: relative;
+	text-align: left;
+}
+
+.mb-tree-settings-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding-bottom: 8px;
+	margin-bottom: 10px;
+	border-bottom: 1px solid #e2e8f0;
+}
+
+.mb-tree-settings-title-container {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	overflow: hidden;
+	max-width: 180px;
+}
+
+.mb-tree-settings-icon {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+}
+
+.mb-tree-settings-title {
+	font-size: 13px;
+	font-weight: 600;
+	color: #0f172a;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mb-tree-settings-close {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	font-size: 16px;
+	line-height: 1;
+	color: #64748b;
+	padding: 2px 6px;
+	border-radius: 4px;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mb-tree-settings-close:hover {
+	background-color: #f1f5f9;
+	color: #0f172a;
+}
+
+/* Opacity Slider Section */
+.mb-tree-opacity-section {
+	margin-bottom: 10px;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	padding: 8px 10px;
+}
+
+.mb-tree-opacity-label {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 12px;
+	font-weight: 500;
+	color: #334155;
+	margin-bottom: 6px;
+}
+
+.mb-tree-opacity-value {
+	font-weight: 700;
+	color: #2563eb;
+	font-size: 12px;
+}
+
+.mb-opacity-slider {
+	-webkit-appearance: none;
+	width: 100%;
+	height: 6px;
+	border-radius: 3px;
+	background: #cbd5e1;
+	outline: none;
+	margin: 4px 0 !important;
+	padding: 0 !important;
+	cursor: pointer;
+}
+
+.mb-opacity-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #2563eb;
+	border: 2px solid #ffffff;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	cursor: pointer;
+	transition: transform 0.1s ease;
+}
+
+.mb-opacity-slider::-webkit-slider-thumb:hover {
+	transform: scale(1.15);
+}
+
+.mb-opacity-slider::-moz-range-thumb {
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #2563eb;
+	border: 2px solid #ffffff;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	cursor: pointer;
+}
+
+/* Action items list */
+.mb-tree-settings-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.mb-tree-action-btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: transparent;
+	border: none;
+	color: #334155;
+	font-size: 12px;
+	font-weight: 500;
+	text-decoration: none;
+	cursor: pointer;
+	transition: background-color 0.15s ease, color 0.15s ease;
+	width: 100%;
+	text-align: left;
+	box-sizing: border-box;
+}
+
+.mb-tree-action-btn:hover {
+	background-color: #f1f5f9;
+	color: #0f172a;
+}
+
+.mb-tree-action-btn.mb-tree-action-delete:hover {
+	background-color: #fef2f2;
+	color: #dc2626;
+}
+
+.mb-tree-action-icon {
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+

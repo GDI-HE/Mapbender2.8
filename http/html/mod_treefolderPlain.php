@@ -1191,7 +1191,7 @@ function initArray(){
 										groupedImageStyle ='closed_folder.png';
 									}
 									else{
-										groupedImageStyle ='menu.png';
+										groupedImageStyle ='verticaldots.svg';
 									}
 									//add sublayer - don't change order of them!
 									addNode(parentObj + parentLayer, [temp.layer_id,[temp.layer_currentTitle,((metadatalink=='true'&&wmsbuttons != 'true')?('javascript:openwindow(\"'+ defaultMetadataUrl + '&id='+temp.layer_uid+'\",'+metadataWidth+','+metadataHeight+');'):"javascript:select("+i+","+ii+","+iii+");"),,((c_menu!='[]'&&temp.layer_name!="")?groupedImageStyle:null),temp.layer_currentTitle,eval(c_menu),controls.join(""),[i,ii,iii]]],false,false,false);
@@ -1269,3 +1269,4 @@ function initWmsCheckboxen(){
 		}
 	}
 }
+

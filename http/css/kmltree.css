@@ -6,7 +6,7 @@ a{ border: 1px dotted red; }
 
 
 #kmlTree .style-preview svg {
-    margin: 5px 3px -8px 3px !important;
+	margin: 5px 3px -8px 3px !important;
 }
 
 /* The Whole kml Tree */
@@ -14,29 +14,32 @@ a{ border: 1px dotted red; }
 ul.kmlTree {
 	overflow: auto;
 	width: 10em;
-/*	background-image: url("http://localhost:8888/vertical_dots.png");*/
-	background-repeat: repeat-y	;
+	/*	background-image: url("http://localhost:8888/vertical_dots.png");*/
+	background-repeat: repeat-y;
 	background-position: 20px;
 
 }
-ul.kmlTree, ul.kmlTree ul {
+
+ul.kmlTree,
+ul.kmlTree ul {
 	list-style-type: none;
 	margin-left: 0;
 	padding-left: 0;
-        margin-top: 0;
+	margin-top: 0;
 }
 
-ul.kmlTree a{
+ul.kmlTree a {
 	font-size: x-small;
 }
 
 
-ul.kmlTree  li{
+ul.kmlTree li {
 	padding-left: 2px;
-/*	margin-left: 1em;*/
+	/*	margin-left: 1em;*/
 }
 
-ul.kmlTree button,#kml-load-tabs button {
+ul.kmlTree button,
+#kml-load-tabs button {
 	padding: 0;
 	margin-left: 0;
 	background-color: transparent;
@@ -47,7 +50,10 @@ ul.kmlTree button,#kml-load-tabs button {
 	cursor: pointer;
 }
 
-ul.kmlTree a:link, ul.kmlTree a:visited, ul.kmlTree a:hover, ul.kmlTree a:active {
+ul.kmlTree a:link,
+ul.kmlTree a:visited,
+ul.kmlTree a:hover,
+ul.kmlTree a:active {
 	background-color: transparent;
 	text-decoration: none;
 	color: black;
@@ -56,21 +62,23 @@ ul.kmlTree a:link, ul.kmlTree a:visited, ul.kmlTree a:hover, ul.kmlTree a:active
 
 /* a Root Node  */
 
-ul.kmlTree  li.kml.open{
+ul.kmlTree li.kml.open {
 	padding-left: 0;
 }
 
-ul.kmlTree li.kml ul li{
-	margin-left:  0.2em;
+ul.kmlTree li.kml ul li {
+	margin-left: 0.2em;
 }
 
 #kml-load-tabs .add {
-	background-image:  url("../img/add.png");
+	background-image: url("../img/add.png");
 	background-repeat: no-repeat;
 	background-position: 50% 50%;
 }
-.icon-select-geodata, .icon-add-geodata {
-    margin-right: 5px;
+
+.icon-select-geodata,
+.icon-add-geodata {
+	margin-right: 5px;
 }
 
 .icon-add-geodata {
@@ -78,85 +86,89 @@ ul.kmlTree li.kml ul li{
 	background-repeat: no-repeat;
 	background-position: 50% 50%;
 	width: 20px;
-    height: 20px;
-    display: inline-block;
+	height: 20px;
+	display: inline-block;
 }
 
-ul.kmlTree button.add, #toggle-select-features {
+ul.kmlTree button.add,
+#toggle-select-features {
 	outline: unset;
-    display: flex;
-    width: 100%;
-    margin-bottom: 5px;
-    align-items: center;
-    justify-content: center;
-    border-bottom: 1px solid transparent;
-    background-color: #e3e3e3;
-    font-size: 10px;
-    padding: 12px;
+	display: flex;
+	width: 100%;
+	margin-bottom: 5px;
+	align-items: center;
+	justify-content: center;
+	border-bottom: 1px solid transparent;
+	background-color: #e3e3e3;
+	font-size: 10px;
+	padding: 12px;
 }
 
-ul.kmlTree li.open.kml > button.toggle{
+ul.kmlTree li.open.kml>button.toggle {
 	background-image: url("../img/geokml_logo_folder.png");
 	background-repeat: no-repeat;
 	background-position: 50% 50%;
 }
 
-ul.kmlTree li.closed.kml > button.toggle{
+ul.kmlTree li.closed.kml>button.toggle {
 	background-image: url("../img/geokml_logo_folder.png");
 	background-repeat: no-repeat;
 	background-position: 50% 50%;
 }
-ul.kmlTree li.kml.open, ul.kmlTree li.kml.closed {
+
+ul.kmlTree li.kml.open,
+ul.kmlTree li.kml.closed {
 	background-image: none;
 }
 
 
 /*  a kml Node */
 
-ul.kmlTree li.open > button.toggle{
+ul.kmlTree li.open>button.toggle {
 	background-image: url("../img/tree_new/expanded_folder.png");
 	background-repeat: no-repeat;
 	background-position: 0 0;
 }
 
-ul.kmlTree li.closed >  button.toggle{
+ul.kmlTree li.closed>button.toggle {
 	background-image: url("../img/tree_new/closed_folder.png");
 	background-repeat: no-repeat;
 	background-position: 0 0;
 }
 
-ul.kmlTree li button.remove{
+ul.kmlTree li button.remove {
 	background-image: url("../img/button_digitize/geomRemove.png");
 	background-repeat: no-repeat;
 	background-position: 0 0;
 }
 
 ul.kmlTree li button.digitize-layer {
-    background-image: url('../img/button_digitize/polygon_off.png');
-    background-repeat: no-repeat;
-    background-position: 0 0;
-    width: 28px;
-    height: 27px;
+	background-image: url('../img/button_digitize/polygon_off.png');
+	background-repeat: no-repeat;
+	background-position: 0 0;
+	width: 28px;
+	height: 27px;
 }
 
 ul.kmlTree li button.digitize-layer.active {
-    background-image: url('../img/button_digitize/polygon_on.png');
+	background-image: url('../img/button_digitize/polygon_on.png');
 }
 
-ul.kmlTree li.open, ul.kmlTree li.closed {
-/*	background-image: url("http://localhost:8888/vertical_dots.png");*/
-	background-repeat: repeat-x	;
+ul.kmlTree li.open,
+ul.kmlTree li.closed {
+	/*	background-image: url("http://localhost:8888/vertical_dots.png");*/
+	background-repeat: repeat-x;
 	background-position: 10px 10px;
 	padding-bottom: 0.5em;
 }
 
-ul.kmlTree li.closed >ul{
+ul.kmlTree li.closed>ul {
 	display: none;
 }
 
 
 
-ul.kmlTree li.kml  li input{
+ul.kmlTree li.kml li input {
 	vertical-align: middle;
 	margin: 0;
 }
@@ -164,127 +176,432 @@ ul.kmlTree li.kml  li input{
 
 /* a kmlItem Node */
 
-ul.kmlTree  ul ul {
+ul.kmlTree ul ul {
 	padding: 0;
 }
 
-ul.kmlTree  ul ul li {
+ul.kmlTree ul ul li {
 	padding: 0;
 	border: 1px solid transparent;
 }
-ul.kmlTree ul ul li:hover, li.feature-container:hover{
+
+ul.kmlTree ul ul li:hover,
+li.feature-container:hover {
 	border: 1px dotted gray;
 }
-ul.kmlTree ul ul li, li.feature-container{
+
+ul.kmlTree ul ul li,
+li.feature-container {
 	border: 1px dotted transparent;
 }
+
 ul.kmlTree li.kmltree-selected {
-    background-color: yellow;
+	background-color: yellow;
 }
 
 a.icon {
-    background-repeat: no-repeat;
-    background-position: center left;
-    padding-left: 21px !important;
-    margin-left: 5px;
+	background-repeat: no-repeat;
+	background-position: center left;
+	padding-left: 21px !important;
+	margin-left: 5px;
 }
 
 a.icon-wmc {
-    background-image: url('../img/tree_new/expanded_folder.png');
+	background-image: url('../img/tree_new/expanded_folder.png');
 }
 
 a.icon-local {
-    background-image: url('../img/osgeo_graphics/geosilk/database.png');
+	background-image: url('../img/osgeo_graphics/geosilk/database.png');
 }
 
 a.icon-remote {
-    background-image: url('../img/up-ilink.png');
-    background-size: 22px;
+	background-image: url('../img/up-ilink.png');
+	background-size: 22px;
 }
 
 a.icon-new {
-    background-image: url('../img/add.png');
+	background-image: url('../img/add.png');
 }
 
 #kml-new button.add-kml {
-    background-image:  url("../img/add.png");
-    background-repeat: no-repeat;
-    background-position: 50% 50%;
+	background-image: url("../img/add.png");
+	background-repeat: no-repeat;
+	background-position: 50% 50%;
 }
 
 .kmltree-metadata-list {
-    list-style-type: none;
+	list-style-type: none;
 }
 
 .kmltree-metadata-list li {
-    cursor: pointer;
-    line-height: 22px;
+	cursor: pointer;
+	line-height: 22px;
 }
 
 .kmltree-metadata-list li img {
-    vertical-align: middle;
+	vertical-align: middle;
 }
 
-#licenseTbl td, #licenseTbl th{
+#licenseTbl td,
+#licenseTbl th {
 
-border: 1px solid rgb(211, 214, 255);
-
-}
-#licenseTbl td:empty{
-
-border: none !important;
+	border: 1px solid rgb(211, 214, 255);
 
 }
 
-.geometry-div{
+#licenseTbl td:empty {
 
-    text-align: right
+	border: none !important;
 
 }
 
-.geometry-div .geometry-p{
+.geometry-div {
 
-    margin: 1px;
+	text-align: right
+}
+
+.geometry-div .geometry-p {
+
+	margin: 1px;
 
 }
 
 
 #publishDenied {
 
-position:absolute;
-width:50%;
-cursor:pointer;
-left: -10px;
+	position: absolute;
+	width: 50%;
+	cursor: pointer;
+	left: -10px;
 
 }
 
 #publishConfirmed {
 
 
-width:50%;
-cursor:pointer;
+	width: 50%;
+	cursor: pointer;
 
 }
 
 /*dialog_override*/
-#kml-from-wmc {overflow:auto;}
-#kml-from-wmc div table.display {border-collapse:unset;}
-#kml-from-wmc div.dataTables_length, #kml-from-wmc div.dataTables_filter, #kml-from-wmc div.dataTables_info, #kml-from-wmc div.dataTables_paginate {
+#kml-from-wmc {
+	overflow: auto;
+}
+
+#kml-from-wmc div table.display {
+	border-collapse: unset;
+}
+
+#kml-from-wmc div.dataTables_length,
+#kml-from-wmc div.dataTables_filter,
+#kml-from-wmc div.dataTables_info,
+#kml-from-wmc div.dataTables_paginate {
 	font-size: 12px;
 	margin: 5px 0px 5px 0px;
 	line-height: 26px;
-	padding: 0 5px 0 5px;	
+	padding: 0 5px 0 5px;
 	box-sizing: border-box;
 }
-#kml-from-wmc div.dataTables_length {border-right:none;width:50%;}
-#kml-from-wmc div.dataTables_filter{border-left:none;width:50%;}
+
+#kml-from-wmc div.dataTables_length {
+	border-right: none;
+	width: 50%;
+}
+
+#kml-from-wmc div.dataTables_filter {
+	border-left: none;
+	width: 50%;
+}
+
 #kml-from-wmc div table.display thead th {
 	padding: 3px 18px 3px 10px;
 	border: 1px solid #d3d3d3;
 	font-weight: normal;
 	font-size: 12px;
-	cursor: pointer;	
+	cursor: pointer;
 }
-#kml-from-upload input, #kml-from-url input.kmlurl, #kml-new input{margin:5px 0px 10px 0px;}
-#kml-from-url, #kml-new, #kml-from-upload {font-size:12px;line-height:20px;}
-#kml-from-url input.kmlurl {margin-left: 2px;}
+
+#kml-from-upload input,
+#kml-from-url input.kmlurl,
+#kml-new input {
+	margin: 5px 0px 10px 0px;
+}
+
+#kml-from-url,
+#kml-new,
+#kml-from-upload {
+	font-size: 12px;
+	line-height: 20px;
+}
+
+#kml-from-url input.kmlurl {
+	margin-left: 2px;
+}
+
+
+.feature-info-table {
+	border-collapse: collapse;
+	width: 100%;
+	border: 1px solid #ccc;
+	background-color: #fff;
+	/* Ensure table has a background */
+}
+
+.feature-info-table tr.even {
+	background-color: #f2f2f2;
+}
+
+.feature-info-table td {
+	padding: 2px;
+	border: 1px solid #ccc;
+	color: #000;
+	/* Ensure text is black */
+	background-color: transparent;
+	/* Prevent inheriting a white background */
+}
+
+.feature-info-key {
+	font-weight: 700;
+	/* Bolder */
+}
+
+#contextMenu {
+	position: fixed !important;
+	z-index: 999999 !important;
+}
+
+/* Layer Settings Popover Card - Geoportal Dark Theme */
+.mb-tree-settings-panel {
+	background: #3a3a3a !important;
+	border-radius: 6px !important;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+	border: 1px solid #555555 !important;
+	padding: 10px 12px !important;
+	width: 240px !important;
+	font-family: Arial, Helvetica, sans-serif !important;
+	box-sizing: border-box !important;
+	color: #ffffff !important;
+	position: relative !important;
+	text-align: left !important;
+}
+
+.mb-tree-settings-header {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	padding-bottom: 6px !important;
+	margin-bottom: 8px !important;
+	border-bottom: 1px solid #555555 !important;
+}
+
+.mb-tree-settings-title-container {
+	display: flex !important;
+	align-items: center !important;
+	gap: 6px !important;
+	overflow: hidden !important;
+	max-width: 190px !important;
+}
+
+.mb-tree-settings-icon {
+	width: 16px !important;
+	height: 16px !important;
+	flex-shrink: 0 !important;
+}
+
+.mb-tree-settings-title {
+	font-size: 13px !important;
+	font-weight: bold !important;
+	color: #ffffff !important;
+	white-space: nowrap !important;
+	overflow: hidden !important;
+	text-overflow: ellipsis !important;
+}
+
+.mb-tree-settings-close {
+	background: transparent !important;
+	border: none !important;
+	cursor: pointer !important;
+	font-size: 16px !important;
+	line-height: 1 !important;
+	color: #bbbbbb !important;
+	padding: 2px 5px !important;
+	border-radius: 3px !important;
+}
+
+.mb-tree-settings-close:hover {
+	background-color: #555555 !important;
+	color: #ffffff !important;
+}
+
+/* Opacity Slider Section */
+.mb-tree-opacity-section {
+	margin-bottom: 8px !important;
+	background: #2b2b2b !important;
+	border: 1px solid #444444 !important;
+	border-radius: 4px !important;
+	padding: 8px 10px !important;
+}
+
+.mb-tree-opacity-label {
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	font-size: 12px !important;
+	font-weight: bold !important;
+	color: #dddddd !important;
+	margin-bottom: 6px !important;
+}
+
+.mb-tree-opacity-value {
+	font-weight: bold !important;
+	color: #ffffff !important;
+	font-size: 12px !important;
+}
+
+.mb-opacity-slider {
+	-webkit-appearance: none !important;
+	width: 100% !important;
+	height: 6px !important;
+	border-radius: 3px !important;
+	background: #555555 !important;
+	outline: none !important;
+	margin: 4px 0 !important;
+	padding: 0 !important;
+	cursor: pointer !important;
+}
+
+.mb-opacity-slider::-webkit-slider-thumb {
+	-webkit-appearance: none !important;
+	appearance: none !important;
+	width: 16px !important;
+	height: 16px !important;
+	border-radius: 50% !important;
+	background: #ffffff !important;
+	border: 2px solid #3a3a3a !important;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+	cursor: pointer !important;
+}
+
+.mb-opacity-slider::-moz-range-thumb {
+	width: 16px !important;
+	height: 16px !important;
+	border-radius: 50% !important;
+	background: #ffffff !important;
+	border: 2px solid #3a3a3a !important;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+	cursor: pointer !important;
+}
+
+/* Action items list */
+.mb-tree-settings-actions {
+	display: flex !important;
+	flex-direction: column !important;
+	gap: 4px !important;
+}
+
+.mb-tree-action-btn {
+	display: flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	padding: 5px 8px !important;
+	border-radius: 4px !important;
+	background: #4a4a4a !important;
+	border: 1px solid #555555 !important;
+	color: #ffffff !important;
+	font-size: 12px !important;
+	font-weight: normal !important;
+	text-decoration: none !important;
+	cursor: pointer !important;
+	width: 100% !important;
+	text-align: left !important;
+	box-sizing: border-box !important;
+}
+
+.mb-tree-action-btn:hover {
+	background-color: #5c5c5c !important;
+	color: #ffffff !important;
+}
+
+.mb-tree-action-btn.mb-tree-action-delete:hover {
+	background-color: #7f1d1d !important;
+	color: #ffffff !important;
+}
+
+.mb-tree-action-icon {
+	width: 16px !important;
+	height: 16px !important;
+	object-fit: contain !important;
+	flex-shrink: 0 !important;
+}
+
+/* Drag & Drop Theme Tree Indicators */
+#treeGDE tr[draggable="true"],
+.treeGDE3_tr {
+	cursor: grab;
+}
+
+#treeGDE tr[draggable="true"]:active,
+.treeGDE3_tr:active {
+	cursor: grabbing;
+}
+
+.mb-dragging-row {
+	opacity: 1 !important;
+	background-color: #444444 !important;
+}
+
+.mb-drag-over-above {
+	border-top: 2px solid #3b82f6 !important;
+}
+
+.mb-drag-over-below {
+	border-bottom: 2px solid #3b82f6 !important;
+}
+
+@keyframes mbFadeInSlide {
+	from {
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.mb-tree-opacity-presets {
+	display: flex !important;
+	justify-content: space-between !important;
+	gap: 6px !important;
+	margin-top: 6px !important;
+}
+
+.mb-opacity-preset-btn {
+	flex: 1 !important;
+	padding: 3px 0 !important;
+	background: #3e3e3e !important;
+	border: 1px solid #555555 !important;
+	border-radius: 3px !important;
+	color: #dddddd !important;
+	font-size: 11px !important;
+	font-weight: 500 !important;
+	cursor: pointer !important;
+	transition: all 0.12s ease !important;
+	text-align: center !important;
+}
+
+.mb-opacity-preset-btn:hover {
+	background: #009688 !important;
+	border-color: #009688 !important;
+	color: #ffffff !important;
+}
+
+#treeGDE a.node, .treeGDE3_tr a.node {
+	display: inline-block;
+	max-width: 210px !important;
+	white-space: nowrap !important;
+	overflow: hidden !important;
+	text-overflow: ellipsis !important;
+	vertical-align: middle !important;
+}

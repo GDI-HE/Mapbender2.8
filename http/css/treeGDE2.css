@@ -1,65 +1,326 @@
 #treeGDE a {
-	text-decoration:none;
-	color:black;
-	font-size:12px;
+	text-decoration: none;
+	color: black;
+	font-size: 12px;
 }
-#treeGDE a.node
-{
-	vertical-align:middle;
+#treeGDE a.node {
+	vertical-align: middle;
 }
-#treeGDE a:link
-{
+#treeGDE a:link {
 	color: #000000;
 }
-#treeGDE a:visited
-{
+#treeGDE a:visited {
 	color: #000000;
 }
-#treeGDE a:hover
-{
+#treeGDE a:hover {
 	color: #8080FF;
-	text-decoration:underline;
+	text-decoration: underline;
 }
-#treeGDE table
-{
-	font-size:8pt;
-	line-height:8pt;
+
+#treeGDE table {
+	font-size: 8pt;
+	line-height: 8pt;
 	margin: 0px;
 	padding: 0px;
 }
-#treeGDE table.menu
-{
+
+#treeGDE table.menu {
 	background-color: #fff;
 	border: 1px solid #999999
 }
-#treeGDE tr td
-{
+
+#treeGDE tr td {
 	color: #000000;
 	font-family: Verdana;
 	padding: 0px;
 }
-#treeGDE img
-{
-	border:none;
-	padding:0px;
-	margin:0px;
-	vertical-align:middle;		
+
+#treeGDE img {
+	border: none;
+	padding: 0px;
+	margin: 0px;
+	vertical-align: middle;
 }
-#treeGDE input
-{
-	margin-top:0px;
-	margin-bottom:0px;
-	margin-left:0px;
-	margin-right:3px;
-	padding:0px;
-	vertical-align:middle;
+
+#treeGDE input {
+	margin-top: 0px;
+	margin-bottom: 0px;
+	margin-left: 0px;
+	margin-right: 3px;
+	padding: 0px;
+	vertical-align: middle;
 }
 
 #treeGDE span {
-  font-size: 15px;
+	font-size: 15px;
 }
+
 #treeGDE .action {
 
-  cursor:pointer;
+	cursor: pointer;
 }
 
+#contextMenu {
+	position: fixed !important;
+	z-index: 999999 !important;
+}
+
+/* Layer Settings Popover Card - Geoportal Dark Theme */
+.mb-tree-settings-panel {
+	background: #3a3a3a !important;
+	border-radius: 6px !important;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+	border: 1px solid #555555 !important;
+	padding: 10px 12px !important;
+	width: 240px !important;
+	font-family: Arial, Helvetica, sans-serif !important;
+	box-sizing: border-box !important;
+	color: #ffffff !important;
+	position: relative !important;
+	text-align: left !important;
+	animation: mbFadeInSlide 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+@keyframes mbFadeInSlide {
+	from {
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.mb-tree-opacity-presets {
+	display: flex !important;
+	justify-content: space-between !important;
+	gap: 6px !important;
+	margin-top: 6px !important;
+}
+
+.mb-opacity-preset-btn {
+	flex: 1 !important;
+	padding: 3px 0 !important;
+	background: #3e3e3e !important;
+	border: 1px solid #555555 !important;
+	border-radius: 3px !important;
+	color: #dddddd !important;
+	font-size: 11px !important;
+	font-weight: 500 !important;
+	cursor: pointer !important;
+	transition: all 0.12s ease !important;
+	text-align: center !important;
+}
+
+.mb-opacity-preset-btn:hover {
+	background: #009688 !important;
+	border-color: #009688 !important;
+	color: #ffffff !important;
+}
+
+#treeGDE a.node, .treeGDE3_tr a.node {
+	display: inline-block;
+	max-width: 210px !important;
+	white-space: nowrap !important;
+	overflow: hidden !important;
+	text-overflow: ellipsis !important;
+	vertical-align: middle !important;
+}
+
+/* Drag & Drop Theme Tree Indicators */
+#treeGDE tr[draggable="true"],
+.treeGDE3_tr {
+	cursor: grab;
+}
+
+#treeGDE tr[draggable="true"]:active,
+.treeGDE3_tr:active {
+	cursor: grabbing;
+}
+
+.mb-dragging-row {
+	opacity: 1 !important;
+	background-color: #444444 !important;
+}
+
+.mb-drag-over-above {
+	border-top: 2px solid #3b82f6 !important;
+}
+
+.mb-drag-over-below {
+	border-bottom: 2px solid #3b82f6 !important;
+}
+
+.mb-tree-settings-header {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	padding-bottom: 6px !important;
+	margin-bottom: 8px !important;
+	border-bottom: 1px solid #555555 !important;
+}
+
+.mb-tree-settings-title-container {
+	display: flex !important;
+	align-items: center !important;
+	gap: 6px !important;
+	overflow: hidden !important;
+	max-width: 190px !important;
+}
+
+.mb-tree-settings-icon {
+	width: 16px !important;
+	height: 16px !important;
+	flex-shrink: 0 !important;
+}
+
+.mb-tree-settings-title {
+	font-size: 13px !important;
+	font-weight: bold !important;
+	color: #ffffff !important;
+	white-space: nowrap !important;
+	overflow: hidden !important;
+	text-overflow: ellipsis !important;
+}
+
+.mb-tree-settings-close {
+	background: transparent !important;
+	border: none !important;
+	cursor: pointer !important;
+	font-size: 16px !important;
+	line-height: 1 !important;
+	color: #bbbbbb !important;
+	padding: 2px 5px !important;
+	border-radius: 3px !important;
+}
+
+.mb-tree-settings-close:hover {
+	background-color: #555555 !important;
+	color: #ffffff !important;
+}
+
+/* Opacity Slider Section */
+.mb-tree-opacity-section {
+	margin-bottom: 8px !important;
+	background: #2b2b2b !important;
+	border: 1px solid #444444 !important;
+	border-radius: 4px !important;
+	padding: 8px 10px !important;
+}
+
+.mb-tree-opacity-label {
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	font-size: 12px !important;
+	font-weight: bold !important;
+	color: #dddddd !important;
+	margin-bottom: 6px !important;
+}
+
+.mb-tree-opacity-value {
+	font-weight: bold !important;
+	color: #ffffff !important;
+	font-size: 12px !important;
+}
+
+.mb-opacity-slider {
+	-webkit-appearance: none !important;
+	width: 100% !important;
+	height: 6px !important;
+	border-radius: 3px !important;
+	background: #555555 !important;
+	outline: none !important;
+	margin: 4px 0 !important;
+	padding: 0 !important;
+	cursor: pointer !important;
+}
+
+.mb-opacity-slider::-webkit-slider-thumb {
+	-webkit-appearance: none !important;
+	appearance: none !important;
+	width: 16px !important;
+	height: 16px !important;
+	border-radius: 50% !important;
+	background: #ffffff !important;
+	border: 2px solid #3a3a3a !important;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+	cursor: pointer !important;
+}
+
+.mb-opacity-slider::-moz-range-thumb {
+	width: 16px !important;
+	height: 16px !important;
+	border-radius: 50% !important;
+	background: #ffffff !important;
+	border: 2px solid #3a3a3a !important;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+	cursor: pointer !important;
+}
+
+/* Action items list */
+.mb-tree-settings-actions {
+	display: flex !important;
+	flex-direction: column !important;
+	gap: 4px !important;
+}
+
+.mb-tree-action-btn {
+	display: flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	padding: 5px 8px !important;
+	border-radius: 4px !important;
+	background: #4a4a4a !important;
+	border: 1px solid #555555 !important;
+	color: #ffffff !important;
+	font-size: 12px !important;
+	font-weight: normal !important;
+	text-decoration: none !important;
+	cursor: pointer !important;
+	width: 100% !important;
+	text-align: left !important;
+	box-sizing: border-box !important;
+}
+
+.mb-tree-action-btn:hover {
+	background-color: #5c5c5c !important;
+	color: #ffffff !important;
+}
+
+.mb-tree-action-btn.mb-tree-action-delete:hover {
+	background-color: #7f1d1d !important;
+	color: #ffffff !important;
+}
+
+.mb-tree-action-icon {
+	width: 16px !important;
+	height: 16px !important;
+	object-fit: contain !important;
+	flex-shrink: 0 !important;
+}
+
+/* Drag & Drop Theme Tree Indicators */
+#treeGDE tr[draggable="true"],
+.treeGDE3_tr {
+	cursor: grab;
+}
+
+#treeGDE tr[draggable="true"]:active,
+.treeGDE3_tr:active {
+	cursor: grabbing;
+}
+
+.mb-dragging-row {
+	opacity: 1 !important;
+	background-color: #444444 !important;
+}
+
+.mb-drag-over-above {
+	border-top: 2px solid #3b82f6 !important;
+}
+
+.mb-drag-over-below {
+	border-bottom: 2px solid #3b82f6 !important;
+}

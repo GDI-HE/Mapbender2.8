@@ -969,18 +969,22 @@ var KmlTree = function(o) {
 
     function createFeatureInfoContent(props) {
         var $table = $("<table>")
-                .attr("border", 1);
-        for (var key in props) {
+                .addClass("feature-info-table");
+	var i = 0;
+            for (var key in props) {
             if (props.hasOwnProperty(key) && featureInfoFilter.indexOf(key) < 0) {
-                $table
-                    .append($("<tr>")
-                        .append($("<td>").html(escapeHTML(key)))
-                        .append($("<td>").html(escapeHTML(props[key]))))
+                var $tr = $("<tr>");
+                if (i % 2 === 0) {
+                    $tr.addClass("even");
+                }
+                $tr.append($("<td>").addClass("feature-info-key").html(escapeHTML(key)))
+                   .append($("<td>").addClass("feature-info-value").html(escapeHTML(props[key])));
+                $table.append($tr);
+                i++;
             }
         }
         return $table.attr('outerHTML');
     }
-
     this.getFeatureInfos = function (click) {
         var map = Mapbender.modules.mapframe1;
         var kml = $('#mapframe1').data('kml');

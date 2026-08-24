@@ -735,7 +735,7 @@ function updateParent(path){
 		setTimeout('setNodeImage("'+path+'", "eye_off.svg");', 100);
 	}
 	else{
-		setTimeout('setNodeImage("'+path+'", "verticaldots.svg");', 100);
+		setTimeout('setNodeImage("'+path+'", "closed_folder.png");', 100);
 	}
 	if(reset_lock){
 		lock_update=false;
@@ -776,7 +776,7 @@ function handleSelectedWMS(path){
 		setTimeout('setNodeImage("'+path+'", "eye_off.svg");', 100);
 	}
 	else{
-		setTimeout('setNodeImage("'+path+'", "verticaldots.svg");', 100);
+		setTimeout('setNodeImage("'+path+'", "closed_folder.png");', 100);
 	}
 	if(reset_lock)
 	{
@@ -1177,7 +1177,7 @@ function initArray(){
 						
 									var groupedImageStyle ='';
 									if (temp.has_childs == true){
-										groupedImageStyle ='verticaldots.svg';
+										groupedImageStyle ='closed_folder.png';
 									}
 									else{
 										groupedImageStyle ='verticaldots.svg';
@@ -1257,3 +1257,4 @@ function initWmsCheckboxen(){
 		}
 	}
 }
+
