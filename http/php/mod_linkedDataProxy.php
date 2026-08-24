@@ -3060,7 +3060,11 @@ switch ($f) {
 		
 		// count of entries
 		$html .= '<script>' . $newline;
-		$html .= 'document.addEventListener("DOMContentLoaded", function() {' . $newline;
+                $html .= 'if ("scrollRestoration" in history) { history.scrollRestoration = "manual"; }' . $newline;
+                $html .= 'window.scrollTo(0, 0);' . $newline;
+                $html .= 'document.addEventListener("DOMContentLoaded", function() {' . $newline;
+                $html .= '  window.scrollTo(0, 0);' . $newline;
+                $html .= '  try { if (window.parent && window.parent !== window) { window.parent.scrollTo(0, 0); } } catch(e) {}' . $newline;
 		$html .= '  const container = document.querySelector(\'[itemtype="http://schema.org/DataCatalog"]\');' . $newline;
 		$html .= '  if (!container) return;' . $newline;
 		$html .= '  const h2CountElem = document.getElementById("h2-count");' . $newline;
