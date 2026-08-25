@@ -307,8 +307,18 @@ function featureInfoDialog(featureInfo, dialogPosition, offset, printInfo) {
 
 function ownDataDialog(ownData, dialogPosition, offset, printInfo) {
     if (printInfo !== undefined) {
-      console.error('kml data is not printable');
-      printInfo = undefined
+      // console.error('kml data is not printable');
+      // printInfo = undefined
+          printInfo = $.extend({}, printInfo, {
+          urls: [] 
+          });
+          // push a mock url object which contains the html content
+          printInfo.urls.push({
+           title: ownData.title,
+           htmlContent: btoa(unescape(encodeURIComponent(ownData.content))),
+           isBase64: true,
+           inBbox: true
+          });
     }
     var $box = $('<div>').html(ownData.content);
     return makeDialog($box,
@@ -404,12 +414,19 @@ function featureInfoListDialog(urls, ownDataInfos, printInfo) {
         });
     }
 
-    if (printInfo !== undefined) {
-        printInfo = $.extend({}, printInfo, {
-          urls: urls
-        });
-    }
-
+        if (printInfo !== undefined) {
+            var pfiOwnDataForPrint = ownDataInfos.map(function (ownDataInfo) {
+                return {
+                    title: ownDataInfo.title,
+                    htmlContent: btoa(unescape(encodeURIComponent(ownDataInfo.content))),
+                    isBase64: true,
+                    inBbox: true
+                };
+            });
+            printInfo = $.extend({}, printInfo, {
+            urls: urls.concat(pfiOwnDataForPrint)
+            });
+        }
     makeDialog($("<div id='featureInfo_preselect'></div>").append($featureInfoList),
         "<?php echo _mb("Please choose a requestable Layer");?>", undefined, undefined, printInfo);
 }

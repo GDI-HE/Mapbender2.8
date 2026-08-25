@@ -288,3 +288,27 @@ cursor:pointer;
 #kml-from-upload input, #kml-from-url input.kmlurl, #kml-new input{margin:5px 0px 10px 0px;}
 #kml-from-url, #kml-new, #kml-from-upload {font-size:12px;line-height:20px;}
 #kml-from-url input.kmlurl {margin-left: 2px;}
+
+
+.feature-info-table {
+    border-collapse: collapse;
+    width: 100%;
+    border: 1px solid #ccc;
+    background-color: #fff; /* Ensure table has a background */
+}
+
+.feature-info-table tr.even {
+    background-color: #f2f2f2;
+}
+
+.feature-info-table td {
+    padding: 2px;
+    border: 1px solid #ccc;
+    color: #000; /* Ensure text is black */
+    background-color: transparent; /* Prevent inheriting a white background */
+}
+
+.feature-info-key {
+    font-weight: 700; /* Bolder */
+}
+
