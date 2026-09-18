@@ -23,8 +23,9 @@ require_once dirname(__FILE__) ."/../http/classes/class_bbox.php";
 $wfsToExclude = [];
 $wmsToExclude = [];
 
-if (file_exists ( dirname ( __FILE__ ) . "/../conf/excludeFromMonitoring.json" )) {
-	$configObject = json_decode ( file_get_contents ( "../conf/excludeFromMonitoring.json" ) );
+$excludeConfigFile = dirname(__FILE__) . "/../conf/excludeFromMonitoring.json";
+if (file_exists($excludeConfigFile)) {
+	$configObject = json_decode(file_get_contents($excludeConfigFile));
 }
 if (isset ( $configObject ) && isset ( $configObject->wms ) && count($configObject->wms) > 0 ) {
 	$wmsToExclude = $configObject->wms;
