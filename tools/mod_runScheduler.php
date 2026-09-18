@@ -38,32 +38,9 @@ while ($row = db_fetch_array($res)) {
 	   	"wms_password"  =>  $row['wms_password']
 	);
 
-	if($row['scheduler_interval'] == '1 mon') {
-	    $row['scheduler_interval'] = "1 month";
-	}
-    //check wms timestamp , schedule interval with current date for update
-    $currentDate = date('Y-m-d',time());
-    $schedulerDateTimestamp = date("Y-m-d",strtotime(date("Y-m-d", strtotime($row['last_change'])) . $row['scheduler_interval']));
-    //last monitoring date
-    $lastMonitorDate = date("Y-m-d", $row['fkey_upload_id']);
-    $schedulerDateMonitoring = date("Y-m-d",strtotime(date("Y-m-d", $row['fkey_upload_id']) . $row['scheduler_interval']));
-    
-    //if calculated $schedulerDateTimestamp is in the past 
-    //or last_status value of monitoring does not have the value 1 which means wms has changed!
-    if($currentDate >= $schedulerDateTimestamp) {
-        if ($row['last_status'] == 1) {
-		//nothing to change!!!!
-               if($currentDate >= $schedulerDateMonitoring) {
-                array_push($wmsToUpdate, $resultObj);
-            }
-        } else {
-            array_push($wmsToUpdate, $resultObj);
-        }
-    } else {
-	//if service is not up to date
-        if ($row['last_status'] == 0 || $row['last_status'] == -1 || $row['last_status'] == -2) {
-            array_push($wmsToUpdate, $resultObj);
-        }
+    //check last_status: update immediately when changes were detected by capabilities monitoring (last_status == 0)
+    if ($row['last_status'] === 0 || $row['last_status'] === '0') {
+        array_push($wmsToUpdate, $resultObj);
     }
 }
 for ($i=0; $i<count($wmsToUpdate); $i++) {
@@ -72,6 +49,10 @@ for ($i=0; $i<count($wmsToUpdate); $i++) {
 	//call update via http!
 	$uri = 'http://localhost/mapbender/php/mod_updateOwsRoot.php?';
 	$query = 'serviceType=wms&serviceId=' . $wmsToUpdate[$i]['wms_id']; 
+	$query .= '&schedulerPublish=' . (($wmsToUpdate[$i]['scheduler_publish'] === 1 || $wmsToUpdate[$i]['scheduler_publish'] === '1') ? 'true' : 'false');
+	$query .= '&schedulerSearchable=' . (($wmsToUpdate[$i]['scheduler_searchable'] === 1 || $wmsToUpdate[$i]['scheduler_searchable'] === '1') ? 'true' : 'false');
+	$query .= '&schedulerOverwrite=' . (($wmsToUpdate[$i]['scheduler_overwrite'] === 1 || $wmsToUpdate[$i]['scheduler_overwrite'] === '1') ? 'true' : 'false');
+	$query .= '&schedulerOverwriteCategories=' . (($wmsToUpdate[$i]['scheduler_overwrite_categories'] === 1 || $wmsToUpdate[$i]['scheduler_overwrite_categories'] === '1') ? 'true' : 'false');
 	$updateConnector = new Connector();
 	$updateConnector->timeout = 120;
 	$resultJson = $updateConnector->load($uri . $query);
@@ -94,43 +75,61 @@ for ($i=0; $i<count($wmsToUpdate); $i++) {
 	if($wmsToUpdate[$i]['scheduler_mail']) {
 	    $mail_error_message = "";
 	    $admin = new administration();
-		//get all users which have the wms integrated in their guis!
+		//get all users which have the wms integrated in their guis
 		$ownerIds = $admin->getOwnerByWms($wmsToUpdate[$i]['wms_id']);
+		//get all users who subscribed to this service
+		$subscriberIds = $admin->getSubscribersByWms($wmsToUpdate[$i]['wms_id']);
+		
+		$recipientIds = array();
 		if ($ownerIds && count($ownerIds) > 0) {
-			$ownerMailAddresses = array();
-			$j=0;
-			for ($k=0; $k<count($ownerIds); $k++) {
-				$adrTmp = $admin->getEmailByUserId($ownerIds[$k]);
-				if (!in_array($adrTmp, $ownerMailAddresses) && $adrTmp) {
-					$ownerMailAddresses[$j] = $adrTmp;
-					$j++;
+			$recipientIds = array_merge($recipientIds, $ownerIds);
+		}
+		if ($subscriberIds && count($subscriberIds) > 0) {
+			$recipientIds = array_merge($recipientIds, $subscriberIds);
+		}
+		$recipientIds = array_unique($recipientIds);
+
+		if (count($recipientIds) > 0) {
+			$recipientMailAddresses = array();
+			foreach ($recipientIds as $userId) {
+				$adrTmp = $admin->getEmailByUserId($userId);
+				if (!in_array($adrTmp, $recipientMailAddresses) && !empty($adrTmp)) {
+					$recipientMailAddresses[] = $adrTmp;
 				} 
 			}
 			$adrRoot = $admin->getEmailByUserId("1");	
 			$from = $adrRoot;
 			if($from != "") {
+				$wmsTitle = $admin->getWmsTitleByWmsId($wmsToUpdate[$i]['wms_id']);
 			    if ($result->success) {
-    				$body = "WMS '" . $admin->getWmsTitleByWmsId($wmsToUpdate[$i]['wms_id']) . "' has been updated by the scheduler update. \n\nYou may want to check the changes as you are an owner of this WMS.";
+    				$body = "WMS '" . $wmsTitle . "' has been updated by the scheduler update. \n\nYou may want to check the changes as you are an owner or subscriber of this WMS.";
 			    } else {
-			        $body = "WMS '" . $admin->getWmsTitleByWmsId($wmsToUpdate[$i]['wms_id']) . "' could not be updated by the scheduler. \n\nYou have to check the configuration of this WMS.";
+			        $body = "WMS '" . $wmsTitle . "' could not be updated by the scheduler. \n\nYou have to check the configuration of this WMS.";
 			    }
-    				for ($m=0; $m<count($ownerMailAddresses); $m++) {
-					    echo $ownerMailAddresses[$m]."\n";
-    				    if (!$admin->sendEmail($from, $from, $ownerMailAddresses[$m], $ownerMailAddresses[$m], "[Mapbender Update Scheduler] One of your WMS has been updated", $body, $mail_error_message)) {
-    					    echo "Notification could not be send!\n";
-    					}
+    			for ($m=0; $m<count($recipientMailAddresses); $m++) {
+					echo "Sending notification to: " . $recipientMailAddresses[$m] . "\n";
+     				if (!$admin->sendEmail($from, $from, $recipientMailAddresses[$m], $recipientMailAddresses[$m], "[Mapbender Update Scheduler] WMS '" . $wmsTitle . "' has been updated", $body, $mail_error_message)) {
+    					echo "Notification could not be send!\n";
     				}
+    			}
 			}
 		}
 	}	
 	if($result->success) {
 	    $status = 1;
+	    // update availability status to 1 (OK) and clear diff since DB was updated to current capabilities
+	    $sql_avail = "UPDATE mb_wms_availability SET last_status = 1, cap_diff = '' WHERE fkey_wms_id = $1";
+	    try {
+	        db_prep_query($sql_avail, array($wmsToUpdate[$i]['wms_id']), array('i'));
+	    } catch (Exception $e) {
+	        // ignore
+	    }
 	}
 	else {
 	    $status = -1;
 	}	
     $sql = <<<SQL
-UPDATE scheduler SET scheduler_status = $1, scheduler_status_error_message = $2 WHERE fkey_wms_id = $3;
+UPDATE scheduler SET scheduler_status = $1, scheduler_status_error_message = $2, scheduler_change = now() WHERE fkey_wms_id = $3;
 SQL;
     $v = array($status, $result->message, $wmsToUpdate[$i]['wms_id']);
 	$t = array('i','s','i');

@@ -155,7 +155,6 @@ while ($row = db_fetch_array( $res )) {
     switch ($serviceType) {
         case "WMS":
             $updateWms = new wms();
-            $updateWms->harvestCoupledDatasetMetadata = true;
             break;
         case "WFS":
             $wfsFactory = new UniversalWfsFactory();
@@ -169,7 +168,7 @@ while ($row = db_fetch_array( $res )) {
         $schedulerConf[$schedulerParam] = $row[$schedulerParam];
         //get-params overwrite params from db
         if (!isset(${$schedulerParam})) {
-            if ($row[$schedulerParam] == '1') {
+            if ($row[$schedulerParam] === null || $row[$schedulerParam] == '1') {
                 ${$schedulerParam} = true; 
             } else {
                 ${$schedulerParam} = false; 
@@ -208,6 +207,7 @@ while ($row = db_fetch_array( $res )) {
             $updateWms->overwriteCategories = $schedulerOverwriteCategories;
             $updateWms->setGeoRss = $schedulerPublish;
             $updateWms->twitterNews = false;
+            $updateWms->harvestCoupledDatasetMetadata = true;
             if ($createObjFromXml['success'] == false) {
                 $resultObject->error->message = $createObjFromXml['message'];
                 echo json_encode($resultObject);

@@ -55,21 +55,17 @@ var WmsSchedulerSelectApi = function (o) {
 					
 					//build editor
 					var editFormHtml = "<div id='scheduleEditor'>";
+					editFormHtml += "<div style='background-color:#f0f4f8; border-left:4px solid #005596; padding:8px 12px; margin-bottom:12px; font-size:12px; line-height:1.4; color:#333;'>";
+					editFormHtml += "<strong>Hinweis:</strong> Die Aktualisierung wird erst ausgeführt, wenn beim Dienste-Monitoring ein geändertes Capabilities-Dokument festgestellt wurde.<br/>";
+					editFormHtml += "Verknüpfte Daten-Metadaten werden beim Update erneut geharvestet – eventuelle Anpassungen an vormals geharvesteten Metadatensätzen werden dabei überschrieben.";
+					editFormHtml += "</div>";
 					editFormHtml += "<form id='edit_scheduler_form'>";
 					//wms information
 					editFormHtml += "<fieldset><legend>WMS Title:</legend>" + obj.wms_id+" : "+obj.wms_title + "</fieldset>";
-					editFormHtml += "<fieldset><legend>Update interval:</legend>";
-					editFormHtml += "<select id='scheduler_interval'>";
-					editFormHtml += "<option value='1 day'>1 day</option>";
-					editFormHtml += "<option value='7 days'>1 week</option>";
-					editFormHtml += "<option value='1 mon'>1 month</option>";
-					editFormHtml += "<option value='1 year'>1 year</option>";
-					editFormHtml += "</select>";
-					editFormHtml += "</fieldset>";
 					editFormHtml += "<fieldset><legend>Notify per Mail:</legend>";
 					editFormHtml += "<input type='checkbox' id='scheduler_mail'/>";
 					editFormHtml += "</fieldset>";
-					editFormHtml += "<fieldset><legend>Publish via RSS/Twitter:</legend>";
+					editFormHtml += "<fieldset><legend>Im RSS-Feed veröffentlichen:</legend>";
 					editFormHtml += "<input type='checkbox' id='scheduler_publish'/>";
 					editFormHtml += "</fieldset>";
 					editFormHtml += "<fieldset><legend>Make new layer searchable:</legend>";
@@ -124,7 +120,7 @@ var WmsSchedulerSelectApi = function (o) {
 									scheduler_overwrite_categories = 0;
 								}
 								data = {
-									scheduler_interval: $('#scheduler_interval').val(),
+									scheduler_interval: '1 day',
 									scheduler_publish: scheduler_publish,
 									wms_id: obj.wms_id,
 									scheduler_searchable: scheduler_searchable,
@@ -146,7 +142,6 @@ var WmsSchedulerSelectApi = function (o) {
 					});
 					$editEntryDialog.dialog("open");
 					
-					$('#scheduler_interval option[value="'+obj.scheduler_interval+'"]').attr({'selected':'selected'});
 					if (obj.scheduler_mail == 1) {
 						$("#scheduler_mail").attr({'checked':'checked'});
 					}
@@ -174,20 +169,16 @@ var WmsSchedulerSelectApi = function (o) {
 	//function init form to add new scheduling for update own wms
 	this.initAddForm = function() {
 		var addFormHtml = "<div id='scheduleEditor'>";
+		addFormHtml += "<div style='background-color:#f0f4f8; border-left:4px solid #005596; padding:8px 12px; margin-bottom:12px; font-size:12px; line-height:1.4; color:#333;'>";
+		addFormHtml += "<strong>Hinweis:</strong> Die Aktualisierung wird erst ausgeführt, wenn beim Dienste-Monitoring ein geändertes Capabilities-Dokument festgestellt wurde.<br/>";
+		addFormHtml += "Verknüpfte Daten-Metadaten werden beim Update erneut geharvestet – eventuelle Anpassungen an vormals geharvesteten Metadatensätzen werden dabei überschrieben.";
+		addFormHtml += "</div>";
 		addFormHtml += "<form id='edit_scheduler_form'>";
 		addFormHtml += "<fieldset><legend>WMS</legend><select id='scheduler_wms'></select></fieldset>";
-		addFormHtml += "<fieldset><legend>Update interval:</legend>";
-		addFormHtml += "<select id='scheduler_interval'>";
-		addFormHtml += "<option value='1 day'>1 day</option>";
-		addFormHtml += "<option value='7 days'>1 week</option>";
-		addFormHtml += "<option value='1 mon'>1 month</option>";
-		addFormHtml += "<option value='1 year'>1 year</option>";
-		addFormHtml += "</select>";
-		addFormHtml += "</fieldset>";
 		addFormHtml += "<fieldset><legend>Notify per Mail:</legend>";
 		addFormHtml += "<input type='checkbox' id='scheduler_mail'/>";
 		addFormHtml += "</fieldset>";
-		addFormHtml += "<fieldset><legend>Publish via RSS/Twitter:</legend>";
+		addFormHtml += "<fieldset><legend>Im RSS-Feed veröffentlichen:</legend>";
 		addFormHtml += "<input type='checkbox' id='scheduler_publish'/>";
 		addFormHtml += "</fieldset>";
 		addFormHtml += "<fieldset><legend>Make new layer searchable:</legend>";
@@ -243,7 +234,7 @@ var WmsSchedulerSelectApi = function (o) {
 					}
 
 					data = {
-						scheduler_interval: $('#scheduler_interval').val(),
+						scheduler_interval: '1 day',
 						scheduler_publish: scheduler_publish,
 						wms_id: $("#scheduler_wms").val(),
 						scheduler_searchable: scheduler_searchable,

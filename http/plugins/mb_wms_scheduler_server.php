@@ -31,15 +31,6 @@ $user = new User(Mapbender::session()->get("mb_user_id"));
 
 switch ($ajaxResponse->getMethod()) {
 	case "getWmsScheduler" :
-		$wmsSchedulerIdArray = getWmsScheduler();		
-		$wmsSchedulerList = implode(",", $wmsSchedulerIdArray);
-		$sql = <<<SQL
-
-SELECT scheduler_id, wms_id, wms_title, to_timestamp(wms_timestamp), last_status, fkey_upload_id,  scheduler_interval,scheduler_mail,scheduler_publish,scheduler_searchable,scheduler_overwrite,scheduler_overwrite_categories, scheduler_status FROM (SELECT scheduler_id, wms_id, fkey_wms_id, wms_title, wms_timestamp, scheduler_interval,scheduler_mail,scheduler_publish,scheduler_searchable,scheduler_overwrite,scheduler_overwrite_categories,scheduler_status FROM scheduler INNER JOIN wms ON scheduler.fkey_wms_id=wms.wms_id WHERE scheduler.scheduler_id IN ($wmsSchedulerList)) AS test LEFT OUTER JOIN mb_wms_availability ON test.fkey_wms_id = mb_wms_availability.fkey_wms_id;
-
-SQL;
-		$res = db_query($sql);
-		$e = new mb_exception($sql);
 		$resultObj = array(
 			"header" => array(
 				_mb("Scheduler ID"),
@@ -60,13 +51,25 @@ SQL;
 			"data" => array()
 		);
 
-		while ($row = db_fetch_row($res)) {
-		    // convert NULL to '', NULL values cause datatables to crash
-			$walk = array_walk($row, create_function('&$s', '$s=strval($s);'));
-			$row[] = "<img style='cursor:pointer;' class='deleteImg' title='löschen' src='../img/cross.png' />";
-			//if fkey_upload_id is set, format it to date for dataTables
-			$row[5] = $row[5]?date("Y-m-d",$row[5]) : $row[5];
-			$resultObj["data"][]= $row;
+		$wmsSchedulerIdArray = getWmsScheduler();		
+		if (!empty($wmsSchedulerIdArray)) {
+			$wmsSchedulerList = implode(",", array_map('intval', $wmsSchedulerIdArray));
+			$sql = <<<SQL
+
+SELECT scheduler_id, wms_id, wms_title, to_timestamp(wms_timestamp), last_status, fkey_upload_id,  scheduler_interval,scheduler_mail,scheduler_publish,scheduler_searchable,scheduler_overwrite,scheduler_overwrite_categories, scheduler_status FROM (SELECT scheduler_id, wms_id, fkey_wms_id, wms_title, wms_timestamp, scheduler_interval,scheduler_mail,scheduler_publish,scheduler_searchable,scheduler_overwrite,scheduler_overwrite_categories,scheduler_status FROM scheduler INNER JOIN wms ON scheduler.fkey_wms_id=wms.wms_id WHERE scheduler.scheduler_id IN ($wmsSchedulerList)) AS test LEFT OUTER JOIN mb_wms_availability ON test.fkey_wms_id = mb_wms_availability.fkey_wms_id;
+
+SQL;
+			$res = db_query($sql);
+			$e = new mb_exception($sql);
+
+			while ($row = db_fetch_row($res)) {
+				// convert NULL to '', NULL values cause datatables to crash
+				$walk = array_walk($row, create_function('&$s', '$s=strval($s);'));
+				$row[] = "<img style='cursor:pointer;' class='deleteImg' title='löschen' src='../img/cross.png' />";
+				//if fkey_upload_id is set, format it to date for dataTables
+				$row[5] = $row[5]?date("Y-m-d",$row[5]) : $row[5];
+				$resultObj["data"][]= $row;
+			}
 		}
 		
 		$ajaxResponse->setResult($resultObj);
@@ -216,46 +219,44 @@ SQL;
 	case "getUserWms" :
 		$user = new User(Mapbender::session()->get("mb_user_id"));
 		$wmsSchedulerIdArray = getWmsScheduler();		
-		$wmsSchedulerList = implode(",", $wmsSchedulerIdArray);
+		$wmsIdArray = $user->getOwnedWms();
 
-	    	$wmsIdArray = $user->getOwnedWms();
-	    	//$wmsList = implode(",", $wmsIdArray);
-		
-
-$sql = <<<SQL
+		if (!empty($wmsSchedulerIdArray)) {
+			$wmsSchedulerList = implode(",", array_map('intval', $wmsSchedulerIdArray));
+			$sql = <<<SQL
 
 	SELECT fkey_wms_id FROM scheduler WHERE scheduler.scheduler_id IN ($wmsSchedulerList);
 
 SQL;
-		$res = db_query($sql);
+			$res = db_query($sql);
+			$scheduledWms = array();
+			while ($row = db_fetch_array($res)) {
+				$scheduledWms[] = $row['fkey_wms_id'];
+			}
+			//remove already scheduled elements from wms list
+			$wmsIdArray = array_diff($wmsIdArray, $scheduledWms);
+		}
+
 		$resultObj = array();
-		while ($row = db_fetch_array($res)) {
-			$resultObj[] = $row['fkey_wms_id'];
-			$e = new mb_exception($wmsList);
-    	    	}
-		//remove already scheduled elements from wms list
-		$wmsIdArray = array_diff($wmsIdArray,$resultObj);
-		$wmsList = implode(",", $wmsIdArray);
-
-		$e = new mb_exception($wmsList);
-		$e = new mb_exception($wmsSchedulerList);
-
-$sql = <<<SQL
+		if (!empty($wmsIdArray)) {
+			$wmsList = implode(",", array_map('intval', $wmsIdArray));
+			$sql = <<<SQL
 	
 SELECT wms.wms_id, wms.wms_title FROM wms LEFT JOIN mb_wms_availability AS m
 ON wms.wms_id = m.fkey_wms_id 
 WHERE wms_id IN ($wmsList)  ORDER BY wms.wms_id;
 
 SQL;
-		$res = db_query($sql);
-		$resultObj = array();
-		while ($row = db_fetch_array($res)) {
-			$resultObj[] = array(
-    			"wmsId" 	=> $row['wms_id'],
-    			"wmsTitle"  =>  $row['wms_title']
-    	    	);
+			$res = db_query($sql);
+			while ($row = db_fetch_array($res)) {
+				$resultObj[] = array(
+					"wmsId" 	=> $row['wms_id'],
+					"wmsTitle"  =>  $row['wms_title']
+				);
+			}
 		}
-        $ajaxResponse->setResult($resultObj);
+
+		$ajaxResponse->setResult($resultObj);
 		$ajaxResponse->setSuccess(true);
 		break;
 
