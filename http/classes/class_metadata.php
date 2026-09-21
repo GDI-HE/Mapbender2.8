@@ -496,12 +496,27 @@ class searchMetadata
 		);
 		//read out records
 		$wfsMatrix = db_fetch_all($res);
+		$seenFeaturetypes = array();
 		for ($i = 0; $i < count($wfsMatrix); $i++) {
-			$hasModule = (isset($wfsMatrix[$i]['wfs_conf_id']) && $wfsMatrix[$i]['wfs_conf_id'] != "");
+			$featuretypeId = (int) $wfsMatrix[$i]['featuretype_id'];
+			// For internal searches (used by coupled resources), de-duplicate by featuretype_id
+			if ($this->resultTarget == 'internal') {
+				if (isset($seenFeaturetypes[$featuretypeId])) {
+					continue;
+				}
+				$seenFeaturetypes[$featuretypeId] = true;
+				$hasModule = false;
+			} else {
+				$hasModule = (isset($wfsMatrix[$i]['wfs_conf_id']) && $wfsMatrix[$i]['wfs_conf_id'] != "");
+			}
+
+			$otherInformation = $this->getInfofromFeaturetypeId($featuretypeId);
+			$wfsVersion = !empty($otherInformation['wfsVersion']) ? $otherInformation['wfsVersion'] : '1.1.0';
+
 			$srvObj = new stdClass;
-			$srvObj->id = $hasModule ? (int) $wfsMatrix[$i]['wfs_conf_id'] : (int) $wfsMatrix[$i]['featuretype_id'];
+			$srvObj->id = $hasModule ? (int) $wfsMatrix[$i]['wfs_conf_id'] : $featuretypeId;
 			$srvObj->wfs_id = (int) $wfsMatrix[$i]['wfs_id'];
-			$srvObj->featuretype_id = (int) $wfsMatrix[$i]['featuretype_id'];
+			$srvObj->featuretype_id = $featuretypeId;
 			$srvObj->wfs_conf_id = $hasModule ? (int) $wfsMatrix[$i]['wfs_conf_id'] : null;
 			$srvObj->has_module = $hasModule;
 			$srvObj->modultype = $hasModule ? $wfsMatrix[$i]['modultype'] : null;
@@ -526,12 +541,13 @@ class searchMetadata
 			$srvObj->date = date("d.m.Y", $wfsMatrix[$i]['wfs_timestamp']);
 			$srvObj->respOrg = $wfsMatrix[$i]['mb_group_name'];
 			$srvObj->logoUrl = $wfsMatrix[$i]['mb_group_logo_path'];
-			$srvObj->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=featuretype&id=" . $wfsMatrix[$i]['featuretype_id'];
+			$srvObj->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=featuretype&id=" . $featuretypeId;
 			$srvObj->wfsMdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=wfs&id=" . $wfsMatrix[$i]['wfs_id'];
 
 			// Capabilities links
-			$srvObj->capabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/php/wfs.php?FEATURETYPE_ID=" . $wfsMatrix[$i]['featuretype_id'] . "&REQUEST=GetCapabilities&VERSION=2.0.0&SERVICE=WFS";
-			$srvObj->wfsCapabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/registry/wfs/" . $wfsMatrix[$i]['wfs_id'] . "?REQUEST=GetCapabilities&VERSION=1.1.0&SERVICE=WFS";
+			$srvObj->capabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/php/wfs.php?FEATURETYPE_ID=" . $featuretypeId . "&REQUEST=GetCapabilities&VERSION=" . $wfsVersion . "&SERVICE=WFS";
+			$srvObj->originalGetCapabilitiesUrl = $otherInformation['getCapabilitiesUrl'];
+			$srvObj->wfsCapabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/registry/wfs/" . $wfsMatrix[$i]['wfs_id'] . "?REQUEST=GetCapabilities&VERSION=" . $wfsVersion . "&SERVICE=WFS";
 
 			$spatialSource = "";
 			$stateOrProvince = $wfsMatrix[$i]['administrativearea'];
@@ -567,13 +583,14 @@ class searchMetadata
 
 			// Backward-compatible ftype structure for helpers expecting ftype
 			$ftypeObj = new stdClass;
-			$ftypeObj->id = (int) $wfsMatrix[$i]['featuretype_id'];
+			$ftypeObj->id = $featuretypeId;
 			$ftypeObj->title = $srvObj->title;
 			$ftypeObj->abstract = $srvObj->abstract;
 			$ftypeObj->mdLink = $srvObj->mdLink;
 			$ftypeObj->geomtype = $srvObj->geomtype;
 			$ftypeObj->bbox = $srvObj->bbox;
 			$ftypeObj->capabilitiesUrl = $srvObj->capabilitiesUrl;
+			$ftypeObj->originalGetCapabilitiesUrl = $srvObj->originalGetCapabilitiesUrl;
 			$ftypeObj->has_module = $hasModule;
 			$ftypeObj->modultype = $srvObj->modultype;
 			$ftypeObj->permission = $srvObj->permission;
@@ -2143,18 +2160,28 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 
 	private function getInfofromFeaturetypeId($featuretypeId)
 	{
+		static $featuretypeInfoCache = array();
+		if (isset($featuretypeInfoCache[$featuretypeId])) {
+			return $featuretypeInfoCache[$featuretypeId];
+		}
 		$admin = new administration();
 		$sql = "SELECT wfs_id, wfs_version, wfs_getcapabilities, wfs_describefeaturetype, featuretype_name, wfs_owsproxy FROM wfs_featuretype INNER JOIN wfs ON wfs_featuretype.fkey_wfs_id = wfs.wfs_id WHERE wfs_featuretype.featuretype_id = $1";
 		$v = array($featuretypeId);
 		$t = array('i');
 		$res = db_prep_query($sql, $v, $t);
+		$wfsVersion = '1.1.0';
+		$wfsId = 0;
+		$getCapabilitiesUrl = '';
+		$describeFeaturetypeUrl = '';
+		$featuretypeName = '';
+		$owsProxy = '';
 		while ($row = db_fetch_array($res)) {
 			$getCapabilitiesUrl = $row['wfs_getcapabilities'];
 			$describeFeaturetypeUrl = $row['wfs_describefeaturetype'];
 			$featuretypeName = $row['featuretype_name'];
 			$owsProxy = $row['wfs_owsproxy'];
-			$wfsVersion = $row['wfs_version'];
-			$wfsId = $row['wfs_id'];
+			$wfsVersion = !empty($row['wfs_version']) ? $row['wfs_version'] : '1.1.0';
+			$wfsId = (int) $row['wfs_id'];
 		}
 		//if proxy is activated change request urls
 		if ($owsProxy != null && $owsProxy != '') {
@@ -2168,6 +2195,9 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 		$returnArray['describeFeaturetypeUrl'] = $describeFeaturetypeUrl;
 		$returnArray['featuretypeName'] = $featuretypeName;
 		$returnArray['owsProxy'] = $owsProxy;
+		$returnArray['wfsVersion'] = $wfsVersion;
+		$returnArray['wfsId'] = $wfsId;
+		$featuretypeInfoCache[$featuretypeId] = $returnArray;
 		return $returnArray;
 	}
 
