@@ -1842,43 +1842,28 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 					for ($i = 0; $i < count($this->resourceClasses); $i++) {
 						//TODO: not to set the classification?
 						$this->catJSON->searchMD->category[$i]->title = $this->resourceClassifications[$i]['title'];
-						$sqlCat[$i] = "SELECT " . $this->resourceClassifications[$i]['tablename'];
-						$sqlCat[$i] .= "." . $this->resourceClassifications[$i]['tablename'] . "_id, ";
-						$sqlCat[$i] .= " " . $this->resourceClassifications[$i]['tablename'] . ".";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . "_code_";
-						$sqlCat[$i] .= $this->languageCode . ", COUNT(*) FROM " . $this->searchView;
-
-						//first join for connection table
-						$sqlCat[$i] .= " INNER JOIN " . $this->resourceClassifications[$i]['relation_' . $this->searchResources];
-						$sqlCat[$i] .= " ON (";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['relation_' . $this->searchResources] . ".fkey_";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['id_' . $this->searchResources] . "=" . $this->searchView;
-						$sqlCat[$i] .= "." . $this->resourceClassifications[$i]['id_' . $this->searchResources];
-						$sqlCat[$i] .= ") INNER JOIN ";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . " ON (";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . ".";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . "_id=";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['relation_' . $this->searchResources] . ".fkey_";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . "_id)";
-						//the following is needed to filter the custom cats for those which should not be seen in the classification
-						if ($this->resourceClassifications[$i]['title'] != $this->resourceClassifications[2]['title']) {
-							if ($whereStr != '') {
-								$sqlCat[$i] .= " " . $whereStr . " GROUP BY ";
-							} else {
-								$sqlCat[$i] .= " GROUP BY ";
-							}
-						} else {
-							if ($whereStr != '') {
-								$sqlCat[$i] .= " " . $whereStr . $this->whereStrCatExtension . " GROUP BY ";
-							} else {
-								$sqlCat[$i] .= " WHERE " . $this->whereStrCatExtension . " GROUP BY ";
-							}
+						$tableName = $this->resourceClassifications[$i]['tablename'];
+						$catColumn = '';
+						if ($i === 0) {
+							$catColumn = 'md_topic_cats';
+						} else if ($i === 1) {
+							$catColumn = 'md_inspire_cats';
+						} else if ($i === 2) {
+							$catColumn = 'md_custom_cats';
 						}
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . ".";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . "_id,";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . ".";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . "_code_" . $this->languageCode . " ORDER BY ";
-						$sqlCat[$i] .= $this->resourceClassifications[$i]['tablename'] . "_id";
+						if ($catColumn != '') {
+							$subWhere = ($whereStr != '') ? ($whereStr . " AND ") : "WHERE ";
+							$subWhere .= "(" . $catColumn . " IS NOT NULL AND " . $catColumn . " <> '' AND " . $catColumn . " <> '{}')";
+							$sqlCat[$i] = "SELECT " . $tableName . "." . $tableName . "_id, " . $tableName . "." . $tableName . "_code_" . $this->languageCode . ", COUNT(*) ";
+							$sqlCat[$i] .= "FROM (SELECT CAST(UNNEST(string_to_array(REPLACE(TRIM(BOTH '{}' FROM " . $catColumn . "), ' ', ''), '}{')) AS integer) AS cat_id FROM " . $this->searchView . " " . $subWhere . ") sub ";
+							$sqlCat[$i] .= "INNER JOIN " . $tableName . " ON (" . $tableName . "." . $tableName . "_id = sub.cat_id) ";
+							if ($this->resourceClassifications[$i]['title'] == $this->resourceClassifications[2]['title']) {
+								$sqlCat[$i] .= "WHERE custom_category.custom_category_hidden = 0 ";
+							}
+							$sqlCat[$i] .= "GROUP BY " . $tableName . "." . $tableName . "_id, " . $tableName . "." . $tableName . "_code_" . $this->languageCode . " ORDER BY " . $tableName . "." . $tableName . "_id";
+						} else {
+							$sqlCat[$i] = "SELECT " . $tableName . "." . $tableName . "_id, " . $tableName . "." . $tableName . "_code_" . $this->languageCode . ", COUNT(*) FROM " . $this->searchView . " GROUP BY " . $tableName . "." . $tableName . "_id, " . $tableName . "." . $tableName . "_code_" . $this->languageCode . " ORDER BY " . $tableName . "." . $tableName . "_id";
+						}
 						$sqlCategory = $sqlCat[$i];
 						$sqlCategory = str_replace("WHERE  AND", "WHERE", $sqlCategory);
 						//call sql for count of category
