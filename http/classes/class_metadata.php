@@ -496,24 +496,59 @@ class searchMetadata
 		);
 		//read out records
 		$wfsMatrix = db_fetch_all($res);
-		//sort result for accessing the right services
-		$wfsMatrix = $this->flipDiagonally($wfsMatrix);
-		//TODO check if order by db or order by php is faster! 
-		#array_multisort($wfsMatrix['wfs_id'], SORT_ASC,$wfsMatrix['featuretype_id'], SORT_ASC,$wfsMatrix['wfs_conf_id'], SORT_ASC); //have some problems - the database version is more stable
-		$wfsMatrix = $this->flipDiagonally($wfsMatrix);
-		//read out first server entry - maybe this a little bit timeconsuming TODO
-		$j = 0; //count identical wfs_id => double featuretype
-		$l = 0; //index featuretype and or modul per wfs
-		$m = 0; //index modul per featuretype
+		$seenFeaturetypes = array();
 		for ($i = 0; $i < count($wfsMatrix); $i++) {
-			$this->wfsJSON->wfs->srv[$i - $j]->id = $wfsMatrix[$i]['wfs_id'];
-			$this->wfsJSON->wfs->srv[$i - $j]->title = $wfsMatrix[$i]['wfs_title'];
-			$this->wfsJSON->wfs->srv[$i - $j]->abstract = $wfsMatrix[$i]['wfs_abstract'];
-			$this->wfsJSON->wfs->srv[$i - $j]->date = date("d.m.Y", $wfsMatrix[$i]['wfs_timestamp']);
-			$this->wfsJSON->wfs->srv[$i - $j]->respOrg = $wfsMatrix[$i]['mb_group_name'];
-			$this->wfsJSON->wfs->srv[$i - $j]->logoUrl = $wfsMatrix[$i]['mb_group_logo_path'];
-			$this->wfsJSON->wfs->srv[$i - $j]->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=wfs&id=" . $wfsMatrix[$i]['wfs_id'];
-			//TODO: Capabilities link
+			$featuretypeId = (int) $wfsMatrix[$i]['featuretype_id'];
+			// For internal searches (used by coupled resources), de-duplicate by featuretype_id
+			if ($this->resultTarget == 'internal') {
+				if (isset($seenFeaturetypes[$featuretypeId])) {
+					continue;
+				}
+				$seenFeaturetypes[$featuretypeId] = true;
+				$hasModule = false;
+			} else {
+				$hasModule = (isset($wfsMatrix[$i]['wfs_conf_id']) && $wfsMatrix[$i]['wfs_conf_id'] != "");
+			}
+
+			$otherInformation = $this->getInfofromFeaturetypeId($featuretypeId);
+			$wfsVersion = !empty($otherInformation['wfsVersion']) ? $otherInformation['wfsVersion'] : '1.1.0';
+
+			$srvObj = new stdClass;
+			$srvObj->id = $hasModule ? (int) $wfsMatrix[$i]['wfs_conf_id'] : $featuretypeId;
+			$srvObj->wfs_id = (int) $wfsMatrix[$i]['wfs_id'];
+			$srvObj->featuretype_id = $featuretypeId;
+			$srvObj->wfs_conf_id = $hasModule ? (int) $wfsMatrix[$i]['wfs_conf_id'] : null;
+			$srvObj->has_module = $hasModule;
+			$srvObj->modultype = $hasModule ? $wfsMatrix[$i]['modultype'] : null;
+
+			// Title & Abstract: prefer module description/abstract if module, else featuretype
+			if ($hasModule && !empty($wfsMatrix[$i]['wfs_conf_description'])) {
+				$srvObj->title = $wfsMatrix[$i]['wfs_conf_description'];
+			} else if (!empty($wfsMatrix[$i]['featuretype_title'])) {
+				$srvObj->title = $wfsMatrix[$i]['featuretype_title'];
+			} else {
+				$srvObj->title = $wfsMatrix[$i]['wfs_title'];
+			}
+
+			if ($hasModule && !empty($wfsMatrix[$i]['wfs_conf_abstract'])) {
+				$srvObj->abstract = $wfsMatrix[$i]['wfs_conf_abstract'];
+			} else if (!empty($wfsMatrix[$i]['featuretype_abstract'])) {
+				$srvObj->abstract = $wfsMatrix[$i]['featuretype_abstract'];
+			} else {
+				$srvObj->abstract = $wfsMatrix[$i]['wfs_abstract'];
+			}
+
+			$srvObj->date = date("d.m.Y", $wfsMatrix[$i]['wfs_timestamp']);
+			$srvObj->respOrg = $wfsMatrix[$i]['mb_group_name'];
+			$srvObj->logoUrl = $wfsMatrix[$i]['mb_group_logo_path'];
+			$srvObj->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=featuretype&id=" . $featuretypeId;
+			$srvObj->wfsMdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=wfs&id=" . $wfsMatrix[$i]['wfs_id'];
+
+			// Capabilities links
+			$srvObj->capabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/php/wfs.php?FEATURETYPE_ID=" . $featuretypeId . "&REQUEST=GetCapabilities&VERSION=" . $wfsVersion . "&SERVICE=WFS";
+			$srvObj->originalGetCapabilitiesUrl = $otherInformation['getCapabilitiesUrl'];
+			$srvObj->wfsCapabilitiesUrl = $this->protocol . "://" . $this->hostName . "/mapbender/registry/wfs/" . $wfsMatrix[$i]['wfs_id'] . "?REQUEST=GetCapabilities&VERSION=" . $wfsVersion . "&SERVICE=WFS";
+
 			$spatialSource = "";
 			$stateOrProvince = $wfsMatrix[$i]['administrativearea'];
 			if ($stateOrProvince == "NULL" || $stateOrProvince == "") {
@@ -521,89 +556,60 @@ class searchMetadata
 			} else {
 				$spatialSource = $wfsMatrix[$i]['administrativearea'];
 			}
-			$this->wfsJSON->wfs->srv[$i - $j]->iso3166 = $spatialSource;
-			//check if a disclaimer has to be shown and give the relevant symbol
+			$srvObj->iso3166 = $spatialSource;
+
 			list($hasConstraints, $symbolLink, $termsOfUseId) = $this->hasConstraints("wfs", $wfsMatrix[$i]['wfs_id']);
-			$this->wfsJSON->wfs->srv[$i - $j]->hasConstraints = $hasConstraints;
-			$this->wfsJSON->wfs->srv[$i - $j]->symbolLink = $symbolLink;
-			$this->wfsJSON->wfs->srv[$i - $j]->license_id = $termsOfUseId;
-			//TODO check the field accessconstraints - which should be presented?
-			$this->wfsJSON->wfs->srv[$i - $j]->status = $wfsMatrix[$i]['status'];
-			$this->wfsJSON->wfs->srv[$i - $j]->avail = $wfsMatrix[$i]['availability'];
-			$this->wfsJSON->wfs->srv[$i - $j]->logged = $wfsMatrix[$i]['wfs_proxylog']; //$wfsMatrix[$i][''];
+			$srvObj->hasConstraints = $hasConstraints;
+			$srvObj->symbolLink = $symbolLink;
+			$srvObj->license_id = $termsOfUseId;
+			$srvObj->status = $wfsMatrix[$i]['status'];
+			$srvObj->avail = $wfsMatrix[$i]['availability'];
+			$srvObj->logged = $wfsMatrix[$i]['wfs_proxylog'];
 			if ($wfsMatrix[$i]['wfs_pricevolume'] == '0' || $wfsMatrix[$i]['wfs_pricevolume'] == null || $wfsMatrix[$i]['wfs_pricevolume'] == '') {
-				$this->wfsJSON->wfs->srv[$i - $j]->price = null;
+				$srvObj->price = null;
 			} else {
-				$this->wfsJSON->wfs->srv[$i - $j]->price = $wfsMatrix[$i]['wfs_pricevolume'];
+				$srvObj->price = $wfsMatrix[$i]['wfs_pricevolume'];
 			}
-			$this->wfsJSON->wfs->srv[$i - $j]->nwaccess = $wfsMatrix[$i]['wfs_network_access']; //$wfsMatrix[$i][''];
-			$this->wfsJSON->wfs->srv[$i - $j]->bbox = "-180.0,-90.0,180.0,90.0"; //$wfsMatrix[$i][''];
-			//if featuretype hasn't been created - do it
-			if (!isset($this->wfsJSON->wfs->srv[$i - $j]->ftype)) {
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype = array();
-			}
-			//fill in featuretype infos
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->id = (int) $wfsMatrix[$i]['featuretype_id'];
-			//get other infos directly from database
-			$otherInformation = $this->getInfofromFeaturetypeId($this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->id);
+			$srvObj->nwaccess = $wfsMatrix[$i]['wfs_network_access'];
+			$srvObj->bbox = !empty($wfsMatrix[$i]['bbox']) ? $wfsMatrix[$i]['bbox'] : "-180.0,-90.0,180.0,90.0";
+			$srvObj->geomtype = $wfsMatrix[$i]['element_type'];
 
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->title = $wfsMatrix[$i]['featuretype_title'];
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->abstract = $wfsMatrix[$i]['featuretype_abstract'];
-			//TODO featuretype name
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->name = $otherInformation['featuretypeName'];
-			//TODO featuretype schema
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->schema = $otherInformation['describeFeaturetypeUrl'];
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=featuretype&id=" . $wfsMatrix[$i]['featuretype_id'];
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->geomtype = $wfsMatrix[$i]['element_type'];
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->bbox = $wfsMatrix[$i]['bbox']; //TODO: $wfsMatrix[$i]['bbox'];
-			//wfs capabilities url:
-			$this->wfsJSON->wfs->srv[$i - $j]->getCapabilitiesUrl = $otherInformation['getCapabilitiesUrl'];
-
-			//give info for inspire categories - not relevant for other services or instances of mapbender TODO: comment it if the mapbender installation is not used to generate inspire output
-			if (isset($wfsMatrix[$i]['md_inspire_cats']) & ($wfsMatrix[$i]['md_inspire_cats'] != '')) {
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->inspire = 1;
-			} else {
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->inspire = 0;
-			}
-
-			if (isset($wfsMatrix[$i]['wfs_conf_id']) && $wfsMatrix[$i]['wfs_conf_id'] != "") {
-				//if modul hasn't been created - do it
-				if (!isset($this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul)) {
-					$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul = array();
-				}
-				//fill in modul infos
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->id = $wfsMatrix[$i]['wfs_conf_id'];
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->title = $wfsMatrix[$i]['wfs_conf_description'];
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->abstract = $wfsMatrix[$i]['wfs_conf_abstract'];
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->type = $wfsMatrix[$i]['modultype'];
-				$equalEPSG = $wfsMatrix[$i]['featuretype_srs'];
-				$isEqual = true;
-				//control if EPSG is supported by Client
-				if ($equalEPSG == $this->searchEPSG) {
-					$isEqual = false;
-				}
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->srsProblem = $isEqual;
-				//generate Link to show metadata
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->mdLink = $this->protocol . "://" . $this->hostName . "/mapbender/php/mod_showMetadata.php?resource=featuretype&id=" . $wfsMatrix[$i]['featuretype_id'];
+			if ($hasModule) {
 				$perText = $this->getPermissionValueForWFS($wfsMatrix[$i]['wfs_id'], $wfsMatrix[$i]['wfs_conf_id']);
-				$this->wfsJSON->wfs->srv[$i - $j]->ftype[$l - $m]->modul[$m]->permission = $perText;
+				$srvObj->permission = $perText;
+			} else {
+				$srvObj->permission = 'true';
 			}
 
-			//alter ftype to array - not associative array - built new sequence
-			$this->wfsJSON->wfs->srv[$i - $j]->ftype = array_values($this->wfsJSON->wfs->srv[$i - $j]->ftype);
-			if ($wfsMatrix[$i]['wfs_id'] == $wfsMatrix[$i + 1]['wfs_id']) {
-				$j++; //next record is the same service
-				$l++;
+			// Backward-compatible ftype structure for helpers expecting ftype
+			$ftypeObj = new stdClass;
+			$ftypeObj->id = $featuretypeId;
+			$ftypeObj->title = $srvObj->title;
+			$ftypeObj->abstract = $srvObj->abstract;
+			$ftypeObj->mdLink = $srvObj->mdLink;
+			$ftypeObj->geomtype = $srvObj->geomtype;
+			$ftypeObj->bbox = $srvObj->bbox;
+			$ftypeObj->capabilitiesUrl = $srvObj->capabilitiesUrl;
+			$ftypeObj->originalGetCapabilitiesUrl = $srvObj->originalGetCapabilitiesUrl;
+			$ftypeObj->has_module = $hasModule;
+			$ftypeObj->modultype = $srvObj->modultype;
+			$ftypeObj->permission = $srvObj->permission;
+			if ($hasModule) {
+				$modulObj = new stdClass;
+				$modulObj->id = (int) $wfsMatrix[$i]['wfs_conf_id'];
+				$modulObj->title = $srvObj->title;
+				$modulObj->abstract = $srvObj->abstract;
+				$modulObj->type = $wfsMatrix[$i]['modultype'];
+				$modulObj->mdLink = $srvObj->mdLink;
+				$modulObj->permission = $srvObj->permission;
+				$ftypeObj->modul = array($modulObj);
 			} else {
-				$l = 0;
+				$ftypeObj->modul = null;
 			}
-			if ($wfsMatrix[$i]['featuretype_id'] == $wfsMatrix[$i + 1]['featuretype_id']) {
-				$m++;
-			} else {
-				$m = 0;
-			}
+			$srvObj->ftype = array($ftypeObj);
+
+			$this->wfsJSON->wfs->srv[] = $srvObj;
 		}
-		$this->wfsJSON->wfs->srv = array_values($this->wfsJSON->wfs->srv);
 	}
 
 	private function generateWMCMetadataJSON($res, $n)
@@ -2154,18 +2160,28 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 
 	private function getInfofromFeaturetypeId($featuretypeId)
 	{
+		static $featuretypeInfoCache = array();
+		if (isset($featuretypeInfoCache[$featuretypeId])) {
+			return $featuretypeInfoCache[$featuretypeId];
+		}
 		$admin = new administration();
 		$sql = "SELECT wfs_id, wfs_version, wfs_getcapabilities, wfs_describefeaturetype, featuretype_name, wfs_owsproxy FROM wfs_featuretype INNER JOIN wfs ON wfs_featuretype.fkey_wfs_id = wfs.wfs_id WHERE wfs_featuretype.featuretype_id = $1";
 		$v = array($featuretypeId);
 		$t = array('i');
 		$res = db_prep_query($sql, $v, $t);
+		$wfsVersion = '1.1.0';
+		$wfsId = 0;
+		$getCapabilitiesUrl = '';
+		$describeFeaturetypeUrl = '';
+		$featuretypeName = '';
+		$owsProxy = '';
 		while ($row = db_fetch_array($res)) {
 			$getCapabilitiesUrl = $row['wfs_getcapabilities'];
 			$describeFeaturetypeUrl = $row['wfs_describefeaturetype'];
 			$featuretypeName = $row['featuretype_name'];
 			$owsProxy = $row['wfs_owsproxy'];
-			$wfsVersion = $row['wfs_version'];
-			$wfsId = $row['wfs_id'];
+			$wfsVersion = !empty($row['wfs_version']) ? $row['wfs_version'] : '1.1.0';
+			$wfsId = (int) $row['wfs_id'];
 		}
 		//if proxy is activated change request urls
 		if ($owsProxy != null && $owsProxy != '') {
@@ -2179,6 +2195,9 @@ $layer_id_sorted wird befüllt mit der obigen getMetadata Abfrage
 		$returnArray['describeFeaturetypeUrl'] = $describeFeaturetypeUrl;
 		$returnArray['featuretypeName'] = $featuretypeName;
 		$returnArray['owsProxy'] = $owsProxy;
+		$returnArray['wfsVersion'] = $wfsVersion;
+		$returnArray['wfsId'] = $wfsId;
+		$featuretypeInfoCache[$featuretypeId] = $returnArray;
 		return $returnArray;
 	}
 
