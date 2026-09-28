@@ -25,13 +25,15 @@ require_once(dirname(__FILE__) . "/../classes/class_owsMetadataUrl.php");
 $admin = new administration();
 
 function getScalarRequestValue($key) {
-	if (!isset($_REQUEST[$key])) {
-		return null;
+	if (array_key_exists($key, $_POST)) {
+		$val = $_POST[$key];
+		return is_scalar($val) ? (string)$val : null;
 	}
-	if (!is_scalar($_REQUEST[$key])) {
-		return null;
+	if (array_key_exists($key, $_GET)) {
+		$val = $_GET[$key];
+		return is_scalar($val) ? (string)$val : null;
 	}
-	return (string)$_REQUEST[$key];
+	return null;
 }
 //
 // make all parameters available as upper case
