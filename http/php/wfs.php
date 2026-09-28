@@ -23,61 +23,108 @@ require_once(dirname(__FILE__)."/../classes/class_administration.php");
 require_once(dirname(__FILE__) . "/../classes/class_owsMetadataUrl.php");
 //
 $admin = new administration();
+
+function getScalarRequestValue($key) {
+	if (array_key_exists($key, $_POST)) {
+		$val = $_POST[$key];
+		return is_scalar($val) ? (string)$val : null;
+	}
+	if (array_key_exists($key, $_GET)) {
+		$val = $_GET[$key];
+		return is_scalar($val) ? (string)$val : null;
+	}
+	return null;
+}
 //
 // make all parameters available as upper case
 //
 foreach($_GET as $key => $val) {
 	$_GET[strtoupper($key)] = $val;
 }
+foreach($_POST as $key => $val) {
+	$_POST[strtoupper($key)] = $val;
+}
+foreach($_REQUEST as $key => $val) {
+	$_REQUEST[strtoupper($key)] = $val;
+}
 
-$requestType = $_GET["REQUEST"];
-$version = $_GET["VERSION"];
-$service = strtoupper($_GET["SERVICE"]);
+$requestType = getScalarRequestValue("REQUEST");
+if ($requestType === null) {
+	$requestType = "";
+}
+if (strcasecmp($requestType, "GetCapabilities") === 0) {
+	$requestType = "GetCapabilities";
+}
+$version = getScalarRequestValue("VERSION");
+if ($version === null) {
+	$version = "";
+}
+$service = strtoupper((string)getScalarRequestValue("SERVICE"));
 
 //check for integer value WFS_ID
-if (isset($_REQUEST["WFS_ID"]) & $_REQUEST["WFS_ID"] != "") {
+if (isset($_REQUEST["WFS_ID"])) {
     //validate integer 
-    $testMatch = $_REQUEST["WFS_ID"];
+	if (!is_scalar($_REQUEST["WFS_ID"])) {
+		echo 'Parameter <b>WFS_ID</b> is not valid integer.<br/>';
+		die();
+	}
+	$testMatch = (string)$_REQUEST["WFS_ID"];
+	if ($testMatch !== "") {
     //give max 99 entries - more will be to slow
-    $pattern = '/[0-9]*+/';
+	$pattern = '/^[0-9]+$/';
     if (!preg_match($pattern,$testMatch)){
         //echo 'maxResults: <b>'.$testMatch.'</b> is not valid.<br/>';
         echo 'Parameter <b>WFS_ID</b> is not valid integer.<br/>';
         die();
     }
-    $wfsId = $testMatch;
+	$wfsId = (int)$testMatch;
+	}
     $testMatch = NULL;
 }
 
 //check for integer value FEATURETYPE_ID
-if (isset($_REQUEST["FEATURETYPE_ID"]) & $_REQUEST["FEATURETYPE_ID"] != "") {
+if (isset($_REQUEST["FEATURETYPE_ID"])) {
     //validate integer
-    $testMatch = $_REQUEST["FEATURETYPE_ID"];
+	if (!is_scalar($_REQUEST["FEATURETYPE_ID"])) {
+		echo 'Parameter <b>FEATURETYPE_ID</b> is not valid integer.<br/>';
+		die();
+	}
+	$testMatch = (string)$_REQUEST["FEATURETYPE_ID"];
+	if ($testMatch !== "") {
     //give max 99 entries - more will be to slow
-    $pattern = '/[0-9]*+/';
+	$pattern = '/^[0-9]+$/';
     if (!preg_match($pattern,$testMatch)){
         //echo 'maxResults: <b>'.$testMatch.'</b> is not valid.<br/>';
         echo 'Parameter <b>FEATURETYPE_ID</b> is not valid integer.<br/>';
         die();
     }
-    $featuretypeId = $testMatch;
+	$featuretypeId = (int)$testMatch;
+	}
     $testMatch = NULL;
 }
 
-$updateSequence = intval($_GET["UPDATESEQUENCE"]);
-$inspire = $_GET["INSPIRE"];
+$updateSequence = intval((string)getScalarRequestValue("UPDATESEQUENCE"));
+$inspire = getScalarRequestValue("INSPIRE");
+if ($inspire === null) {
+	$inspire = "";
+}
 $withChilds = false;
 
-if (isset($_REQUEST["withChilds"]) && $_REQUEST["withChilds"] === "1") {
+if (isset($_REQUEST["WITHCHILDS"]) && $_REQUEST["WITHCHILDS"] === "1") {
 	$withChilds = true;
 }
-$sessionId = $_GET[strtoupper(session_name())];
+$sessionName = strtoupper(session_name());
+$sessionId = getScalarRequestValue($sessionName);
 //if session id not set, set a dummy id!
-if (!isset($sessionId) || $sessionId =="") {
+
+if (!is_string($sessionId) || $sessionId === "" || !preg_match('/^[A-Za-z0-9,-]{1,128}$/', $sessionId)) {
 	$sessionId = "00000000000000000000000000000000";
 	}
-if (isset($inspire) && $inspire === 1 ) {
+
+if (isset($inspire) && ($inspire === "1" || strtolower($inspire) === "true")) {
 	$inspire = true;
+} else {
+	$inspire = false;
 }
 
 if (isset($_SERVER["HTTPS"])){
