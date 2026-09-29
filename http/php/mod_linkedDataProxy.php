@@ -2286,7 +2286,20 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 							$offsetExceeded = true;
 						}
 	
-						if ($numberOfObjects == 0 || $numberOfObjects == false) {
+						if ($numberOfObjects === false || $numberOfObjects === null || !is_numeric($numberOfObjects) || intval($numberOfObjects) < 0) {
+							$returnObject->success = false;
+							$returnObject->message = "Feature count request failed - remote WFS unavailable or returned invalid response.";
+							$returnObject->features = array();
+							$e = new mb_exception("php/mod_linkedDataProxy.php: Feature count failed for wfs_id " . $wfsid . " and featuretype " . $ftName . " - nothing returned!");
+							
+							if ($f == "json") {
+							     header ( "application/json" );
+							     echo json_encode ( $returnObject );
+							     die ();
+							}
+							
+						}
+						if (intval($numberOfObjects) == 0) {
 							$returnObject->success = false;
 							$returnObject->message = "No results found or an error occured - see server logs - please try it again! Use the back button!";
 							$returnObject->features = array();

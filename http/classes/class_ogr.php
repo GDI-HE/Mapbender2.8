@@ -36,6 +36,7 @@ class Ogr {
     var $ramdiskPath; # string
     var $useRamdisk; # boolean
     var $logRuntime; # boolean
+    var $logOgrStderr = true; // set to false to suppress raw GDAL/OGR stderr in Apache logs
     
     /**
      * @constructor
@@ -59,9 +60,33 @@ class Ogr {
         list ( $usec, $sec ) = explode ( " ", microtime () );
         return (( float ) $usec + ( float ) $sec);
     }
+
+    /**
+     * Log GDAL/OGR stderr through PHP so Apache adds its usual request metadata
+     */
+    private function logOgrOutput($output) {
+        if (!$this->logOgrStderr || !is_array($output)) {
+            return;
+        }
+        foreach ($output as $line) {
+            $line = trim((string) $line);
+            if ($line !== '') {
+                error_log('GDAL/OGR: ' . $line);
+            }
+        }
+    }
+    
+    private function buildCommand($command) {
+        if ($this->logOgrStderr) {
+            return $command . ' 2>&1';
+        }
+        return $command . ' 2>/dev/null';
+    }
     
     public function getFormat($geometryFilename) {
-        $result = shell_exec('ogrinfo '.$geometryFilename);
+        $command = $this->buildCommand('ogrinfo ' . escapeshellarg($geometryFilename));
+        $result = shell_exec($command);
+        $this->logOgrOutput((array) $result);
         //get successful or not
         $e = new mb_exception("classes/class_ogr.php: reult of ogrinfo: " . $result);
         if (strpos($result, 'successful') !== false) {
@@ -97,8 +122,10 @@ class Ogr {
         }
         $filenameUniquePart = "ogr_transform_".time()."_".uniqid();
         $targetFilename = $tmpDir . "/" . $filenameUniquePart . "." . $appendix;
-        $e = new mb_exception("classes/class_ogr.php: result of ogrcommand: " . 'ogr2ogr -t_srs "'. $targetCrs .'" -f "' . $targetFormat . '" '.$targetFilename.' '. $inputFilename.' -lco WRITE_BBOX=YES');
-        exec('ogr2ogr -t_srs "'. $targetCrs .'" -f "' . $targetFormat . '" '.$targetFilename.' '. $inputFilename.' -lco WRITE_BBOX=YES', $output);
+        $command = $this->buildCommand('ogr2ogr -t_srs "'. $targetCrs .'" -f "' . $targetFormat . '" '.$targetFilename.' '. $inputFilename.' -lco WRITE_BBOX=YES');
+        $e = new mb_exception("classes/class_ogr.php: result of ogrcommand: " . $command);
+        exec($command, $output, $exitCode);
+        $this->logOgrOutput($output);
         
         if($h = fopen($targetFilename, "r")){
             $result = fread($h, filesize($targetFilename));
@@ -134,7 +161,9 @@ class Ogr {
             fclose($h);
         }
         $filenameGeojson = $tmpDir."/".$filenameUniquePart.".geojson";
-        exec('ogr2ogr -a_srs "EPSG:4326" -dim 2 -f "GeoJSON" '.$filenameGeojson.' '. $filenameGml.' -lco WRITE_BBOX=YES', $output);
+        $command = $this->buildCommand('ogr2ogr -a_srs "EPSG:4326" -dim 2 -f "GeoJSON" '.$filenameGeojson.' '. $filenameGml.' -lco WRITE_BBOX=YES');
+        exec($command, $output, $exitCode);
+        $this->logOgrOutput($output);
         //read geojson
         if($h = fopen($filenameGeojson, "r")){
             $geojson = fread($h, filesize($filenameGeojson));
@@ -271,13 +300,19 @@ class Ogr {
             } else {
                 $e = new mb_exception("classes/class_ogr.php: tmp folder: " . $zipTmpFolder . " could not be created!");
             }
-            exec("unzip " . $filenameFeatures . " -d " . $tmpDir."/" . $zipTmpFolder . '/');          
+            $command = $this->buildCommand("unzip " . escapeshellarg($filenameFeatures) . " -d " . escapeshellarg($tmpDir."/" . $zipTmpFolder . '/'));
+            exec($command, $output, $exitCode);
+            $this->logOgrOutput($output);
         }
         //use shell_exec to get back textual representation of ogrinfo
         if ($ogrDriver == "ESRI Shapefile") {
-            $result = shell_exec('ogrinfo -so ' . $tmpDir."/" . $zipTmpFolder . '/' .$layername . ".shp"  . ' ' . $layername);
+            $command = $this->buildCommand('ogrinfo -so ' . escapeshellarg($tmpDir."/" . $zipTmpFolder . '/' .$layername . ".shp")  . ' ' . escapeshellarg($layername));
+            $result = shell_exec($command);
+            $this->logOgrOutput((array) $result);
         } else {
-            $result = shell_exec('ogrinfo -so ' . $filenameFeatures . ' ' . $layername);
+            $command = $this->buildCommand('ogrinfo -so ' . escapeshellarg($filenameFeatures) . ' ' . escapeshellarg($layername));
+            $result = shell_exec($command);
+            $this->logOgrOutput((array) $result);
         }
         //$e = new mb_exception("classes/class_ogr.php: ogr:  " . 'ogrinfo -so ' . $filenameFeatures . ' ' . $layername);
         /*ogrinfo -so /tmp/test_wfs.xml fluren_rlp

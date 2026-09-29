@@ -864,6 +864,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 				}
 	
 				$e = new mb_exception("returned result: " . $resultOfCount);
+				return false;
 		}
 		switch ($version) {
 			case "2.0.0":
@@ -886,6 +887,7 @@ $bboxFilter = '<fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0"><fes:BBOX>
 		}
 		catch (Exception $e) {
     			$e = new mb_exception($e->getMessage());
+				return false;
 		}
 		switch ($version) {
 			case "2.0.0":
