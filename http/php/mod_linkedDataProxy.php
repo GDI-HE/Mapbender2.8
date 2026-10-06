@@ -272,7 +272,95 @@ function isWfsExceptionResponse($response) {
 	if (stripos($response, "ExceptionReport") !== false || stripos($response, "ServiceExceptionReport") !== false || stripos($response, "ExceptionText") !== false) {
 		return true;
 	}
+	$response_lower = mb_strtolower($response);
+	if ((stripos($response_lower, "<!doctype html") !== false || stripos($response_lower, "<html") !== false) &&
+		(strpos($response_lower, "<head") !== false || strpos($response_lower, "<body") !== false)) {
+		return true;
+	}
+	if (stripos($response, "<title>") !== false && (stripos($response, "404") !== false || stripos($response, "500") !== false || stripos($response, "502") !== false || stripos($response, "503") !== false)) {
+		return true;
+	}
 	return false;
+}
+
+function sanitizeUrlForOutput($url) {
+	return preg_replace('/([?&])(apikey|api_key|token|auth|password|passwd|secret|key|x-api-key)[=:]([^&\s]*)/i', '$1$2=***REDACTED***', $url);
+}
+
+function handleWfsRequestError($httpCode, $requestUrl, $wfs, $format) {
+	global $linkedDataProxyUrl;
+	$sanitizedUrl = sanitizeUrlForOutput($requestUrl);
+
+	$errorObject = new stdClass();
+	$errorObject->error = "Bad Gateway";
+	$errorObject->message = "Der externe Datendienst ist zurzeit nicht erreichbar oder hat fehlerhafte Daten geliefert.";
+	$errorObject->status = 502;
+	$errorObject->httpStatusCode = $httpCode;
+	$errorObject->requestUrl = $sanitizedUrl;
+
+	$providerName = "Unbekannter Anbieter";
+	$providerEmail = "info@example.org";
+	if (isset($wfs)) {
+		if (!empty($wfs->providerName)) {
+			$providerName = $wfs->providerName;
+		}
+		if (!empty($wfs->electronicMailAddress)) {
+			$providerEmail = $wfs->electronicMailAddress;
+		}
+	}
+	$errorObject->provider = $providerName;
+	$errorObject->providerEmail = $providerEmail;
+
+	$e = new mb_exception("mod_linkedDataProxy.php: WFS Request Error - HTTP " . $httpCode . " from " . $sanitizedUrl . " (Provider: " . $providerName . ", Email: " . $providerEmail . ")");
+
+	if ($format == "json") {
+		header("HTTP/1.1 502 Bad Gateway");
+		header("Content-type: application/json; charset=UTF-8");
+		echo json_encode($errorObject);
+	} elseif ($format == "xml") {
+		header("HTTP/1.1 502 Bad Gateway");
+		header("Content-type: application/xml; charset=UTF-8");
+		echo "<error>";
+		echo "<message>" . htmlspecialchars($errorObject->message, ENT_XML1, 'UTF-8') . "</message>";
+		echo "<httpStatusCode>" . htmlspecialchars($errorObject->httpStatusCode, ENT_XML1, 'UTF-8') . "</httpStatusCode>";
+		echo "<requestUrl>" . htmlspecialchars($sanitizedUrl, ENT_XML1, 'UTF-8') . "</requestUrl>";
+		echo "<provider>" . htmlspecialchars($errorObject->provider, ENT_XML1, 'UTF-8') . "</provider>";
+		echo "<providerEmail>" . htmlspecialchars($errorObject->providerEmail, ENT_XML1, 'UTF-8') . "</providerEmail>";
+		echo "</error>";
+	} else {
+		header("HTTP/1.1 502 Bad Gateway");
+		header("Content-type: text/html; charset=UTF-8");
+		echo "<!DOCTYPE html>";
+		echo "<html>";
+		echo "<head>";
+		echo "<meta charset=\"UTF-8\">";
+		echo "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
+		echo "<title>Fehler</title>";
+		echo "<link rel=\"stylesheet\" href=\"../css/ldproxy_ia.css\">";
+		echo "<style>";
+		echo "body { margin: 2rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.5; color: #333; }";
+		echo ".error-box { border-left: 4px solid #d32f2f; padding: 1.5rem; background-color: #f5f5f5; margin: 1rem 0; }";
+		echo ".error-box h2 { margin-top: 0; color: #d32f2f; }";
+		echo ".error-box p { margin: 0.5rem 0; }";
+		echo ".error-box code { background-color: #eeeeee; padding: 0.25rem 0.5rem; border-radius: 3px; font-family: 'Courier New', monospace; word-break: break-all; }";
+		echo ".error-label { font-weight: 600; color: #555; }";
+		echo "a { color: #1976d2; text-decoration: none; }";
+		echo "a:hover { text-decoration: underline; }";
+		echo "</style>";
+		echo "</head>";
+		echo "<body>";
+		echo "<div class=\"error-box\">";
+		echo "<h2>Fehler beim Datenabruf</h2>";
+		echo "<p>Der externe Datendienst ist nicht erreichbar oder hat ungültige Daten geliefert.</p>";
+		echo "<p><span class=\"error-label\">HTTP-Status:</span> " . htmlspecialchars($httpCode, ENT_HTML5, 'UTF-8') . "</p>";
+		echo "<p><span class=\"error-label\">Anbieter:</span> " . htmlspecialchars($providerName, ENT_HTML5, 'UTF-8') . "</p>";
+		echo "<p><span class=\"error-label\">Anfrage:</span> <code>" . htmlspecialchars($sanitizedUrl, ENT_HTML5, 'UTF-8') . "</code></p>";
+		echo "<p><span class=\"error-label\">Support:</span> <a href=\"mailto:" . htmlspecialchars($providerEmail, ENT_HTML5, 'UTF-8') . "\">" . htmlspecialchars($providerEmail, ENT_HTML5, 'UTF-8') . "</a></p>";
+		echo "</div>";
+		echo "</body>";
+		echo "</html>";
+	}
+	die();
 }
 
 function updateBboxAccumulatorFromCoordinates($coordinates, &$minLat, &$minLon, &$maxLat, &$maxLon) {
@@ -1870,7 +1958,7 @@ if (! isset ( $wfsid ) || $wfsid == "") {
 						"properties" 
 				); // TODO: relations, resolve, offsetList, crs, bbox-crs, maxAllowedOffset
 				                                                                                                           // first draft - set only json based api description and give it back
-				header ( "Content-type: application/openapi+json;version=3.0" );
+				header ( "Content-type: application/json; charset=UTF-8" );
 				if ($corsHeader != false) {
 				    header ( "Access-Control-Allow-Origin: " . $corsHeader);
 				}
@@ -2223,6 +2311,12 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 									}
 									$e = new mb_notice("php/mod_linkedDataProxy.php: countFeatures failed for version " . $wfsRequestVersion . " - trying fallback");
 								}
+								if ($numberOfObjects === false || $numberOfObjects === null) {
+									$httpCode = $wfs->getLastHttpCode();
+									if ($httpCode && $httpCode != 200) {
+										handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+									}
+								}
 								$cache->cachedVariableAdd ( $countCacheKey, $numberOfObjects );
 							} else {
 								// $e = new mb_exception("read count from cache!");
@@ -2241,6 +2335,12 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 									break;
 								}
 								$e = new mb_notice("php/mod_linkedDataProxy.php: countFeatures failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
+							if ($numberOfObjects === false || $numberOfObjects === null) {
+								$httpCode = $wfs->getLastHttpCode();
+								if ($httpCode && $httpCode != 200) {
+									handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+								}
 							}
 						}
 						// $numberOfObjects = 1000;
@@ -2287,17 +2387,23 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 						}
 	
 						if ($numberOfObjects == 0 || $numberOfObjects == false) {
+							if ($numberOfObjects === false || $numberOfObjects === null) {
+								$httpCode = $wfs->getLastHttpCode();
+								if ($httpCode && $httpCode != 200) {
+									handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+								}
+							}
 							$returnObject->success = false;
 							$returnObject->message = "No results found or an error occured - see server logs - please try it again! Use the back button!";
 							$returnObject->features = array();
 							$e = new mb_exception("php/mod_linkedDataProxy.php: Feature count was not successful - nothing returned!");
-							
+
 							if ($f == "json") {
-							     header ( "application/json" );
+							     header ( "Content-type: application/json; charset=UTF-8" );
 							     echo json_encode ( $returnObject );
 							     die ();
 							}
-							
+
 						}
 						// $e = new mb_exception("number of objects: ".$numberOfObjects);
 						// request first object and metadata
@@ -2351,6 +2457,12 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 									break;
 								}
 								$e = new mb_notice("php/mod_linkedDataProxy.php: getFeaturePaging(nativeJson) failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
+							if (isWfsExceptionResponse($features)) {
+								$httpCode = $wfs->getLastHttpCode();
+								if ($httpCode && $httpCode != 200) {
+									handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+								}
 							}
 							$gmlFeatureCache = $features;
 							$geojsonList = json_decode ( $features );
@@ -2439,6 +2551,12 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 									break;
 								}
 								$e = new mb_notice("php/mod_linkedDataProxy.php: getFeaturePaging(gml) failed for version " . $wfsRequestVersion . " - trying fallback");
+							}
+							if (isWfsExceptionResponse($features)) {
+								$httpCode = $wfs->getLastHttpCode();
+								if ($httpCode && $httpCode != 200) {
+									handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+								}
 							}
 							//$features = $wfs->getFeaturePaging ( $ftName, $filter, "urn:ogc:def:crs:EPSG::4326", null, null, $limit, $startIndex, "1.1.0", false, $wfs_http_method );
 							$gmlFeatureCache = $features;
@@ -2640,6 +2758,12 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 							}
 							$e = new mb_notice("php/mod_linkedDataProxy.php: getFeatureById(nativeJson) failed for version " . $wfsRequestVersion . " - trying fallback");
 						}
+						if (isWfsExceptionResponse($features)) {
+							$httpCode = $wfs->getLastHttpCode();
+							if ($httpCode && $httpCode != 200) {
+								handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+							}
+						}
 						$gmlFeatureCache = $features;
 						$geojsonList = json_decode ( $features );
 						$geojsonBbox = array ();
@@ -2709,6 +2833,12 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 					    //$e = new mb_exception("php/mod_linkedDataProxy.php item:". $item);
 					    //request with registrated wfs version - don't force wfs 2.0.0
 					    $features = $wfs->getFeatureById ( $collection, $forcedOutputFormat, $item, false, "EPSG:4326", true );
+					    if (isWfsExceptionResponse($features)) {
+					    	$httpCode = $wfs->getLastHttpCode();
+					    	if ($httpCode && $httpCode != 200) {
+					    		handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+					    	}
+					    }
 					    $gmlFeatureCache = $features;
 					    $useGdal = $useGdal === false ? false : checkValidForGDAL($features);
 					    if ($useGdal) {
