@@ -122,7 +122,7 @@ class Ogr {
         }
         $filenameUniquePart = "ogr_transform_".time()."_".uniqid();
         $targetFilename = $tmpDir . "/" . $filenameUniquePart . "." . $appendix;
-        $command = $this->buildCommand('ogr2ogr -t_srs "'. $targetCrs .'" -f "' . $targetFormat . '" '.$targetFilename.' '. $inputFilename.' -lco WRITE_BBOX=YES');
+        $command = $this->buildCommand('ogr2ogr -t_srs ' . escapeshellarg($targetCrs) . ' -f ' . escapeshellarg($targetFormat) . ' ' . escapeshellarg($targetFilename) . ' ' . escapeshellarg($inputFilename) . ' -lco WRITE_BBOX=YES');
         $e = new mb_exception("classes/class_ogr.php: result of ogrcommand: " . $command);
         exec($command, $output, $exitCode);
         $this->logOgrOutput($output);
@@ -161,7 +161,7 @@ class Ogr {
             fclose($h);
         }
         $filenameGeojson = $tmpDir."/".$filenameUniquePart.".geojson";
-        $command = $this->buildCommand('ogr2ogr -a_srs "EPSG:4326" -dim 2 -f "GeoJSON" '.$filenameGeojson.' '. $filenameGml.' -lco WRITE_BBOX=YES');
+        $command = $this->buildCommand('ogr2ogr -a_srs "EPSG:4326" -dim 2 -f "GeoJSON" ' . escapeshellarg($filenameGeojson) . ' ' . escapeshellarg($filenameGml) . ' -lco WRITE_BBOX=YES');
         exec($command, $output, $exitCode);
         $this->logOgrOutput($output);
         //read geojson
@@ -344,7 +344,7 @@ class Ogr {
         }
         //delete temporary files
         if ($ogrDriver == "ESRI Shapefile") {
-            exec("rm -r " . $tmpDir."/" . $zipTmpFolder . '/');
+            exec('rm -r ' . escapeshellarg($tmpDir."/" . $zipTmpFolder . '/'));
             unlink($filenameFeatures);
         } else {
             unlink($filenameFeatures);
