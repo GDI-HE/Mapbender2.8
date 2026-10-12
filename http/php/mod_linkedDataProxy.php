@@ -287,8 +287,29 @@ function sanitizeUrlForOutput($url) {
 	return preg_replace('/([?&])(apikey|api_key|token|auth|password|passwd|secret|key|x-api-key)[=:]([^&\s]*)/i', '$1$2=***REDACTED***', $url);
 }
 
+function normalizeItemIdForWfsLookup($itemId) {
+	if (!is_string($itemId) || $itemId === "") {
+		return $itemId;
+	}
+	if (preg_match('/^(.+\.\d+)\.0+$/', $itemId, $matches)) {
+		return $matches[1];
+	}
+	return $itemId;
+}
+
+function isValidGeojsonFeatureCollection($geojsonList) {
+	if (!is_object($geojsonList)) {
+		return false;
+	}
+	if (!isset($geojsonList->features) || !is_array($geojsonList->features)) {
+		return false;
+	}
+	return true;
+}
+
 function handleWfsRequestError($httpCode, $requestUrl, $wfs, $format) {
 	global $linkedDataProxyUrl;
+	global $corsHeader;
 	$sanitizedUrl = sanitizeUrlForOutput($requestUrl);
 
 	$errorObject = new stdClass();
@@ -312,6 +333,9 @@ function handleWfsRequestError($httpCode, $requestUrl, $wfs, $format) {
 	$errorObject->providerEmail = $providerEmail;
 
 	$e = new mb_exception("mod_linkedDataProxy.php: WFS Request Error - HTTP " . $httpCode . " from " . $sanitizedUrl . " (Provider: " . $providerName . ", Email: " . $providerEmail . ")");
+	if ($corsHeader !== false && $corsHeader != "") {
+		header("Access-Control-Allow-Origin: " . $corsHeader);
+	}
 
 	if ($format == "json") {
 		header("HTTP/1.1 502 Bad Gateway");
@@ -1278,7 +1302,10 @@ if (isset ( $_REQUEST ["item"] ) & $_REQUEST ["item"] != "") {
 		$e = new mb_exception("php/mod_linkedDataProxy.php: Parameter item is not valid ");
 		die ();
 	}
-	$item = $testMatch;
+	$item = normalizeItemIdForWfsLookup($testMatch);
+	if ($item != $testMatch) {
+		$e = new mb_notice("php/mod_linkedDataProxy.php: normalized item id from " . $testMatch . " to " . $item);
+	}
 	$testMatch = NULL;
 }
 if (isset ( $_REQUEST ["outputFormat"] ) & $_REQUEST ["outputFormat"] != "") {
@@ -2460,12 +2487,18 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 							}
 							if (isWfsExceptionResponse($features)) {
 								$httpCode = $wfs->getLastHttpCode();
-								if ($httpCode && $httpCode != 200) {
-									handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+								if ($httpCode == 200) {
+									$e = new mb_notice("php/mod_linkedDataProxy.php: Exception/HTML response detected with HTTP 200 in getFeaturePaging(nativeJson)");
 								}
+								handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
 							}
 							$gmlFeatureCache = $features;
 							$geojsonList = json_decode ( $features );
+							if (!isValidGeojsonFeatureCollection($geojsonList)) {
+								$httpCode = $wfs->getLastHttpCode();
+								$e = new mb_notice("php/mod_linkedDataProxy.php: Invalid geojson payload in getFeaturePaging(nativeJson)");
+								handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+							}
 							// native json from wfs may not have bbox and gml_id attribute !!!!!!!!!
 							// bbox has to be calculated from result!
 							// $e = new mb_exception("features from wfs: " . $features);
@@ -2554,9 +2587,10 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 							}
 							if (isWfsExceptionResponse($features)) {
 								$httpCode = $wfs->getLastHttpCode();
-								if ($httpCode && $httpCode != 200) {
-									handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+								if ($httpCode == 200) {
+									$e = new mb_notice("php/mod_linkedDataProxy.php: Exception/HTML response detected with HTTP 200 in getFeaturePaging(gml)");
 								}
+								handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
 							}
 							//$features = $wfs->getFeaturePaging ( $ftName, $filter, "urn:ogc:def:crs:EPSG::4326", null, null, $limit, $startIndex, "1.1.0", false, $wfs_http_method );
 							$gmlFeatureCache = $features;
@@ -2760,12 +2794,18 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 						}
 						if (isWfsExceptionResponse($features)) {
 							$httpCode = $wfs->getLastHttpCode();
-							if ($httpCode && $httpCode != 200) {
-								handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+							if ($httpCode == 200) {
+								$e = new mb_notice("php/mod_linkedDataProxy.php: Exception/HTML response detected with HTTP 200 in getFeatureById(nativeJson)");
 							}
+							handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
 						}
 						$gmlFeatureCache = $features;
 						$geojsonList = json_decode ( $features );
+						if (!isValidGeojsonFeatureCollection($geojsonList)) {
+							$httpCode = $wfs->getLastHttpCode();
+							$e = new mb_notice("php/mod_linkedDataProxy.php: Invalid geojson payload in getFeatureById(nativeJson)");
+							handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+						}
 						$geojsonBbox = array ();
 						$geojsonIndex = 0;
 						$minxFC = 90;
@@ -2835,9 +2875,10 @@ if ($filter != null && isset($wfsDetectedVersion) && strpos($wfsDetectedVersion,
 					    $features = $wfs->getFeatureById ( $collection, $forcedOutputFormat, $item, false, "EPSG:4326", true );
 					    if (isWfsExceptionResponse($features)) {
 					    	$httpCode = $wfs->getLastHttpCode();
-					    	if ($httpCode && $httpCode != 200) {
-					    		handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
+					    	if ($httpCode == 200) {
+					    		$e = new mb_notice("php/mod_linkedDataProxy.php: Exception/HTML response detected with HTTP 200 in getFeatureById(gml)");
 					    	}
+					    	handleWfsRequestError($httpCode, $wfs->getLastHttpUrl(), $wfs, $f);
 					    }
 					    $gmlFeatureCache = $features;
 					    $useGdal = $useGdal === false ? false : checkValidForGDAL($features);
