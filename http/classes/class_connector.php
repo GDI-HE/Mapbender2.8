@@ -60,7 +60,7 @@ class connector {
 	var $file;
 	private $connectionType;
 	public  $timeOut = 20;
-	private $executionTimeOut = 0; //set max execution time in ms e.g. for a download process 
+	private $executionTimeOut = 0; //set max execution time in ms e.g. for a download process
 	private $httpType = "get";
 	private $httpVersion = "1.0";
 	private $httpPostData;
@@ -71,6 +71,7 @@ class connector {
 	private $externalHeaders = "";
 	public $httpCode = null;
 	public $curlError = false;
+	private $maxResponseSize = 52428800; // 50MB default limit
 
 
 	/**
@@ -264,6 +265,10 @@ class connector {
 				if ($this->isValidHttpContentType($value)) {
 					$this->httpContentType = $value;
 				}
+				break;
+
+			case "maxResponseSize":
+				$this->maxResponseSize = (integer)$value;
 				break;
 		}
 	}
@@ -655,7 +660,30 @@ class connector {
 
 	private function getHTTP($url){
 		if ($this->httpType == "get") {
-			return @file_get_contents($url);
+			$context = stream_context_create(array(
+				'http' => array(
+					'method' => 'GET',
+					'timeout' => $this->timeOut,
+					'ignore_errors' => true
+				)
+			));
+			$result = @file_get_contents($url, false, $context, 0, $this->maxResponseSize + 1);
+			if ($result !== false && strlen($result) > $this->maxResponseSize) {
+				$e = new mb_exception('connector.php: Response size exceeds max limit (' . $this->maxResponseSize . ' bytes)');
+				return false;
+			}
+			if (isset($http_response_header)) {
+				foreach ($http_response_header as $header) {
+					if (strpos($header, 'HTTP') === 0) {
+						preg_match('/HTTP\/\d\.\d (\d{3})/', $header, $matches);
+						if (isset($matches[1])) {
+							$this->httpCode = (int)$matches[1];
+						}
+						break;
+					}
+				}
+			}
+			return $result;
 	 	}
 		else {
 			$errno = 0;
@@ -709,14 +737,29 @@ class connector {
 			//new mb_notice("connector.http.postData: ".$this->httpPostData);
 
 		    $xmlstr = false;
+		    $headerEnd = false;
 		    //@TODO remove possibly infinite loop
 			while (!feof($fp)) {
 		    	$content = fgets($fp,4096);
-//		    	if( strpos($content, '<?xml') === 0){
+
+		    	if (!$headerEnd) {
+		    		if (strpos($content, 'HTTP/') === 0) {
+		    			preg_match('/HTTP\/[\d\.]+\s+(\d{3})/', $content, $matches);
+		    			if (isset($matches[1])) {
+		    				$this->httpCode = (int)$matches[1];
+		    			}
+		    		}
+		    		if (trim($content) === '' || $content === "\r\n") {
+		    			$headerEnd = true;
+		    			continue;
+		    		}
+		    	}
+
+	//		    	if( strpos($content, '<?xml') === 0){
 		    	if( strpos($content, '<') === 0){
 		    		$xmlstr = true;
 		    	}
-		    	if($xmlstr == true){
+		    	if($xmlstr == true && $headerEnd){
 		    		$buf .= $content;
 		    	}
 			}

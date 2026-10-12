@@ -132,7 +132,6 @@
 			go: that.activate,
 			stop: that.deactivate
 		});
-		checkSession();
 		
 	
  	};
@@ -144,14 +143,7 @@
         if (!$('#dataset-list').length) {
 			$('#dataset-list-header').hide();
 		}
-        checkSession();
-    };
-       
-    //initialize area_of_interest geojeon polygon
-    this.area_of_interest = {}; 
-    
-    var finishDigitize = function() {        
-        status = 'created-new';
+
         //use digitize pane to pull points
         var digit = o.$target.data('mb_digitize');
         // problem : shallow copying: https://code.tutsplus.com/the-best-way-to-deep-copy-an-object-in-javascript--cms-39655a
@@ -302,25 +294,41 @@
         }
     };
     
-    var checkSession = function() {
+    var checkSession = function(afterCheckCallback) {
     	//console.log("checkSession");
         $.ajax({
             url: '../php/mod_showLoggedInUser.php?outputFormat=json',
-            type: 'POST',
+			type: 'POST',
+			contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
             async: true,
             dataType: 'json',
-            data: {
-            },
+			data: {
+				checkSession: 1
+			},
             success: function(data) {
-            	if (data.result.logged_in) {
+            	var loggedIn = !!(data && data.result && data.result.logged_in);
+            	if (loggedIn) {
             		$('#user-info').html('<i><b>' + data.result.username + '</b></i>');
+            		$('#identity').show();
             	} else {
             	    //alert('problem');
             		//$('#user-info').html('<i><b>' + data.result.username + '</b></i>' + '<br><?php echo _mb('The anonymous user is not allowed to download data!');?>');
             		//$('#user-info').show();
             		$('#start-digitize').html('<?php echo _mb('The anonymous user is not allowed to download data!');?>');
+            		$('#identity').hide();
             	}
-            	userLoggedIn = data.result.logged_in;
+            	userLoggedIn = loggedIn;
+            	if ($.isFunction(afterCheckCallback)) {
+            		afterCheckCallback(loggedIn, data);
+            	}
+            },
+            error: function() {
+                userLoggedIn = false;
+                $('#identity').hide();
+                $('#start-digitize').html('<?php echo _mb('The anonymous user is not allowed to download data!');?>');
+                if ($.isFunction(afterCheckCallback)) {
+                    afterCheckCallback(false, null);
+                }
             }
         });
     };
@@ -567,47 +575,56 @@
 			$('#dataset-list-header').hide();
 		}*/
 		$('#load-options-spinner').hide();
-		checkSession();
-		if(!$('#start-digitize').length){
-			downloadDialog.append($(startDigitizeHtml));
-		}
-		$('#start-digitize').show();
 		$('#dataset-list-header').hide();
+		$('#start-digitize').hide();
 		$('#identity').hide();
-		
-		//if dataset-list already opened
-		if ($('#dataset-list-table').length) {
-			$('#start-digitize').hide();
-			$('#dataset-list-header').show();
-		}
-		if (userLoggedIn == false) {
-			Mapbender.bindPanEvents();
-			return;
-		}
-        var mode = status.match(/(new|edit)-.+/);
-        if (!mode) {
-            return;
-        };
-        mode = mode[1];
-        if (mode === 'new') {
-            if (o.$target.size() > 0) {
-                o.type = status.match(/new-(.+)/)[1];
-                o.editedFeature = null;
-                o.$target
-                    .mb_digitize(o)
-                    .mb_digitize('modeOff')
-                    .mb_digitize('startDigitizing')
-                    .unbind('mb_digitizelastpointadded')
-                    .unbind('mb_digitizereinitialize')
-                    .bind("mb_digitizelastpointadded", finishDigitize)
-                    .bind("mb_digitizereinitialize", reinitializeDigitize);
-            }
-        } else {
-        	alert('Editing of features is not possible in this module!')
-        }
-        if (!inProgress) {
-            inProgress = true;
-        }
+
+		checkSession(function (loggedIn) {
+			if (!loggedIn) {
+				if(!$('#start-digitize').length){
+					downloadDialog.append($(startDigitizeHtml));
+				}
+				$('#start-digitize').show();
+				Mapbender.bindPanEvents();
+				return;
+			}
+			if(!$('#start-digitize').length){
+				downloadDialog.append($(startDigitizeHtml));
+			}
+			$('#start-digitize').show();
+			$('#dataset-list-header').hide();
+			$('#identity').show();
+			
+			//if dataset-list already opened
+			if ($('#dataset-list-table').length) {
+				$('#start-digitize').hide();
+				$('#dataset-list-header').show();
+			}
+			var mode = status.match(/(new|edit)-.+/);
+			if (!mode) {
+				return;
+			};
+			mode = mode[1];
+			if (mode === 'new') {
+				if (o.$target.size() > 0) {
+					o.type = status.match(/new-(.+)/)[1];
+					o.editedFeature = null;
+					o.$target
+					    .mb_digitize(o)
+					    .mb_digitize('modeOff')
+					    .mb_digitize('startDigitizing')
+					    .unbind('mb_digitizelastpointadded')
+					    .unbind('mb_digitizereinitialize')
+					    .bind("mb_digitizelastpointadded", finishDigitize)
+					    .bind("mb_digitizereinitialize", reinitializeDigitize);
+				}
+			} else {
+				alert('Editing of features is not possible in this module!')
+			}
+			if (!inProgress) {
+				inProgress = true;
+			}
+		});
 	};
 
 	this.destroy = function () {

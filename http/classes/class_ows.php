@@ -47,6 +47,8 @@ abstract class Ows {
 	var $country;
 	var $termsofuse;
 	var $auth = false; //array 'auth_type', 'auth_username', 'auth_password', default false
+	private $lastHttpCode = null;
+	private $lastHttpUrl = null;
 	
 	/**
 	 * Removes the namespace from a tag name.
@@ -115,6 +117,8 @@ abstract class Ows {
 		}
 		//$e = new mb_notice("OWS REQUEST: " . $url);
 		$data = $connection->file;
+		$this->lastHttpCode = $connection->getHttpCode();
+		$this->lastHttpUrl = $url;
 		if (!$data) {
 			$e = new mb_exception("OWS request returned no result: " . $url);
 			return null;
@@ -132,6 +136,8 @@ abstract class Ows {
 		} else {
 			$data = $connection->load($url, $this->auth);
 		}
+		$this->lastHttpCode = $connection->getHttpCode();
+		$this->lastHttpUrl = $url;
 		if (!$data) {
 			$e = new mb_exception("OWS request returned no result: " . $url . "\n" . $postData);
 			return null;
@@ -139,5 +145,12 @@ abstract class Ows {
 		return $data;
 	}
 
+	final public function getLastHttpCode () {
+		return $this->lastHttpCode;
+	}
+
+	final public function getLastHttpUrl () {
+		return $this->lastHttpUrl;
+	}
+
 }
-?>
