@@ -264,7 +264,14 @@ $format_mapping = <<<JSON
     "WMS": "http://publications.europa.eu/resource/authority/file-type/WMS_SRVC",
     "WFS": "http://publications.europa.eu/resource/authority/file-type/WFS_SRVC",
     "HTML": "http://publications.europa.eu/resource/authority/file-type/HTML",
-    "REST": "http://publications.europa.eu/resource/authority/file-type/REST"
+    "REST": "http://publications.europa.eu/resource/authority/file-type/REST",
+    "PDF": "http://publications.europa.eu/resource/authority/file-type/PDF",
+    "ZIP": "http://publications.europa.eu/resource/authority/file-type/ZIP",
+    "CSV": "http://publications.europa.eu/resource/authority/file-type/CSV",
+    "GEOJSON": "http://publications.europa.eu/resource/authority/file-type/GEOJSON",
+    "JSON": "http://publications.europa.eu/resource/authority/file-type/JSON",
+    "GML": "http://publications.europa.eu/resource/authority/file-type/GML",
+    "XML": "http://publications.europa.eu/resource/authority/file-type/XML"
 }
 JSON;
 
@@ -556,8 +563,11 @@ function createDistributionElement($rdfXmlDoc, $uri, $title, $description=false,
     //$distributionFormat->appendChild($distributionFormatText);
     $format_array = json_decode($format_mapping);
     //$e = new mb_exception("format uri: " . $format_array->{$format});
-    if ($format_array->{$format} && $format_array->{$format} != "") {
+    $formatUpper = strtoupper($format);
+    if (isset($format_array->{$format}) && $format_array->{$format} != "") {
         $distributionFormat->setAttribute ( "rdf:resource", $format_array->{$format});
+    } elseif (isset($format_array->{$formatUpper}) && $format_array->{$formatUpper} != "") {
+        $distributionFormat->setAttribute ( "rdf:resource", $format_array->{$formatUpper});
     }
     $Distribution->appendChild($distributionFormat);
     
@@ -1159,9 +1169,12 @@ if ($outputFormat == 'rdfxml') {
                                             $resourceArray[] = $atomFeedAccessResource_3;
                                             break;
                                         case "distribution":
-                                            $otherAccessResource_4 = array("name" => "Sonstiger Zugriff",
-                                            "description" => $value1->serviceTitle,
-                                            "format" => "HTML",
+                                            $distTitle = !empty($value1->serviceTitle) ? $value1->serviceTitle : "Sonstiger Zugriff";
+                                            $distDesc = !empty($value1->description) ? $value1->description : false;
+                                            $distFormat = !empty($value1->format) ? strtoupper($value1->format) : "HTML";
+                                            $otherAccessResource_4 = array("name" => $distTitle,
+                                            "description" => $distDesc,
+                                            "format" => $distFormat,
                                             "url" => str_replace($mapbenderWebserviceUrl, $mapbenderBaseUrl, $value1->accessClient),
                                             "id" => $gpDataset->uuid . "_other_distribution_" . md5($value1->accessClient),
                                             "license_id" => $inspireAtomFeedsLicenseId,
@@ -1557,6 +1570,26 @@ if ($forceCache && $cache->isActive && $cache->cachedVariableExists("mapbender:"
                                         $package[$j]->resource[] = $atomFeedAccessResource_1;
                                     }
                                     
+                                    break;
+                                case "distribution":
+                                    $distTitle = !empty($value1->serviceTitle) ? $value1->serviceTitle : "Sonstiger Zugriff";
+                                    $distDesc = !empty($value1->description) ? $value1->description : (!empty($value1->serviceTitle) ? $value1->serviceTitle : "");
+                                    $distFormat = !empty($value1->format) ? strtoupper($value1->format) : "HTML";
+                                    $otherAccessResource_4 = array(
+                                        "name" => $distTitle,
+                                        "description" => $distDesc,
+                                        "format" => $distFormat,
+                                        "url" => str_replace($mapbenderWebserviceUrl, $mapbenderBaseUrl, $value1->accessClient),
+                                        "id" => $package[$j]->id . "_other_distribution_" . md5($value1->accessClient)
+                                    );
+                                    //check if id already exists
+                                    $idArray = [];
+                                    foreach ($package[$j]->resource as $resource) {
+                                        $idArray[] = $resource->id;
+                                    }
+                                    if (!in_array($otherAccessResource_4['id'], $idArray)) {
+                                        $package[$j]->resource[] = $otherAccessResource_4;
+                                    }
                                     break;
                             }                        
                             //build ckan resource records for the atomfeed entries -> atomfeed xml, atomfeed html, maybe ogc api features interface
