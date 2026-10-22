@@ -441,6 +441,19 @@ die();*/
 				                    $distribution = array();
 				                    $distribution['dcterms:title'] = $dcatDistribution->{'dcterms:title'};
 				                    $distribution['dcat:accessUrl'] = $dcatDistribution->{'dcat:accessUrl'};
+				                    if (isset($dcatDistribution->{'dcterms:description'})) {
+				                        $distribution['dcterms:description'] = $dcatDistribution->{'dcterms:description'};
+				                    } elseif (isset($dcatDistribution->{'dcterms:Description'})) {
+				                        $distribution['dcterms:description'] = $dcatDistribution->{'dcterms:Description'};
+				                    }
+				                    if (isset($dcatDistribution->{'dcterms:format'})) {
+				                        $distribution['dcterms:format'] = $dcatDistribution->{'dcterms:format'};
+				                    } elseif (isset($dcatDistribution->{'dcterms:Format'})) {
+				                        $distribution['dcterms:format'] = $dcatDistribution->{'dcterms:Format'};
+				                    }
+				                    if (isset($dcatDistribution->{'dcat:mediaType'})) {
+				                        $distribution['dcat:mediaType'] = $dcatDistribution->{'dcat:mediaType'};
+				                    }
 				                    $simpleDistributions[] = $distribution;
 				                }
 				            }
@@ -478,6 +491,15 @@ die();*/
 				            $downloadOptions->{$idList[$i]}->option[$j]->accessClient = $distribution['dcat:accessUrl'];
 				            $downloadOptions->{$idList[$i]}->option[$j]->serviceUuid = md5($distribution['dcat:accessUrl']);
 				            $downloadOptions->{$idList[$i]}->option[$j]->serviceTitle = $distribution['dcterms:title'];
+				            if (isset($distribution['dcterms:description'])) {
+				                $downloadOptions->{$idList[$i]}->option[$j]->description = $distribution['dcterms:description'];
+				            }
+				            if (isset($distribution['dcterms:format'])) {
+				                $downloadOptions->{$idList[$i]}->option[$j]->format = $distribution['dcterms:format'];
+				            }
+				            if (isset($distribution['dcat:mediaType'])) {
+				                $downloadOptions->{$idList[$i]}->option[$j]->mediaType = $distribution['dcat:mediaType'];
+				            }
 				            //new in 2024
 				            $downloadOptions->{$idList[$i]}->option[$j]->licenseId = $row['tou_name'];
 				            $downloadOptions->{$idList[$i]}->option[$j]->isopen = $row['tou_isopen'];
