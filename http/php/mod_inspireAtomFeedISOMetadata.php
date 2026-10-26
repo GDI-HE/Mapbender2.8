@@ -1414,6 +1414,11 @@ SQL;
 	// FIX:
 	$mbMetadata ['datasetid'] = $mapbenderMetadata ['datasetId'];
 	$mbMetadata ['datasetid_codespace'] = $mapbenderMetadata ['datasetIdCodeSpace'];
+	$mbMetadata ['origin'] = $mapbenderMetadata ['mdOrigin'];
+	$mbMetadata ['uuid'] = $recordId;
+	if (isset($mapbenderMetadata ['metadataId'])) {
+		$mbMetadata ['metadata_id'] = $mapbenderMetadata ['metadataId'];
+	}
 	
 	$uniqueResourceIdentifierCodespace = $admin->getIdentifierCodespaceFromRegistry ( $departmentMetadata, $mbMetadata );
 	
