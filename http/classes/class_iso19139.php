@@ -1151,19 +1151,6 @@ XML;
 				$html .= $tableEnd;
 				$html .= '</fieldset>';
 			}
-			if (isset($serviceInformation->dataset) && count($serviceInformation->dataset) > 0) {
-				//new for coupled datasets if they exists:
-				$html .= '<fieldset><legend>'._mb("Coupled Metadata").'</legend>';
-				$html .= $tableBegin;
-				foreach ($serviceInformation->dataset as $dataset) {
-					$cleanUrl = explode('#', $dataset->metadataUrl)[0];
-					$viewUrl = $_SERVER['PHP_SELF']."?url=".urlencode($cleanUrl);
-					$label = !empty($dataset->title) ? $dataset->title : (!empty($dataset->uuid) ? $dataset->uuid : $cleanUrl);
-					$html .= $t_a."<img src='../img/osgeo_graphics/geosilk/server_map.png'/> ".$t_b."<a href='".$viewUrl."' target='_blank'>".htmlspecialchars($label)."</a>".$t_c;
-				}
-				$html .= $tableEnd;
-				$html .= '</fieldset>';
-			}
 			$html .= '<fieldset><legend>'._mb("Metadata").'</legend>';
 			$html .= $tableBegin;
 			#$html .= $t_a."<b>".$iso19139Hash[0]['html']."</b>: ".$t_b.'<p property="'.$iso19139Hash[0]['property'].'" datatype="'.$iso19139Hash[0]['datatype'].'" content="'.$iso19139Hash[0]['value'].'">'.$iso19139Hash[0]['value']."</p>".$t_c;
