@@ -2582,36 +2582,57 @@ SQL;
      * @return string 
      */
     function getIdentifierCodespaceFromRegistry($departmentMetadata, $metadataArray) {
-	if (isset($metadataArray['datasetid_codespace']) && $metadataArray['datasetid_codespace'] != "") {
-		if (substr($metadataArray['datasetid_codespace'], -1) !== '/') {
-			$uniqueResourceIdentifierCodespace = $metadataArray['datasetid_codespace'].'/';	
+	// determine origin of metadata record - either from array or from database
+	$origin = '';
+	if (isset($metadataArray['origin']) && $metadataArray['origin'] != "") {
+		$origin = $metadataArray['origin'];
+	} elseif (isset($metadataArray['metadata_id']) && $metadataArray['metadata_id'] != "") {
+		// origin not in array - load from database to avoid changing existing SQL queries
+		$sql_origin = "SELECT origin FROM mb_metadata WHERE metadata_id = $1";
+		$v = array($metadataArray['metadata_id']);
+		$t = array('i');
+		$res_origin = db_prep_query($sql_origin, $v, $t);
+		if ($row_origin = db_fetch_array($res_origin)) {
+			$origin = $row_origin['origin'];
+		}
+	}
+	// for non-metador records (capabilities, external, ...) use stored datasetid_codespace if available
+	// these values were parsed from the original metadata document and are authoritative
+	// for metador records: skip this block and always compute dynamically from organization data
+	if ($origin !== 'metador') {
+		if (isset($metadataArray['datasetid_codespace']) && $metadataArray['datasetid_codespace'] != "") {
+			if (substr($metadataArray['datasetid_codespace'], -1) !== '/') {
+				$uniqueResourceIdentifierCodespace = $metadataArray['datasetid_codespace'].'/';	
+			} else {
+				$uniqueResourceIdentifierCodespace =  $metadataArray['datasetid_codespace'];	
+			}
+			return $uniqueResourceIdentifierCodespace;
+		}
+	}
+	// dynamic computation from organization data
+	// for metador: always used; for others: fallback when datasetid_codespace is empty
+	if (isset($departmentMetadata['mb_group_registry_url']) && $departmentMetadata['mb_group_registry_url'] !== "") {
+		if (substr($departmentMetadata['mb_group_registry_url'], -1) !== '/') {
+			$uniqueResourceIdentifierCodespace = $departmentMetadata['mb_group_registry_url'].'/';	
 		} else {
-			$uniqueResourceIdentifierCodespace =  $metadataArray['datasetid_codespace'];	
+			$uniqueResourceIdentifierCodespace =  $departmentMetadata['mb_group_registry_url'];	
 		}
 	} else {
-		if (isset($departmentMetadata['mb_group_registry_url']) && $departmentMetadata['mb_group_registry_url'] !== "") {
-			if (substr($departmentMetadata['mb_group_registry_url'], -1) !== '/') {
-				$uniqueResourceIdentifierCodespace = $departmentMetadata['mb_group_registry_url'].'/';	
+		if (isset($departmentMetadata['mb_group_homepage']) && $departmentMetadata['mb_group_homepage'] !== "") {
+			if (substr($departmentMetadata['mb_group_homepage'], -1) !== '/') {
+				$uniqueResourceIdentifierCodespace = $departmentMetadata['mb_group_homepage'].'/'.'registry/spatial/dataset/';	
 			} else {
-				$uniqueResourceIdentifierCodespace =  $departmentMetadata['mb_group_registry_url'];	
+				$uniqueResourceIdentifierCodespace =  $departmentMetadata['mb_group_homepage'].'registry/spatial/dataset/';	
 			}
 		} else {
-			if (isset($departmentMetadata['mb_group_homepage']) && $departmentMetadata['mb_group_homepage'] !== "") {
+			if (defined('METADATA_DEFAULT_CODESPACE')) {
 				if (substr($departmentMetadata['mb_group_homepage'], -1) !== '/') {
-					$uniqueResourceIdentifierCodespace = $departmentMetadata['mb_group_homepage'].'/'.'registry/spatial/dataset/';	
+					$uniqueResourceIdentifierCodespace = METADATA_DEFAULT_CODESPACE.'/'.'registry/spatial/dataset/';	
 				} else {
-					$uniqueResourceIdentifierCodespace =  $departmentMetadata['mb_group_homepage'].'registry/spatial/dataset/';	
+					$uniqueResourceIdentifierCodespace =  METADATA_DEFAULT_CODESPACE.'registry/spatial/dataset/';	
 				}
 			} else {
-				if (defined('METADATA_DEFAULT_CODESPACE')) {
-					if (substr($departmentMetadata['mb_group_homepage'], -1) !== '/') {
-						$uniqueResourceIdentifierCodespace = METADATA_DEFAULT_CODESPACE.'/'.'registry/spatial/dataset/';	
-					} else {
-						$uniqueResourceIdentifierCodespace =  METADATA_DEFAULT_CODESPACE.'registry/spatial/dataset/';	
-					}
-				} else {
-					$uniqueResourceIdentifierCodespace = "http://www.mapbender.org/registry/spatial/dataset/";
-				}
+				$uniqueResourceIdentifierCodespace = "http://www.mapbender.org/registry/spatial/dataset/";
 			}
 		}
 	}
