@@ -45,6 +45,7 @@ class Group implements RPCObject {
 	var $logo_path;	
 	var $spatialSecurity;
 	var $homepage;
+	var $registry_url;
 	var $uuid;
 	var $timestamp;
 	var $admin_code;
@@ -112,6 +113,7 @@ class Group implements RPCObject {
 	       	"logo_path" => $this->logo_path,
 			"spatialSecurity" => $this->spatialSecurity,
 			"homepage" => $this->homepage,
+			"registry_url" => $this->registry_url,
 			"admin_code" => $this->admin_code,
 			"external_id" => $this->external_id,
 			"uuid" => $this->uuid,
@@ -183,6 +185,7 @@ class Group implements RPCObject {
 		$this->logo_path = isset($changes->logo_path) ? $changes->logo_path : $this->logo_path;
 		$this->spatialSecurity = isset($changes->spatialSecurity) ? $changes->spatialSecurity : $this->spatialSecurity;
 		$this->homepage = isset($changes->homepage) ? $changes->homepage : $this->homepage;
+		$this->registry_url = isset($changes->registry_url) ? $changes->registry_url : $this->registry_url;
 		$this->admin_code = isset($changes->admin_code) ? $changes->admin_code : $this->admin_code;
 		$this->external_id = isset($changes->external_id) ? $changes->external_id : $this->external_id;
 		$this->searchable = isset($changes->searchable) ? $changes->searchable : $this->searchable;
@@ -208,8 +211,9 @@ class Group implements RPCObject {
 			"mb_group_homepage = $14, ".
 			"mb_group_admin_code = $15, ".
 			"mb_group_external_id_1 = $16, ".
-			"searchable = $17 ".
-			"WHERE mb_group_id = $18 ";
+			"searchable = $17, ".
+			"mb_group_registry_url = $18 ".
+			"WHERE mb_group_id = $19 ";
 
 			$v = array(
 				$this->name,
@@ -229,13 +233,14 @@ class Group implements RPCObject {
 				$this->admin_code,
 				$this->external_id,
 				$this->searchable,
+				$this->registry_url,
 				$this->id
 			);
 
 			$t = array(
 				"s", "i", "s", "s", "s",
 				"i", "s", "s", "s", "s", 
-				"s", "s", "s", "s", "s", "s", "b", "i"
+				"s", "s", "s", "s", "s", "s", "b", "s", "i"
 			);
 
 			$update_result = db_prep_query($sql_update,$v,$t);
@@ -301,6 +306,7 @@ class Group implements RPCObject {
             	$this->email = $row["mb_group_email"];
             	$this->logo_path = $row["mb_group_logo_path"];
 	    		$this->homepage = $row["mb_group_homepage"];
+	    		$this->registry_url = $row["mb_group_registry_url"];
 				$this->uuid = $row["uuid"];
 				$this->admin_code = $row["mb_group_admin_code"];
 				$this->external_id = $row["mb_group_external_id_1"];

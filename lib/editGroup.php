@@ -79,6 +79,7 @@ if($action == 'save'){
 		$changes->logo_path = $logo_path;
 		$changes->spatialSecurity = $spatialSecurity;
 		$changes->homepage = $homepage;
+		$changes->registry_url = $registry_url;
 		$changes->admin_code = $admin_code;
 		$changes->external_id = $external_id;
 		switch ($searchable) {
@@ -124,6 +125,7 @@ if ($action == 'update') {
 		$changes->logo_path = $logo_path;
 		$changes->spatialSecurity = $spatialSecurity;
 		$changes->homepage = $homepage;
+		$changes->registry_url = $registry_url;
 		$changes->admin_code = $admin_code;
 		$changes->external_id = $external_id;
 		switch ($searchable) {
@@ -161,6 +163,7 @@ if (!isset($name) || $selected_group == 'new'){
 	$logo_path = "";
 	$spatialSecurity = "";
 	$homepage = "";
+	$registry_url = "";
 	$admin_code = "";
 	$external_id = "";
 	$searchable = "t";
@@ -218,6 +221,7 @@ if(isset($selected_group) && $selected_group != 0){
 		$logo_path = $data["logo_path"];
 		$spatialSecurity = $data["spatialSecurity"];
 		$homepage = $data["homepage"];
+		$registry_url = $data["registry_url"];
 		$admin_code = $data["admin_code"];
 		$external_id = $data["external_id"];
 		$searchable = $data["searchable"];
@@ -353,6 +357,15 @@ echo "<tr>";
    echo "<td>";
       echo "<input type='text' size='30' name='homepage' value='" .
           htmlentities($homepage, ENT_QUOTES, "UTF-8") . "'>";
+   echo "</td>";
+echo "</tr>";
+
+#registry_url
+echo "<tr>";
+   echo "<td>Registry URL: </td>";
+   echo "<td>";
+      echo "<input type='text' size='30' name='registry_url' value='" .
+          htmlentities($registry_url, ENT_QUOTES, "UTF-8") . "'>";
    echo "</td>";
 echo "</tr>";
 

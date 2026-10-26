@@ -43,6 +43,7 @@ $logo_path = $_POST["logo_path"];
 $admin_code = $_POST["admin_code"];
 $external_id = $_POST["external_id"];
 $homepage = $_POST["homepage"];
+$registry_url = $_POST["registry_url"];
 $action = $_POST["action"];
 $searchable = $_POST["searchable"];
 $spatialSecurity = spatial_security\read_post();
