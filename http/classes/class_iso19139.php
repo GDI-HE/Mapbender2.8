@@ -1073,7 +1073,7 @@ XML;
 					break;
 			}
 			//$html .= '<p>';
-			if (count($serviceInformation->service) > 0) {
+			if (isset($serviceInformation->service) && count($serviceInformation->service) > 0) {
 				//new for coupled services if they exists:
 				$html .= '<fieldset><legend>'._mb("Access via services").'</legend>';
 				$html .= $tableBegin;
@@ -1151,6 +1151,19 @@ XML;
 				$html .= $tableEnd;
 				$html .= '</fieldset>';
 			}
+			if (isset($serviceInformation->dataset) && count($serviceInformation->dataset) > 0) {
+				//new for coupled datasets if they exists:
+				$html .= '<fieldset><legend>'._mb("Coupled Metadata").'</legend>';
+				$html .= $tableBegin;
+				foreach ($serviceInformation->dataset as $dataset) {
+					$cleanUrl = explode('#', $dataset->metadataUrl)[0];
+					$viewUrl = $_SERVER['PHP_SELF']."?url=".urlencode($cleanUrl);
+					$label = !empty($dataset->title) ? $dataset->title : (!empty($dataset->uuid) ? $dataset->uuid : $cleanUrl);
+					$html .= $t_a."<img src='../img/osgeo_graphics/geosilk/server_map.png'/> ".$t_b."<a href='".$viewUrl."' target='_blank'>".htmlspecialchars($label)."</a>".$t_c;
+				}
+				$html .= $tableEnd;
+				$html .= '</fieldset>';
+			}
 			$html .= '<fieldset><legend>'._mb("Metadata").'</legend>';
 			$html .= $tableBegin;
 			#$html .= $t_a."<b>".$iso19139Hash[0]['html']."</b>: ".$t_b.'<p property="'.$iso19139Hash[0]['property'].'" datatype="'.$iso19139Hash[0]['datatype'].'" content="'.$iso19139Hash[0]['value'].'">'.$iso19139Hash[0]['value']."</p>".$t_c;
@@ -1182,7 +1195,9 @@ XML;
 			} else {
 				$hashIndices = array(5, 6); //namespace, id
 				foreach ($hashIndices as $index) {
-					$html .= $this->getHtmlRow($t_a, $t_b, $t_c, $iso19139Hash, $index);
+					if ($iso19139Hash[$index]['value'] != "") {
+						$html .= $this->getHtmlRow($t_a, $t_b, $t_c, $iso19139Hash, $index);
+					}
 				}
 			}
 			/*$hashIndices = array(26, 27); //orga name, email
@@ -1272,9 +1287,28 @@ XML;
 			if ($iso19139Hash[3]['value'] == 'service') {
 				$html .= '<fieldset><legend>'._mb("Service information").'</legend>';
 				$html .= $tableBegin;
-				$hashIndices = array(10, 7);
-				foreach ($hashIndices as $index) {
-					$html .= $this->getHtmlRow($t_a, $t_b, $t_c, $iso19139Hash, $index);
+				$html .= $this->getHtmlRow($t_a, $t_b, $t_c, $iso19139Hash, 10);
+				if (isset($serviceInformation->dataset) && count($serviceInformation->dataset) > 0) {
+					$html .= $t_a."<b>".$iso19139Hash[7]['html']."</b>: ".$t_b;
+					foreach ($serviceInformation->dataset as $dataset) {
+						$cleanUrl = explode('#', $dataset->metadataUrl)[0];
+						$linkTarget = $_SERVER['PHP_SELF']."?url=".urlencode($cleanUrl);
+						$label = !empty($dataset->title) ? $dataset->title : (!empty($dataset->uuid) ? $dataset->uuid : $cleanUrl);
+						$html .= "<a href='".$linkTarget."' target='_blank'>".htmlspecialchars($label)."</a><br>";
+					}
+					$html .= $t_c;
+				} else if (isset($iso19139Hash[7]['value']) && $iso19139Hash[7]['value'] != "") {
+					$html .= $t_a."<b>".$iso19139Hash[7]['html']."</b>: ".$t_b;
+					$coupledUrls = explode(',', $iso19139Hash[7]['value']);
+					foreach ($coupledUrls as $coupledUrl) {
+						$coupledUrl = trim($coupledUrl);
+						if ($coupledUrl != '') {
+							$cleanUrl = explode('#', $coupledUrl)[0];
+							$linkTarget = $_SERVER['PHP_SELF']."?url=".urlencode($cleanUrl);
+							$html .= "<a href='".$linkTarget."' target='_blank'>".htmlspecialchars($coupledUrl)."</a><br>";
+						}
+					}
+					$html .= $t_c;
 				}
 				$html .= $tableEnd;
 				$html .= '</fieldset>';
@@ -1447,12 +1481,24 @@ XML;
 			//push xml instead of html? But there is no real url
 			$html .= $tableEnd;
 			$html .= '</fieldset>';
-			if (count($serviceInformation->service) > 0) {
+			if (isset($serviceInformation->service) && count($serviceInformation->service) > 0) {
 				//new for coupled services if they exists:
 				$html .= '<fieldset><legend>'._mb("Available Services").'</legend>';
 				$html .= $tableBegin;
 				foreach ($serviceInformation->service as $service) {
 					$html .= $t_a."<b>".$service->serviceType."</b>: ".$t_b."<a href='".$_SERVER['PHP_SELF']."?url=".urlencode($service->metadataUrl)."' target='_blank'>".$service->serviceTitle."</a>".$t_c;
+				}
+				$html .= $tableEnd;
+				$html .= '</fieldset>';
+			}
+			if (isset($serviceInformation->dataset) && count($serviceInformation->dataset) > 0) {
+				$html .= '<fieldset><legend>'._mb("Coupled Metadata").'</legend>';
+				$html .= $tableBegin;
+				foreach ($serviceInformation->dataset as $dataset) {
+					$cleanUrl = explode('#', $dataset->metadataUrl)[0];
+					$viewUrl = $_SERVER['PHP_SELF']."?url=".urlencode($cleanUrl);
+					$label = !empty($dataset->title) ? $dataset->title : (!empty($dataset->uuid) ? $dataset->uuid : $cleanUrl);
+					$html .= $t_a."<b>"._mb("Coupled resource")."</b>: ".$t_b."<a href='".$viewUrl."' target='_blank'>".htmlspecialchars($label)."</a>".$t_c;
 				}
 				$html .= $tableEnd;
 				$html .= '</fieldset>';
