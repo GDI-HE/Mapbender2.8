@@ -35,6 +35,7 @@ var MetadataManagerSelectApi = function (o) {
 	var confirmSearchabilityMessage;
 	var confirmExportMessage;
 	var confirmDeleteMessage;
+	var confirmRefreshMessage;
 	var that = this;
 	var dataToEdit;
 	
@@ -112,6 +113,37 @@ var MetadataManagerSelectApi = function (o) {
 						modal: true
 					});
 					that.initTable();
+				}
+			});
+			req.send();
+		}
+	};
+
+	//function to refresh metadata from source URL
+	this.refreshMetadata = function(id, $img) {
+		var confirmMessage = that.confirmRefreshMessage || "Möchten Sie diesen Metadatensatz wirklich von der Quell-URL neu abrufen und in der Datenbank aktualisieren?";
+		var checkRefresh = confirm(confirmMessage);
+		if(checkRefresh) {
+			var originalSrc = $img ? $img.attr("src") : "../img/gnome/view-refresh.png";
+			if ($img) {
+				$img.attr("src", "../img/indicator_wheel.gif");
+			}
+			var req = new Mapbender.Ajax.Request({
+				url: "../plugins/mb_metadata_manager_server.php",
+				method: "updateMetadataFromUrl",
+				parameters: {
+					"id": id
+				},
+				callback: function (obj, result, message) {
+					if ($img) {
+						$img.attr("src", originalSrc);
+					}
+					$("<div></div>").text(message).dialog({
+						modal: true
+					});
+					if (result) {
+						that.initTable();
+					}
 				}
 			});
 			req.send();
@@ -258,6 +290,12 @@ var MetadataManagerSelectApi = function (o) {
 				$(".toggleSearchability").click(function (e) {
 					var id = $(this).parents("tr").data("metadataId");
 					that.toggleSearchability(id);
+					return false;
+				});
+				// add functionality to refresh metadata button
+				$(".refreshMetadata").click(function (e) {
+					var id = $(this).parents("tr").data("metadataId");
+					that.refreshMetadata(id, $(this));
 					return false;
 				});
 
