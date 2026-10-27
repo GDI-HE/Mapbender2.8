@@ -1110,6 +1110,15 @@ function generateFeed($feedDoc, $recordId, $generateFrom) {
 
 	//pull the namespace from database
 	$metadataArray['datasetid_codespace'] = $mapbenderMetadata[$m]->datasetid_codespace;
+	if (isset($mapbenderMetadata[$m]->origin)) {
+		$metadataArray['origin'] = $mapbenderMetadata[$m]->origin;
+	}
+	if (isset($mapbenderMetadata[$m]->metadata_id)) {
+		$metadataArray['metadata_id'] = $mapbenderMetadata[$m]->metadata_id;
+	}
+	if (isset($mapbenderMetadata[$m]->metadata_uuid)) {
+		$metadataArray['uuid'] = $mapbenderMetadata[$m]->metadata_uuid;
+	}
 	$uniqueResourceIdentifierCodespace = $admin->getIdentifierCodespaceFromRegistry($departmentMetadata, $metadataArray);
 
 	//overwrite datasetid_codespace

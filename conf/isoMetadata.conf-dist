@@ -106,7 +106,7 @@ array(	ibus => "t01_object.obj_id",
 //B 1.6 Coupled resource (7)
 //NOTICE: simplexml has problems with namespaced attributes! So we choose a alias for xlink:href which is xlinkhref and exchange this attributes from xml before parsing the xml!
 array(	ibus => "t01_object.obj_id",
-	iso19139 => "/gmd:MD_Metadata/gmd:identificationInfo/*/srv:operatesOn/@xlinkhref",
+	iso19139 => "/gmd:MD_Metadata/gmd:identificationInfo/*/srv:operatesOn/@xlink:href | /gmd:MD_Metadata/gmd:identificationInfo/*/srv:operatesOn/@xlinkhref",
 	iso19139explode => "false" ,
 	inspire => "coupled resource",
 	inspiremandatory => "true",

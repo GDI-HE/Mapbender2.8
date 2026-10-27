@@ -1246,6 +1246,9 @@ SQL;
 	while ($row_metadata = db_fetch_array($res_metadata)) {
 		$respOrga = $admin->getOrgaInfoFromRegistry('metadata', $row_metadata['metadata_id'], $wmsRow['wms_owner']);
 		$metadataArray['datasetid_codespace'] = $row_metadata["datasetid_codespace"];
+		$metadataArray['origin'] = $row_metadata["origin"];
+		$metadataArray['metadata_id'] = $row_metadata["metadata_id"];
+		$metadataArray['uuid'] = $row_metadata["uuid"];
 		$namespace = $admin->getIdentifierCodespaceFromRegistry($respOrga, $metadataArray);	
 		$namespaceArray[] = $namespace;
 		//check id datasetid and codespace and $namespace is not the datasetid_codespace from mb_metadata, if not use metadataid

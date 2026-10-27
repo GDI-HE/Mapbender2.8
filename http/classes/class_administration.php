@@ -2595,6 +2595,24 @@ SQL;
 		if ($row_origin = db_fetch_array($res_origin)) {
 			$origin = $row_origin['origin'];
 		}
+	} elseif (isset($metadataArray['uuid']) && $metadataArray['uuid'] != "") {
+		// fallback: origin and metadata_id not in array - load via uuid
+		$sql_origin = "SELECT origin FROM mb_metadata WHERE uuid = $1";
+		$v = array($metadataArray['uuid']);
+		$t = array('s');
+		$res_origin = db_prep_query($sql_origin, $v, $t);
+		if ($row_origin = db_fetch_array($res_origin)) {
+			$origin = $row_origin['origin'];
+		}
+	} elseif (isset($metadataArray['datasetid']) && $metadataArray['datasetid'] != "") {
+		// fallback: load via datasetid / uuid
+		$sql_origin = "SELECT origin FROM mb_metadata WHERE datasetid = $1 OR uuid = $1";
+		$v = array($metadataArray['datasetid']);
+		$t = array('s');
+		$res_origin = db_prep_query($sql_origin, $v, $t);
+		if ($row_origin = db_fetch_array($res_origin)) {
+			$origin = $row_origin['origin'];
+		}
 	}
 	// for non-metador records (capabilities, external, ...) use stored datasetid_codespace if available
 	// these values were parsed from the original metadata document and are authoritative

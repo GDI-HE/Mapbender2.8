@@ -170,6 +170,57 @@ if ($mbMetadata->hierarchyLevel == 'dataset' || $mbMetadata->hierarchyLevel == '
 	}
 }
 //resolve operates on
+if ($mbMetadata->hierarchyLevel == 'service') {
+	try {
+		$serviceXml = simplexml_load_string($mbMetadata->metadata);
+		if ($serviceXml !== false) {
+			$serviceXml->registerXPathNamespace("gmd", "http://www.isotc211.org/2005/gmd");
+			$serviceXml->registerXPathNamespace("srv", "http://www.isotc211.org/2005/srv");
+			$serviceXml->registerXPathNamespace("xlink", "http://www.w3.org/1999/xlink");
+			$operatesOnList = $serviceXml->xpath('/gmd:MD_Metadata/gmd:identificationInfo/*/srv:operatesOn');
+			if (is_array($operatesOnList) && count($operatesOnList) > 0) {
+				$datasetIndex = 0;
+				foreach ($operatesOnList as $opNode) {
+					$xlinkAttrs = $opNode->attributes("xlink", true);
+					$opHref = (string)$xlinkAttrs['href'];
+					if ($opHref == '') {
+						$opHref = (string)$opNode['xlinkhref'];
+					}
+					if ($opHref == '') {
+						$opHref = (string)$opNode['href'];
+					}
+					$opUuid = (string)$opNode['uuidref'];
+					if ($opHref != '' || $opUuid != '') {
+						$datasetIndex++;
+						$datasetObj = new stdClass();
+						$datasetObj->uuid = $opUuid;
+						$datasetObj->metadataUrl = $opHref;
+						$datasetObj->title = $opUuid != '' ? $opUuid : $opHref;
+
+						if ($resolveCoupledResources == true && $cswBasedResource == true && $opUuid != '') {
+							$urlArray = parse_url($url);
+							$urlWithoutRequest = $urlArray['scheme']."://".$urlArray['host'].$urlArray['path'];
+							$cswClient = new cswClient();
+							$csw = new csw();
+							$csw->createCatObjFromXML($urlWithoutRequest."?SERVICE=CSW&VERSION=2.0.2&REQUEST=GetCapabilities");
+							$dsResponse = $cswClient->doRequest(false, "getrecordbyid", $opUuid, false, 'dataset', false, false, false, false, $csw);
+							if ($cswClient->operationSuccessful && isset($cswClient->operationResult)) {
+								$dsTitle = $cswClient->operationResult->xpath('//gmd:MD_Metadata/gmd:identificationInfo/*/gmd:citation/gmd:CI_Citation/gmd:title/gco:CharacterString');
+								if (isset($dsTitle[0]) && (string)$dsTitle[0] != '') {
+									$datasetObj->title = (string)$dsTitle[0];
+								}
+								$datasetObj->metadataUrl = $urlWithoutRequest."?SERVICE=CSW&VERSION=2.0.2&REQUEST=GetRecordById&ElementSetName=full&outputSchema=".urlencode('http://www.isotc211.org/2005/gmd')."&id=".$opUuid;
+							}
+						}
+						$serviceMetadata->dataset[$datasetIndex] = $datasetObj;
+					}
+				}
+			}
+		}
+	} catch (Exception $e) {
+		$err = new mb_notice("mod_exportIso19139.php: error resolving operatesOn: ".$e->getMessage());
+	}
+}
 //new - test createFromUrl instead and build the presentations from object! There for a new json configuration is needed!
 //html2 / html3 - conf from json!
 switch ($outputFormat) {

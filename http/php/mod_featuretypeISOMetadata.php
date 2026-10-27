@@ -58,8 +58,10 @@ if (!empty($_SERVER['HTTPS'])) {
 }
 
 if (DEFINED("MAPBENDER_PATH") && MAPBENDER_PATH !== "") {
+	$mapbenderBaseUrl = MAPBENDER_PATH;
 	$mapbenderServiceUrl = MAPBENDER_PATH."/php/wfs.php?INSPIRE=1&FEATURETYPE_ID=";
 } else {
+	$mapbenderBaseUrl = $schema."://".$_SERVER['HTTP_HOST']."/mapbender";
 	$mapbenderServiceUrl = $schema."://".$_SERVER['HTTP_HOST']."/mapbender/php/wfs.php?INSPIRE=1&FEATURETYPE_ID=";
 }
 
@@ -149,6 +151,7 @@ if ($serviceType == "ogcapifeatures" | $serviceType == "ogcapifeatures_wfs") {
 function fillISO19139(XmlBuilder $xmlBuilder, $recordId) {
     	global $wmsView;
 	global $mapbenderServiceUrl;
+	global $mapbenderBaseUrl;
 	global $admin;
         global $serviceType;
         global $serviceTypeTitle;
@@ -584,7 +587,7 @@ SQL;
                	$pos++;
                 $xmlBuilder->addValue($MD_Metadata,
                         	'./gmd:identificationInfo/srv:SV_ServiceIdentification/srv:operatesOn['.$pos.']/@xlink:href',
-                        	"http://" . $_SERVER['HTTP_HOST'] . "/mapbender/php/mod_dataISOMetadata.php?outputFormat=iso19139&id=" . $row_metadata['uuid']);
+                        	$mapbenderBaseUrl . "/php/mod_dataISOMetadata.php?outputFormat=iso19139&id=" . $row_metadata['uuid']);
                 $xmlBuilder->addValue($MD_Metadata,
                         	'./gmd:identificationInfo/srv:SV_ServiceIdentification/srv:operatesOn['.$pos.']/@uuidref',
                         	$uniqueResourceIdentifierCodespace.$row_metadata['datasetid']);
@@ -593,7 +596,7 @@ SQL;
                 $pos++;
                 $xmlBuilder->addValue($MD_Metadata,
                         	'./gmd:identificationInfo/srv:SV_ServiceIdentification/srv:operatesOn['.$pos.']/@xlink:href',
-                        	"http://" . $_SERVER['HTTP_HOST'] . "/mapbender/php/mod_dataISOMetadata.php?outputFormat=iso19139&id=" . $row_metadata['uuid'].'#spatial_dataset_'.md5($row_metadata['uuid']));
+                        	$mapbenderBaseUrl . "/php/mod_dataISOMetadata.php?outputFormat=iso19139&id=" . $row_metadata['uuid'].'#spatial_dataset_'.md5($row_metadata['uuid']));
                 $xmlBuilder->addValue($MD_Metadata,
                         	'./gmd:identificationInfo/srv:SV_ServiceIdentification/srv:operatesOn['.$pos.']/@uuidref',
                        		$uniqueResourceIdentifierCodespace.$row_metadata['uuid']);
@@ -602,7 +605,7 @@ SQL;
                 $pos++;
                 $xmlBuilder->addValue($MD_Metadata,
                         	'./gmd:identificationInfo/srv:SV_ServiceIdentification/srv:operatesOn['.$pos.']/@xlink:href',
-                        	"http://" . $_SERVER['HTTP_HOST'] . "/mapbender/php/mod_dataISOMetadata.php?outputFormat=iso19139&id=" . $row_metadata['uuid']);
+                        	$mapbenderBaseUrl . "/php/mod_dataISOMetadata.php?outputFormat=iso19139&id=" . $row_metadata['uuid']);
                 $xmlBuilder->addValue($MD_Metadata,
                         	'./gmd:identificationInfo/srv:SV_ServiceIdentification/srv:operatesOn['.$pos.']/@uuidref',
                 $uniqueResourceIdentifierCodespace.$row_metadata['datasetid']);
