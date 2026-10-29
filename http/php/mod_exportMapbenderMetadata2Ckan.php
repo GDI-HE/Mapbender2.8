@@ -54,6 +54,17 @@ $sql = "SELECT inspire_category_uri, inspire_category_code_de FROM inspire_categ
 $res = db_query($sql);
 while ($row = db_fetch_array($res)){
     $inspireCatHash[$row['inspire_category_code_de']] = $row['inspire_category_uri'];
+    if (isset($row['inspire_category_uri']) && $row['inspire_category_uri'] != '') {
+        $inspireCatHash[$row['inspire_category_uri']] = $row['inspire_category_uri'];
+        $uriNoSlash = rtrim($row['inspire_category_uri'], '/');
+        $inspireCatHash[$uriNoSlash] = $row['inspire_category_uri'];
+        $inspireCatHash[$uriNoSlash . '/'] = $row['inspire_category_uri'];
+        if (strpos($uriNoSlash, 'http://') === 0) {
+            $inspireCatHash['https://' . substr($uriNoSlash, 7)] = $row['inspire_category_uri'];
+        } elseif (strpos($uriNoSlash, 'https://') === 0) {
+            $inspireCatHash['http://' . substr($uriNoSlash, 8)] = $row['inspire_category_uri'];
+        }
+    }
 }
 /*categories from https://tpp.rlp.de - ckan 2.9
  * [
@@ -873,9 +884,12 @@ if ($outputFormat == 'rdfxml') {
                             $Dataset->appendChild($keywordE);
                         }
                         if ($iso19139Md->keywordsThesaurusName[$keyword_idx] == 'GEMET - INSPIRE themes, version 1.0') {                        
-                            $inspire_theme_uri = $inspireCatHash[ $keyword ];  
+                            $inspire_theme_uri = isset($inspireCatHash[ $keyword ]) ? $inspireCatHash[ $keyword ] : '';
+                            if ($inspire_theme_uri == '' && strpos($keyword, 'http') === 0) {
+                                $inspire_theme_uri = $keyword;
+                            }
                             $inspire_dcat_themes_map = json_decode($dcat_category_map);
-                            $dcat_themes_array = $inspire_dcat_themes_map->mapping->{end(explode('/', $inspire_theme_uri))};
+                            $dcat_themes_array = (!empty($inspire_theme_uri)) ? $inspire_dcat_themes_map->mapping->{end(explode('/', $inspire_theme_uri))} : array();
                             //add dcat theme if exists
                             foreach ($dcat_themes_array as $dcat_theme) {
                                 if (!in_array($dcat_theme, $dcat_themes_array_unique)) {

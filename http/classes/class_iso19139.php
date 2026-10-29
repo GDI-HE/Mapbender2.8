@@ -302,6 +302,26 @@ XML;
                                 $inspireCatHash_de[$row['inspire_category_code_de']] = (integer)$row['inspire_category_id'];
                                 //$e = new mb_exception("inspireCatHash_de: ".$row['inspire_category_code_de'] ." : ". $row['inspire_category_id'] );
                         }
+			$inspireCatHash_uri = array();
+			$sql = "SELECT inspire_category_id, inspire_category_uri FROM inspire_category WHERE inspire_category_uri IS NOT NULL AND inspire_category_uri != ''";
+			$res = db_query($sql);
+			while ($row = db_fetch_array($res)){
+				$uri = trim($row['inspire_category_uri']);
+				$catId = (integer)$row['inspire_category_id'];
+				$inspireCatHash_uri[$uri] = $catId;
+				$uriNoSlash = rtrim($uri, '/');
+				$inspireCatHash_uri[$uriNoSlash] = $catId;
+				$inspireCatHash_uri[$uriNoSlash . '/'] = $catId;
+				if (strpos($uriNoSlash, 'http://') === 0) {
+					$httpsUri = 'https://' . substr($uriNoSlash, 7);
+					$inspireCatHash_uri[$httpsUri] = $catId;
+					$inspireCatHash_uri[$httpsUri . '/'] = $catId;
+				} elseif (strpos($uriNoSlash, 'https://') === 0) {
+					$httpUri = 'http://' . substr($uriNoSlash, 8);
+					$inspireCatHash_uri[$httpUri] = $catId;
+					$inspireCatHash_uri[$httpUri . '/'] = $catId;
+				}
+			}
 			//custom
 			//keywords - as text i custom category - special keywords of geoportal instance defined as keys!
 			$customCatHash = array();
@@ -416,20 +436,29 @@ XML;
 			//TODO: find reason for double entries of inspire themes
 			foreach ($this->keywords as $keyword) {
 				$thesaurusName = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:descriptiveKeywords[gmd:MD_Keywords/gmd:keyword/gco:CharacterString="'.$keyword.'"]/gmd:MD_Keywords/gmd:thesaurusName/gmd:CI_Citation/gmd:title/gco:CharacterString');
+				if (empty($thesaurusName) || $thesaurusName[0] == '') {
+					$thesaurusName = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:descriptiveKeywords[gmd:MD_Keywords/gmd:keyword/gco:CharacterString="'.$keyword.'"]/gmd:MD_Keywords/gmd:thesaurusName/gmd:CI_Citation/gmd:title/gmx:Anchor');
+				}
 				$this->keywordsThesaurusName[$iKeyword] = $thesaurusName[0];
 				//$e = new mb_exception("Keyword: ".$keyword);
 				//$e = new mb_exception("Thesaurus: ".$thesaurusName[0]);
 				//check if keyword is inspire thematic key and add it into mapbenders inspire category
-				if (is_int($inspireCatHash_en[trim($keyword)])) {
-					$this->inspireCategories[] = $inspireCatHash_en[trim($keyword)];
+				if (isset($inspireCatHash_en[trim($keyword)]) && is_int($inspireCatHash_en[trim($keyword)])) {
+					if (!in_array($inspireCatHash_en[trim($keyword)], $this->inspireCategories)) {
+						$this->inspireCategories[] = $inspireCatHash_en[trim($keyword)];
+					}
 				}
-				if (is_int($inspireCatHash_de[trim($keyword)])) {
-                                        $this->inspireCategories[] = $inspireCatHash_de[trim($keyword)];
-                                }
+				if (isset($inspireCatHash_de[trim($keyword)]) && is_int($inspireCatHash_de[trim($keyword)])) {
+					if (!in_array($inspireCatHash_de[trim($keyword)], $this->inspireCategories)) {
+						$this->inspireCategories[] = $inspireCatHash_de[trim($keyword)];
+					}
+				}
 				//check if keyword is a key in mapbenders custom keywords and add it to mapbenders custom categories
-				if (is_int($customCatHash[trim($keyword)])) {
+				if (isset($customCatHash[trim($keyword)]) && is_int($customCatHash[trim($keyword)])) {
 					//$e = new mb_exception("class_iso19139.php: found entry ".$customCatHash[trim($keyword)]." for custom keyword: ".trim($keyword));
-					$this->customCategories[] = $customCatHash[trim($keyword)];
+					if (!in_array($customCatHash[trim($keyword)], $this->customCategories)) {
+						$this->customCategories[] = $customCatHash[trim($keyword)];
+					}
 				}
 				//default export2Csw to true!
 				$this->export2Csw = 't';
@@ -474,23 +503,73 @@ XML;
 			foreach ($AnchorKeywords as $keyword) {
 			    $this->keywords[] = $keyword;
 			    $thesaurusName = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:descriptiveKeywords[gmd:MD_Keywords/gmd:keyword/gmx:Anchor="'.$keyword.'"]/gmd:MD_Keywords/gmd:thesaurusName/gmd:CI_Citation/gmd:title/gmx:Anchor');
+			    if (empty($thesaurusName) || $thesaurusName[0] == '') {
+			        $thesaurusName = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:descriptiveKeywords[gmd:MD_Keywords/gmd:keyword/gmx:Anchor="'.$keyword.'"]/gmd:MD_Keywords/gmd:thesaurusName/gmd:CI_Citation/gmd:title/gco:CharacterString');
+			    }
 			    $this->keywordsThesaurusName[$iKeyword] = $thesaurusName[0];
+
+			    $uri = '';
+			    $xlinkAttrs = $keyword->attributes('http://www.w3.org/1999/xlink');
+			    if (isset($xlinkAttrs['href'])) {
+			        $uri = (string)$xlinkAttrs['href'];
+			    }
+			    if ($uri == '') {
+			        $xlinkAttrs = $keyword->attributes('xlink', true);
+			        if (isset($xlinkAttrs['href'])) {
+			            $uri = (string)$xlinkAttrs['href'];
+			        }
+			    }
+			    if ($uri == '') {
+			        $keywordAnchorHref = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:descriptiveKeywords[gmd:MD_Keywords/gmd:keyword/gmx:Anchor="'.$keyword.'"]/gmd:MD_Keywords/gmd:keyword/gmx:Anchor/@xlink:href');
+			        if (!empty($keywordAnchorHref)) {
+			            $attributesJson = json_encode($keywordAnchorHref[0]);
+			            $attributesObj = json_decode($attributesJson);
+			            $uri = isset($attributesObj->{'@attributes'}->href) ? $attributesObj->{'@attributes'}->href : '';
+			        }
+			    }
+
+			    $trimmedUri = trim($uri);
+			    $trimmedKeyword = trim((string)$keyword);
+
+			    // check if anchor href matches an inspire category uri
+			    if ($trimmedUri != '' && isset($inspireCatHash_uri[$trimmedUri]) && is_int($inspireCatHash_uri[$trimmedUri])) {
+			        if (!in_array($inspireCatHash_uri[$trimmedUri], $this->inspireCategories)) {
+			            $this->inspireCategories[] = $inspireCatHash_uri[$trimmedUri];
+			        }
+			    }
+			    // fallback: check if anchor text content matches inspire category in german or english
+			    elseif (isset($inspireCatHash_de[$trimmedKeyword]) && is_int($inspireCatHash_de[$trimmedKeyword])) {
+			        if (!in_array($inspireCatHash_de[$trimmedKeyword], $this->inspireCategories)) {
+			            $this->inspireCategories[] = $inspireCatHash_de[$trimmedKeyword];
+			        }
+			    }
+			    elseif (isset($inspireCatHash_en[$trimmedKeyword]) && is_int($inspireCatHash_en[$trimmedKeyword])) {
+			        if (!in_array($inspireCatHash_en[$trimmedKeyword], $this->inspireCategories)) {
+			            $this->inspireCategories[] = $inspireCatHash_en[$trimmedKeyword];
+			        }
+			    }
+
 			    /*
 			     * extract HVD category from dataset metadata as it is defined for Germany in future coming "Konventionen zu Metadaten" document
 			     * only use the gmx:Anchor variant !
 			     */
 			    //$e = new mb_exception("classes/class_iso19139.php - keyword: " . $keyword);
-			    $keywordAnchorHref = $iso19139Xml->xpath('//gmd:MD_Metadata/gmd:identificationInfo/'.$identifikationXPath.'/gmd:descriptiveKeywords[gmd:MD_Keywords/gmd:keyword/gmx:Anchor="'.$keyword.'"]/gmd:MD_Keywords/gmd:keyword/gmx:Anchor/@xlink:href');
-			    $attributesJson = json_encode($keywordAnchorHref[0]);
-			    $attributesObj = json_decode($attributesJson);
-			    $uri = $attributesObj->{'@attributes'}->href;
-			    if (is_int($customCatHash[trim($uri)])) {
-			        $this->customCategories[] = $customCatHash[trim($uri)];
+			    if ($trimmedUri != '' && isset($customCatHash[$trimmedUri]) && is_int($customCatHash[$trimmedUri])) {
+			        if (!in_array($customCatHash[$trimmedUri], $this->customCategories)) {
+			            $this->customCategories[] = $customCatHash[$trimmedUri];
+			        }
+			    } elseif (isset($customCatHash[$trimmedKeyword]) && is_int($customCatHash[$trimmedKeyword])) {
+			        if (!in_array($customCatHash[$trimmedKeyword], $this->customCategories)) {
+			            $this->customCategories[] = $customCatHash[$trimmedKeyword];
+			        }
 			    }
 			    //$e = new mb_exception("classes/class_iso19139.php - keywordAnchorHref: " . json_encode($keywordAnchorHref));
 			    //$e = new mb_exception("classes/class_iso19139.php: customCategories: " . json_encode($this->customCategories));
+			    unset($thesaurusName);
 			    $iKeyword++;
 			}
+			$this->inspireCategories = array_values(array_unique($this->inspireCategories));
+			$this->customCategories = array_values(array_unique($this->customCategories));
 			//$e = new mb_exception("classes/class_iso19139.php - this->keywordsThesaurusName: " . json_encode($this->keywordsThesaurusName));
 			//$e = new mb_exception("classes/class_iso19139.php - this->keywords: " . json_encode($this->keywords));
 			$iKeyword = 0;
@@ -2207,11 +2286,13 @@ SQL;
 			$this->inspireCategories = array();
 			$this->inspireCategories[0] = $intCategory;
 		}
+		$this->inspireCategories = array_values(array_unique($this->inspireCategories));
 		if (!is_array($this->customCategories)) {
 			$intCategory = (integer)$this->customCategories;
 			$this->customCategories = array();
 			$this->customCategories[0] = $intCategory;
 		}
+		$this->customCategories = array_values(array_unique($this->customCategories));
 		//map keys into relevant ids
 		$sqlInsert = "";
 		if (count($this->isoCategories) > 0 && $this->customCategories[0] !== 0) {
