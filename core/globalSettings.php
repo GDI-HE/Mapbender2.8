@@ -37,6 +37,26 @@ if (defined("SESSION_NAME") && is_string(SESSION_NAME)) {
 //
 require_once dirname(__FILE__)."/../lib/class_Mapbender.php";
 
+$maintenanceFlag = defined("MAINTENANCE_FILE") ? MAINTENANCE_FILE : (dirname(__DIR__) . '/conf/MAINTENANCE_MODE');
+if (file_exists($maintenanceFlag)) {
+    $currentUserId = Mapbender::session()->get("mb_user_id");
+    
+    // If user is logged in and NOT anonymous (ANONYMOUS_USER is typically 2)
+    if (!empty($currentUserId) && defined("ANONYMOUS_USER") && (string)$currentUserId !== (string)ANONYMOUS_USER) {
+        header('HTTP/1.1 503 Service Unavailable');
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px;">';
+        echo '<h2>Wartungsarbeiten</h2>';
+        echo '<p>Die Bearbeitung ist wegen Wartungsarbeiten vorübergehend deaktiviert.<br>Sie werden abgemeldet.</p>';
+        echo '<p>Weiterleitung zur Startseite in <span id="t">5</span> Sekunden...</p>';
+        echo '<p><a href="/logout/" target="_top">Jetzt zur Startseite</a></p>';
+        echo '<script>var s=5;var i=setInterval(function(){if(--s<=0){clearInterval(i);window.top.location.href="/logout/";}else{document.getElementById("t").innerText=s;}},1000);</script>';
+        echo '</body></html>';
+        exit;
+    }
+}
+// ------------------------------------------
+
 //
 // define LC_MESSAGES if unknown (for Windows platforms)
 // 
