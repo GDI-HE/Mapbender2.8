@@ -31,7 +31,7 @@ $(function() {
 
 if (typeof regionData === 'undefined') {
     var regionData = [
-        { "name": "Land Hessen", "minx": 7.7724673, "miny": 49.3952723, "maxx": 10.2364142, "maxy": 51.6577888 },
+        { "name": "Land Hessen", "minx": 7.609011, "miny": 49.359391, "maxx": 10.388817, "maxy": 51.749253 },
         { "name": "Kreisfreie Stadt Darmstadt", "minx": 8.5581615, "miny": 49.795668, "maxx": 8.7498738, "maxy": 49.9538042 },
         { "name": "Kreisfreie Stadt Frankfurt am Main", "minx": 8.4727605, "miny": 50.0153529, "maxx": 8.8004049, "maxy": 50.2271424 },
         { "name": "Kreisfreie Stadt Offenbach am Main", "minx": 8.7224425, "miny": 50.0468179, "maxx": 8.8427322, "maxy": 50.1373991 },
