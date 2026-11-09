@@ -128,17 +128,18 @@ var MeasureApi = function (o) {
 			open: function() {
 				$('#toolsContainer').hide();
 				$('a.toggleToolsContainer').removeClass('activeToggle');
-				//Mapbender.bindPanEvents();
-				//Mapbender.disableFeatureInfo();
-
+				Mapbender.bindPanEvents();
+				Mapbender.disableFeatureInfo();
 			},
 			close: function (){
 				$('#measure_widget').removeClass('myOnClass');
+				Mapbender.enableFeatureInfo();
 				mb_enableButton('pan1');				
 			}
 		}).bind("dialogclose", function () {
 			button.stop();
 			that.destroy();
+			Mapbender.enableFeatureInfo();
 			mb_enableButton('pan1');
 		});
 

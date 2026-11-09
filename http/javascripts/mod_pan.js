@@ -42,6 +42,10 @@ Mapbender.events.init.register(function () {
     var map = Mapbender.modules[options.target];
 
     function movestart(e) {
+        var btn = e.which || (e.button !== undefined ? (e.button === 1 ? 2 : (e.button === 0 ? 1 : 3)) : 1);
+        if (btn !== 1 && btn !== 2) {
+            return;
+        }
         mb_panActive = true;
         startPos = map.getMousePosition(e);
         stopPos = new Point(startPos);
@@ -49,16 +53,22 @@ Mapbender.events.init.register(function () {
         $(document)
             .bind("mouseup", moveend)
             .bind("mousemove", move);
-        return false;
+        if (btn === 2) {
+            e.preventDefault();
+            return false;
+        }
     }
 
     function move(e) {
         if (!mb_panActive) {
             return false;
         }
-        $(map.getDomElement()).css('cursor', 'move'); // Set cursor to move
         stopPos = map.getMousePosition(e);
         var dif = stopPos.minus(startPos);
+        if (!isDragging && Math.abs(dif.x) < 4 && Math.abs(dif.y) < 4) {
+            return;
+        }
+        $(map.getDomElement()).css('cursor', 'move'); // Set cursor to move
         map.moveMap(dif.x, dif.y);
         isDragging = true;
 
@@ -70,7 +80,7 @@ Mapbender.events.init.register(function () {
             });
         }
 
-        if (!$.browser.msie){
+        if (!$.browser.msie) {
             return true;
         }
         return false;
@@ -84,27 +94,12 @@ Mapbender.events.init.register(function () {
             return false;
         }
         mb_panActive = false;
-        var dif = stopPos.minus(startPos);
-        var widthHeight = new Mapbender.Point(
-            map.getWidth(),
-            map.getHeight()
-        );
-        var center = widthHeight.times(0.5).minus(dif);
-        var realCenter = map.convertPixelToReal(center);
-        map.moveMap();
-        map.zoom(false, 1.0, realCenter);
-        if (!isDragging) {
-            if (typeof mod_featureInfo_event === 'function') {
-                mod_featureInfo_event(e);
-            } else {
-                console.error('mod_featureInfo_event is not defined');
-            }
-        }
-        $(map.getDomElement()).css('cursor', 'default'); // Reset cursor
         $(document)
             .unbind("mousemove", move)
             .unbind("mouseup", moveend);
-        
+
+        $(map.getDomElement()).css('cursor', 'default'); // Reset cursor
+
         // Zurücksetzen der Position des KML-Rendering-Pane
         var kmlPane = $('#kml-rendering-pane');
         if (kmlPane.length) {
@@ -113,60 +108,101 @@ Mapbender.events.init.register(function () {
             });
         }
 
-        return false;
-    }
+        if (isDragging) {
+            var mapEl = map.getDomElement();
+            var preventClick = function (ev) {
+                ev.stopPropagation();
+                ev.preventDefault();
+                mapEl.removeEventListener('click', preventClick, true);
+            };
+            mapEl.addEventListener('click', preventClick, true);
+            setTimeout(function () {
+                mapEl.removeEventListener('click', preventClick, true);
+            }, 100);
 
-    Mapbender.bindPanEvents = function() {
-        //console.log('mod_pan.js[bindPanEvents{f} called(bindIfFalse): panEventsActive=' + panEventsActive);
-        if (!panEventsActive) {
-            $(map.getDomElement()).bind('mousedown', movestart)
-                                  .bind('mouseleave', moveend);
-            panEventsActive = true;            
+            var dif = stopPos.minus(startPos);
+            var widthHeight = new Mapbender.Point(
+                map.getWidth(),
+                map.getHeight()
+            );
+            var center = widthHeight.times(0.5).minus(dif);
+            var realCenter = map.convertPixelToReal(center);
+            map.moveMap();
+            map.zoom(false, 1.0, realCenter);
+            return false;
+        } else {
+            map.moveMap();
+            if (typeof mod_featureInfo_event === 'function') {
+                mod_featureInfo_event(e);
+            }
         }
     }
 
-    Mapbender.unbindPanEvents = function() {
+    Mapbender.bindPanEvents = function () {
+        //console.log('mod_pan.js[bindPanEvents{f} called(bindIfFalse): panEventsActive=' + panEventsActive);
+        if (!panEventsActive) {
+            $(map.getDomElement()).bind('mousedown', movestart)
+                .bind('mouseleave', moveend);
+            panEventsActive = true;
+        }
+    }
+
+    Mapbender.unbindPanEvents = function () {
         //console.log('mod_pan.js[unbindPanEvents{f} called(unbindIfTrue): panEventsActive=' + panEventsActive);
         if (panEventsActive) {
             $(map.getDomElement()).unbind('mousedown', movestart)
-                                  .unbind('mouseleave', moveend);
+                .unbind('mouseleave', moveend);
             $(document).unbind('mousemove', move)
-                       .unbind('mouseup', moveend);
+                .unbind('mouseup', moveend);
             panEventsActive = false;
         }
     }
 
     Mapbender.bindPanEvents();
-    
+
+    // Center roller / middle click drag is always enabled for panning
+    $(map.getDomElement()).bind('mousedown', function (e) {
+        if (e.which === 2 && !mb_panActive) {
+            e.preventDefault();
+            movestart(e);
+            return false;
+        }
+    }).bind('auxclick', function (e) {
+        if (e.which === 2) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
     // Funktion zum Anzeigen des Overlays
     function showOverlay() {
-        $('.dialog-overlay').each(function() {
+        $('.dialog-overlay').each(function () {
             $(this).show();
         });
     }
 
     // Funktion zum Ausblenden des Overlays
     function hideOverlay() {
-        $('.dialog-overlay').each(function() {
+        $('.dialog-overlay').each(function () {
             $(this).hide();
         });
     }
-    
-        // Event-Listener für resizable und draggable hinzufügen, wenn das Overlay vorhanden ist
-    $(document).bind("resizestart", ".ui-dialog", function() {
+
+    // Event-Listener für resizable und draggable hinzufügen, wenn das Overlay vorhanden ist
+    $(document).bind("resizestart", ".ui-dialog", function () {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {
             if (panEventsActive) {
                 Mapbender.unbindPanEvents();
                 dialog.data('panEventsActive', true);
             } else {
-                dialog.data('panEventsActive', false); 
+                dialog.data('panEventsActive', false);
             }
             showOverlay();
         }
     });
 
-    $(document).bind("dragstart", ".ui-dialog", function() {
+    $(document).bind("dragstart", ".ui-dialog", function () {
         var dialog = $(this);
 
         // Überprüfen, ob das Dragging von der Titelleiste ausgelöst wurde
@@ -193,8 +229,8 @@ Mapbender.events.init.register(function () {
             showOverlay();
         }
     });
-     
-    $(document).bind("resizestop", ".ui-dialog", function() {
+
+    $(document).bind("resizestop", ".ui-dialog", function () {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {
             if (dialog.data('panEventsActive')) {
@@ -203,8 +239,8 @@ Mapbender.events.init.register(function () {
             hideOverlay();
         }
     });
-    
-    $(document).bind("dragstop", ".ui-dialog", function() {
+
+    $(document).bind("dragstop", ".ui-dialog", function () {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {
             if (dialog.data('panEventsActive')) {
