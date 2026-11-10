@@ -80,7 +80,7 @@ Mapbender.events.init.register(function () {
             });
         }
 
-        if (!$.browser.msie) {
+        if (!$.browser.msie){
             return true;
         }
         return false;
@@ -138,22 +138,22 @@ Mapbender.events.init.register(function () {
         }
     }
 
-    Mapbender.bindPanEvents = function () {
+    Mapbender.bindPanEvents = function() {
         //console.log('mod_pan.js[bindPanEvents{f} called(bindIfFalse): panEventsActive=' + panEventsActive);
         if (!panEventsActive) {
             $(map.getDomElement()).bind('mousedown', movestart)
-                .bind('mouseleave', moveend);
-            panEventsActive = true;
+                                  .bind('mouseleave', moveend);
+            panEventsActive = true;            
         }
     }
 
-    Mapbender.unbindPanEvents = function () {
+    Mapbender.unbindPanEvents = function() {
         //console.log('mod_pan.js[unbindPanEvents{f} called(unbindIfTrue): panEventsActive=' + panEventsActive);
         if (panEventsActive) {
             $(map.getDomElement()).unbind('mousedown', movestart)
-                .unbind('mouseleave', moveend);
+                                  .unbind('mouseleave', moveend);
             $(document).unbind('mousemove', move)
-                .unbind('mouseup', moveend);
+                       .unbind('mouseup', moveend);
             panEventsActive = false;
         }
     }
@@ -173,36 +173,36 @@ Mapbender.events.init.register(function () {
             return false;
         }
     });
-
+    
     // Funktion zum Anzeigen des Overlays
     function showOverlay() {
-        $('.dialog-overlay').each(function () {
+        $('.dialog-overlay').each(function() {
             $(this).show();
         });
     }
 
     // Funktion zum Ausblenden des Overlays
     function hideOverlay() {
-        $('.dialog-overlay').each(function () {
+        $('.dialog-overlay').each(function() {
             $(this).hide();
         });
     }
-
-    // Event-Listener für resizable und draggable hinzufügen, wenn das Overlay vorhanden ist
-    $(document).bind("resizestart", ".ui-dialog", function () {
+    
+        // Event-Listener für resizable und draggable hinzufügen, wenn das Overlay vorhanden ist
+    $(document).bind("resizestart", ".ui-dialog", function() {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {
             if (panEventsActive) {
                 Mapbender.unbindPanEvents();
                 dialog.data('panEventsActive', true);
             } else {
-                dialog.data('panEventsActive', false);
+                dialog.data('panEventsActive', false); 
             }
             showOverlay();
         }
     });
 
-    $(document).bind("dragstart", ".ui-dialog", function () {
+    $(document).bind("dragstart", ".ui-dialog", function() {
         var dialog = $(this);
 
         // Überprüfen, ob das Dragging von der Titelleiste ausgelöst wurde
@@ -229,8 +229,8 @@ Mapbender.events.init.register(function () {
             showOverlay();
         }
     });
-
-    $(document).bind("resizestop", ".ui-dialog", function () {
+     
+    $(document).bind("resizestop", ".ui-dialog", function() {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {
             if (dialog.data('panEventsActive')) {
@@ -239,8 +239,8 @@ Mapbender.events.init.register(function () {
             hideOverlay();
         }
     });
-
-    $(document).bind("dragstop", ".ui-dialog", function () {
+    
+    $(document).bind("dragstop", ".ui-dialog", function() {
         var dialog = $(this);
         if (dialog.find('.dialog-overlay').length > 0) {
             if (dialog.data('panEventsActive')) {
