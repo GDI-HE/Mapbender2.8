@@ -42,7 +42,7 @@ if (file_exists($maintenanceFlag)) {
     $currentUserId = Mapbender::session()->get("mb_user_id");
     
     // If user is logged in and NOT anonymous (ANONYMOUS_USER is typically 2)
-    if (!empty($currentUserId) && defined("ANONYMOUS_USER") && (string)$currentUserId !== (string)ANONYMOUS_USER) {
+    if (!empty($currentUserId) && (!defined("ANONYMOUS_USER") || (string)$currentUserId !== (string)ANONYMOUS_USER)) {
         header('HTTP/1.1 503 Service Unavailable');
         header('Content-Type: text/html; charset=utf-8');
         echo '<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px;">';
