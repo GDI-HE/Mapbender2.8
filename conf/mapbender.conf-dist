@@ -4,6 +4,11 @@
 # Copyright (C) 2010 OSGeo
 
 # --------------------------------------------
+# maintenance mode file
+# --------------------------------------------
+define("MAINTENANCE_FILE", dirname(__DIR__) . "/conf/MAINTENANCE_MODE");
+
+# --------------------------------------------
 # type of mapbender database
 # --------------------------------------------
 define("SYS_DBTYPE", "pgsql");

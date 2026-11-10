@@ -13,6 +13,12 @@ if($_COOKIE[session_name()]=="") {
 	$URLAdd="?".session_name()."=".$_REQUEST[session_name()];
 }
 
+$maintenanceFlag = defined("MAINTENANCE_FILE") ? MAINTENANCE_FILE : (dirname(dirname(__DIR__)) . '/conf/MAINTENANCE_MODE');
+if (file_exists($maintenanceFlag)) {
+	header('Location: /logout/');
+	exit;
+}
+
 $isAuthenticated = authenticate($name,$pw);
 
 if (is_array($isAuthenticated) != false) {
