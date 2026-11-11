@@ -47,6 +47,8 @@ Mapbender.events.init.register(function () {
         if (e.which !== 1) {
             return;
         }
+        // Prevent native browser image drag-and-drop / text selection on map tiles without blocking 'click'
+        e.preventDefault();
         // Reset dragging state and saved cursor on every mousedown
         isDragging = false;
         prevCursor = null;
@@ -64,8 +66,8 @@ Mapbender.events.init.register(function () {
         }
         stopPos = map.getMousePosition(e);
         var dif = stopPos.minus(startPos);
-        // Minimum drag threshold (4px) to prevent static clicks from being treated as pan moves
-        if (!isDragging && Math.abs(dif.x) < 4 && Math.abs(dif.y) < 4) {
+        // Minimum drag threshold (6px) so minor hand jitter during clicks does not trigger a pan drag
+        if (!isDragging && Math.abs(dif.x) < 6 && Math.abs(dif.y) < 6) {
             return;
         }
         if (!isDragging) {
@@ -119,17 +121,19 @@ Mapbender.events.init.register(function () {
 
         if (isDragging) {
             isDragging = false;
-            // Suppress trailing native 'click' event after dragging so active tools (Measure, Digitize, Info) do not drop accidental points
-            var mapEl = map.getDomElement();
-            var preventClick = function (ev) {
-                ev.stopPropagation();
-                ev.preventDefault();
-                mapEl.removeEventListener('click', preventClick, true);
-            };
-            mapEl.addEventListener('click', preventClick, true);
-            setTimeout(function () {
-                mapEl.removeEventListener('click', preventClick, true);
-            }, 100);
+            // Suppress trailing native 'click' only on mouseup (mouseleave never fires click); clean up on next tick so rapid subsequent clicks are never swallowed
+            if (!e || e.type === "mouseup") {
+                var mapEl = map.getDomElement();
+                var preventClick = function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                    mapEl.removeEventListener('click', preventClick, true);
+                };
+                mapEl.addEventListener('click', preventClick, true);
+                setTimeout(function () {
+                    mapEl.removeEventListener('click', preventClick, true);
+                }, 0);
+            }
 
             var dif = stopPos.minus(startPos);
             var widthHeight = new Mapbender.Point(
@@ -170,6 +174,11 @@ Mapbender.events.init.register(function () {
             panEventsActive = false;
         }
     }
+
+    // Prevent native HTML5 image drag-and-drop inside map container so clicks are never hijacked
+    $(map.getDomElement()).bind('dragstart', function () {
+        return false;
+    });
 
     Mapbender.bindPanEvents();
     
