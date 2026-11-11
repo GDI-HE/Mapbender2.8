@@ -475,7 +475,7 @@ $.widget("mapbender.mb_hohe", {
 		}
 
 		var len = jsonPoints.length;
-		if ((len === 0) && (!paintPoints)) {
+		if ((len === 0) && (this._measurePoints.length === 0) && (!paintPoints)) {
 			if (this._map.getSrs() != this._srs)
 				this._srs = this._map.getSrs()
 			return;
@@ -494,6 +494,14 @@ $.widget("mapbender.mb_hohe", {
 					p.mousePos = this._map.convertRealToPixel(p.pos);
 					jsonPoints[i] = p;
 				}
+				// Reproject in-progress _measurePoints too so pre-profile drawing stays aligned on SRS change
+				for (var i = 0; i < this._measurePoints.length; i++) {
+					var mp = this._measurePoints[i];
+					var mp2 = new Proj4js.Point(mp.pos.x, mp.pos.y);
+					mp2 = Proj4js.transform(source, dest, mp2);
+					mp.pos = mp2;
+					mp.mousePos = this._map.convertRealToPixel(mp.pos);
+				}
 			}
 			else
 				alert('Es ist ein Fehler aufgetreten,bitte Zeichnen Sie die Strecke neu');
@@ -511,11 +519,18 @@ $.widget("mapbender.mb_hohe", {
 				p.ist_in_BBox = false;
 			jsonPoints[i] = p;
 		}
-		this._trigger("cleardia", null, null);
+		// Update screen pixel coordinates for in-progress points drawn before double-click (issue #48)
+		for (var i = 0; i < this._measurePoints.length; i++) {
+			this._measurePoints[i].mousePos = this._map.convertRealToPixel(this._measurePoints[i].pos);
+		}
+		// Only refresh the elevation diagram once server elevation points are available
+		if (paintPoints) {
+			this._trigger("cleardia", null, null);
 
-		for (var i = 0; i < len; i++)
-			this._trigger("pointadded", null, jsonPoints[i]);
-		this._trigger("update", null, -1);
+			for (var i = 0; i < len; i++)
+				this._trigger("pointadded", null, jsonPoints[i]);
+			this._trigger("update", null, -1);
+		}
 
 		this._draw(undefined, {
 			not_clicked: true
@@ -523,11 +538,14 @@ $.widget("mapbender.mb_hohe", {
 	},
 
 	_init: function () {
-		// Use 'click' instead of 'mousedown' so drag-to-pan does not drop accidental points
+		// Use 'click' instead of 'mousedown' so drag-to-pan does not drop accidental points; unbind first to prevent duplicates
 		this.element
-			.bind("mousemove", $.proxy(this, "_measure"))
-			.bind("click", $.proxy(this, "_addPoint"))
-			.bind("onwheel",$.proxy(this, "_measure"))
+			.unbind("mousemove", this._measureProxy)
+			.unbind("click", this._addPointProxy)
+			.unbind("onwheel", this._measureProxy)
+			.bind("mousemove", this._measureProxy)
+			.bind("click", this._addPointProxy)
+			.bind("onwheel", this._measureProxy)
 			.css("cursor", "crosshair");
 	},
 
@@ -536,6 +554,10 @@ $.widget("mapbender.mb_hohe", {
 		jsonPoints = [];
 		paintPoints = false;
 		uebergeben = false;
+		// Store stable proxy references so unbind/unregister match exact function identity on destroy/"Neu"
+		this._redrawProxy = $.proxy(this._redraw, this);
+		this._measureProxy = $.proxy(this, "_measure");
+		this._addPointProxy = $.proxy(this, "_addPoint");
 
 		// ":maps" is a Mapbender selector which
 		// checks if an element is a Mapbender map
@@ -547,12 +569,14 @@ $.widget("mapbender.mb_hohe", {
 
 		this._map = this.element.mapbender();
 		if (!create)
-			this._map.events.afterMapRequest.register($.proxy(this._redraw, this));
+			this._map.events.afterMapRequest.register(this._redrawProxy);
 		create = true;
 		this._srs = this._map.getSrs();
 		this._$canvas = $("<div id='measure_canvas' />").css({
 			"z-index": 1000,
-			"position": "absolute"
+			"position": "absolute",
+			// Pass mouse events through to #mapframe1 so _canvas.clear() on mousemove cannot detach the mousedown target mid-click
+			"pointer-events": "none"
 		}).appendTo(this.element);
 		this._canvas = Raphael(this._$canvas.get(0), this._map.getWidth(), this._map.getHeight());
 		mb_registerPanSubElement($(this._canvas.canvas).parent().get(0));
@@ -561,7 +585,7 @@ $.widget("mapbender.mb_hohe", {
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
 		this.element
-			.unbind("click", this._addPoint)
+			.unbind("click", this._addPointProxy)
 			.css("cursor", "default");
 	},
 
@@ -575,8 +599,11 @@ $.widget("mapbender.mb_hohe", {
 		uebergeben = false;
 		create = false;
 		this._$canvas.remove();
-		this.element.unbind("onwheel",$.proxy(this, "_measure"));
-		this._map.events.afterMapRequest.unregister($.proxy(this._redraw, this));
+		// Unbind mousemove/onwheel and unregister exact _redrawProxy so destroyed instances do not leak
+		this.element
+			.unbind("mousemove", this._measureProxy)
+			.unbind("onwheel", this._measureProxy);
+		this._map.events.afterMapRequest.unregister(this._redrawProxy);
 		$.Widget.prototype.destroy.apply(this, arguments); // default destroy
 		$(this.element).data("mb_hohe", null);
 	}
