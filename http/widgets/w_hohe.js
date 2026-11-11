@@ -401,6 +401,10 @@ $.widget("mapbender.mb_hohe", {
 	wird ausgeführt, wenn man einen Punkt durch Klicken oder Doppelklick (Ende Zeichnen) hinzufügt.
 	*/
 	_addPoint: function (e) {
+		// Only primary left-click adds points (ignores middle/right clicks)
+		if (e.which !== 1) {
+			return;
+		}
 		//Abbruch, wenn Punkte vom Sever da sind.
 		if (paintPoints) return;
 		var mousePos = this._map.getMousePosition(e);
@@ -519,9 +523,10 @@ $.widget("mapbender.mb_hohe", {
 	},
 
 	_init: function () {
+		// Use 'click' instead of 'mousedown' so drag-to-pan does not drop accidental points
 		this.element
 			.bind("mousemove", $.proxy(this, "_measure"))
-			.bind("mousedown", $.proxy(this, "_addPoint"))
+			.bind("click", $.proxy(this, "_addPoint"))
 			.bind("onwheel",$.proxy(this, "_measure"))
 			.css("cursor", "crosshair");
 	},
@@ -556,7 +561,7 @@ $.widget("mapbender.mb_hohe", {
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
 		this.element
-			.unbind("mousedown", this._addPoint)
+			.unbind("click", this._addPoint)
 			.css("cursor", "default");
 	},
 

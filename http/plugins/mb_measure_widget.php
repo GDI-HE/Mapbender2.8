@@ -128,17 +128,20 @@ var MeasureApi = function (o) {
 			open: function() {
 				$('#toolsContainer').hide();
 				$('a.toggleToolsContainer').removeClass('activeToggle');
+				// Enable panning during measurement and suppress FeatureInfo
 				Mapbender.bindPanEvents();
 				Mapbender.disableFeatureInfo();
 			},
 			close: function (){
 				$('#measure_widget').removeClass('myOnClass');
+				// Re-enable FeatureInfo after measurement closes
 				Mapbender.enableFeatureInfo();
 				mb_enableButton('pan1');				
 			}
 		}).bind("dialogclose", function () {
 			button.stop();
 			that.destroy();
+			// Re-enable FeatureInfo on dialog close
 			Mapbender.enableFeatureInfo();
 			mb_enableButton('pan1');
 		});
