@@ -22,4 +22,4 @@ jobs:
         with:
           gemini-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          model: gemini-3.8-flash
+          model: gemini-3.5-flash-lite
