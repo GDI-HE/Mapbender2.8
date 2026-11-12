@@ -41,21 +41,41 @@ Mapbender.events.init.register(function () {
     var startPos, stopPos;
     var map = Mapbender.modules[options.target];
     var prevCursor = null;
+    var panButton = null;
+
+    var activePreventClick = null;
+    var preventClickTimer = null;
+
+    function clearPreventClick() {
+        if (preventClickTimer !== null) {
+            clearTimeout(preventClickTimer);
+            preventClickTimer = null;
+        }
+        if (activePreventClick && map && map.getDomElement()) {
+            map.getDomElement().removeEventListener('click', activePreventClick, true);
+            activePreventClick = null;
+        }
+    }
 
     function movestart(e) {
-        // Only use primary left mouse button for panning
-        if (e.which !== 1) {
+        // Allow panning with primary left mouse button (1) or middle mouse button (2)
+        if (e.which !== 1 && e.which !== 2) {
             return;
         }
-        // Prevent native browser image drag-and-drop / text selection on map tiles without blocking 'click'
+        // Clear any leftover click-suppression listener from an earlier drag before handling a new press
+        clearPreventClick();
+        // Prevent native browser image drag-and-drop / text selection / middle-click autoscroll without blocking 'click'
         e.preventDefault();
-        // Reset dragging state and saved cursor on every mousedown
+        // Reset dragging state, active button, and saved cursor on every mousedown
+        panButton = e.which;
         isDragging = false;
         prevCursor = null;
         mb_panActive = true;
         startPos = map.getMousePosition(e);
         stopPos = new Point(startPos);
         $(document)
+            .unbind("mouseup", moveend)
+            .unbind("mousemove", move)
             .bind("mouseup", moveend)
             .bind("mousemove", move);
     }
@@ -66,8 +86,8 @@ Mapbender.events.init.register(function () {
         }
         stopPos = map.getMousePosition(e);
         var dif = stopPos.minus(startPos);
-        // Minimum drag threshold (6px) so minor hand jitter during clicks does not trigger a pan drag
-        if (!isDragging && Math.abs(dif.x) < 6 && Math.abs(dif.y) < 6) {
+        // Apply 6px threshold only for left-button drags so minor jitter during clicks does not pan; middle-button pans immediately
+        if (panButton === 1 && !isDragging && Math.abs(dif.x) < 6 && Math.abs(dif.y) < 6) {
             return;
         }
         if (!isDragging) {
@@ -100,6 +120,8 @@ Mapbender.events.init.register(function () {
         if (!map) {
             return false;
         }
+        var releasedButton = panButton;
+        panButton = null;
         mb_panActive = false;
         $(document)
             .unbind("mousemove", move)
@@ -111,28 +133,26 @@ Mapbender.events.init.register(function () {
             prevCursor = null;
         }
 
-        // Zurücksetzen der Position des KML-Rendering-Pane
-        var kmlPane = $('#kml-rendering-pane');
-        if (kmlPane.length) {
-            kmlPane.css({
-                transform: 'none'
-            });
-        }
-
         if (isDragging) {
             isDragging = false;
-            // Suppress trailing native 'click' only on mouseup (mouseleave never fires click); clean up on next tick so rapid subsequent clicks are never swallowed
+            // Zurücksetzen der Position des KML-Rendering-Pane only after an actual pan drag
+            var kmlPane = $('#kml-rendering-pane');
+            if (kmlPane.length) {
+                kmlPane.css({
+                    transform: 'none'
+                });
+            }
+            // Suppress trailing native 'click' only on mouseup (mouseleave never fires click); clean up on next tick or next mousedown
             if (!e || e.type === "mouseup") {
+                clearPreventClick();
                 var mapEl = map.getDomElement();
-                var preventClick = function (ev) {
+                activePreventClick = function (ev) {
                     ev.stopPropagation();
                     ev.preventDefault();
-                    mapEl.removeEventListener('click', preventClick, true);
+                    clearPreventClick();
                 };
-                mapEl.addEventListener('click', preventClick, true);
-                setTimeout(function () {
-                    mapEl.removeEventListener('click', preventClick, true);
-                }, 0);
+                mapEl.addEventListener('click', activePreventClick, true);
+                preventClickTimer = setTimeout(clearPreventClick, 0);
             }
 
             var dif = stopPos.minus(startPos);
@@ -147,9 +167,8 @@ Mapbender.events.init.register(function () {
             return false;
         } else {
             isDragging = false;
-            map.moveMap();
-            // Static click: trigger FeatureInfo if enabled
-            if (typeof mod_featureInfo_event === 'function') {
+            // Static click: skip map.moveMap() (map never moved) and trigger FeatureInfo only for primary left-click
+            if (releasedButton === 1 && typeof mod_featureInfo_event === 'function') {
                 mod_featureInfo_event(e);
             }
         }
@@ -278,6 +297,8 @@ Mapbender.events.init.register(function () {
                 return false;
             }
             Mapbender.unbindPanEvents();
+            clearPreventClick();
+            panButton = null;
             mb_panActive = false;
         }
     });
