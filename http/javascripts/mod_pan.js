@@ -40,27 +40,64 @@ Mapbender.events.init.register(function () {
     var mb_panActive = false;
     var startPos, stopPos;
     var map = Mapbender.modules[options.target];
+    var prevCursor = null;
+    var panButton = null;
+
+    var activePreventClick = null;
+    var preventClickTimer = null;
+
+    function clearPreventClick() {
+        if (preventClickTimer !== null) {
+            clearTimeout(preventClickTimer);
+            preventClickTimer = null;
+        }
+        if (activePreventClick && map && map.getDomElement()) {
+            map.getDomElement().removeEventListener('click', activePreventClick, true);
+            activePreventClick = null;
+        }
+    }
 
     function movestart(e) {
+        // Allow panning with primary left mouse button (1) or middle mouse button (2)
+        if (e.which !== 1 && e.which !== 2) {
+            return;
+        }
+        // Clear any leftover click-suppression listener from an earlier drag before handling a new press
+        clearPreventClick();
+        // Prevent native browser image drag-and-drop / text selection / middle-click autoscroll without blocking 'click'
+        e.preventDefault();
+        // Reset dragging state, active button, and saved cursor on every mousedown
+        panButton = e.which;
+        isDragging = false;
+        prevCursor = null;
         mb_panActive = true;
         startPos = map.getMousePosition(e);
         stopPos = new Point(startPos);
-        isDragging = false;
         $(document)
+            .unbind("mouseup", moveend)
+            .unbind("mousemove", move)
             .bind("mouseup", moveend)
             .bind("mousemove", move);
-        return false;
     }
 
     function move(e) {
         if (!mb_panActive) {
             return false;
         }
-        $(map.getDomElement()).css('cursor', 'move'); // Set cursor to move
         stopPos = map.getMousePosition(e);
         var dif = stopPos.minus(startPos);
+        // Apply 6px threshold only for left-button drags so minor jitter during clicks does not pan; middle-button pans immediately
+        if (panButton === 1 && !isDragging && Math.abs(dif.x) < 6 && Math.abs(dif.y) < 6) {
+            return;
+        }
+        if (!isDragging) {
+            // Save the active map cursor (e.g. 'crosshair' in Hoehenprofil, Measure, Digitize) before switching to 'move'
+            var curCursor = map.getDomElement().style.cursor;
+            prevCursor = (curCursor && curCursor !== 'move') ? curCursor : 'default';
+            $(map.getDomElement()).css('cursor', 'move'); // Set cursor to move
+            isDragging = true;
+        }
         map.moveMap(dif.x, dif.y);
-        isDragging = true;
 
         // Aktualisiere die Position des KML-Rendering-Pane während des Pannens
         var kmlPane = $('#kml-rendering-pane');
@@ -83,46 +120,67 @@ Mapbender.events.init.register(function () {
         if (!map) {
             return false;
         }
+        var releasedButton = panButton;
+        panButton = null;
         mb_panActive = false;
-        var dif = stopPos.minus(startPos);
-        var widthHeight = new Mapbender.Point(
-            map.getWidth(),
-            map.getHeight()
-        );
-        var center = widthHeight.times(0.5).minus(dif);
-        var realCenter = map.convertPixelToReal(center);
-        map.moveMap();
-        map.zoom(false, 1.0, realCenter);
-        if (!isDragging) {
-            if (typeof mod_featureInfo_event === 'function') {
-                mod_featureInfo_event(e);
-            } else {
-                console.error('mod_featureInfo_event is not defined');
-            }
-        }
-        $(map.getDomElement()).css('cursor', 'default'); // Reset cursor
         $(document)
             .unbind("mousemove", move)
             .unbind("mouseup", moveend);
-        
-        // Zurücksetzen der Position des KML-Rendering-Pane
-        var kmlPane = $('#kml-rendering-pane');
-        if (kmlPane.length) {
-            kmlPane.css({
-                transform: 'none'
-            });
+
+        // Restore the pre-drag cursor only if a pan drag changed it, preserving active tool cursors (e.g. 'crosshair')
+        if (prevCursor !== null) {
+            $(map.getDomElement()).css('cursor', prevCursor);
+            prevCursor = null;
         }
 
-        return false;
+        if (isDragging) {
+            isDragging = false;
+            // Zurücksetzen der Position des KML-Rendering-Pane only after an actual pan drag
+            var kmlPane = $('#kml-rendering-pane');
+            if (kmlPane.length) {
+                kmlPane.css({
+                    transform: 'none'
+                });
+            }
+            // Suppress trailing native 'click' only on mouseup (mouseleave never fires click); clean up on next tick or next mousedown
+            if (!e || e.type === "mouseup") {
+                clearPreventClick();
+                var mapEl = map.getDomElement();
+                activePreventClick = function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                    clearPreventClick();
+                };
+                mapEl.addEventListener('click', activePreventClick, true);
+                preventClickTimer = setTimeout(clearPreventClick, 0);
+            }
+
+            var dif = stopPos.minus(startPos);
+            var widthHeight = new Mapbender.Point(
+                map.getWidth(),
+                map.getHeight()
+            );
+            var center = widthHeight.times(0.5).minus(dif);
+            var realCenter = map.convertPixelToReal(center);
+            map.moveMap();
+            map.zoom(false, 1.0, realCenter);
+            return false;
+        } else {
+            isDragging = false;
+            // Static click: skip map.moveMap() (map never moved) and trigger FeatureInfo only for primary left-click
+            if (releasedButton === 1 && typeof mod_featureInfo_event === 'function') {
+                mod_featureInfo_event(e);
+            }
+        }
     }
 
     Mapbender.bindPanEvents = function() {
-        //console.log('mod_pan.js[bindPanEvents{f} called(bindIfFalse): panEventsActive=' + panEventsActive);
-        if (!panEventsActive) {
-            $(map.getDomElement()).bind('mousedown', movestart)
-                                  .bind('mouseleave', moveend);
-            panEventsActive = true;            
-        }
+        // Cleanly ensure mousedown and mouseleave listeners are bound without duplicates
+        $(map.getDomElement()).unbind('mousedown', movestart)
+                              .unbind('mouseleave', moveend)
+                              .bind('mousedown', movestart)
+                              .bind('mouseleave', moveend);
+        panEventsActive = true;
     }
 
     Mapbender.unbindPanEvents = function() {
@@ -135,6 +193,11 @@ Mapbender.events.init.register(function () {
             panEventsActive = false;
         }
     }
+
+    // Prevent native HTML5 image drag-and-drop inside map container so clicks are never hijacked
+    $(map.getDomElement()).bind('dragstart', function () {
+        return false;
+    });
 
     Mapbender.bindPanEvents();
     
@@ -234,6 +297,8 @@ Mapbender.events.init.register(function () {
                 return false;
             }
             Mapbender.unbindPanEvents();
+            clearPreventClick();
+            panButton = null;
             mb_panActive = false;
         }
     });

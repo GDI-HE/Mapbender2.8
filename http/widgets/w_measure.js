@@ -401,6 +401,10 @@ $.widget("mapbender.mb_measure", {
 			.bind("click", $.proxy(this, "_reinitialize"));
 	},
 	_addPoint: function (e) {
+		// Only primary left-click adds points (ignores middle/right clicks)
+		if (e.which && e.which !== 1) {
+			return;
+		}
 		var mousePos = this._map.getMousePosition(e);
 
 		var len = this._measurePoints.length;
@@ -514,7 +518,9 @@ $.widget("mapbender.mb_measure", {
 
 		this._$canvas = $("<div id='measure_canvas' />").css({
 			"z-index": 1000,
-			"position": "absolute"
+			"position": "absolute",
+			// Pass mouse events through to #mapframe1 so _canvas.clear() on mousemove cannot detach the mousedown target mid-click
+			"pointer-events": "none"
 		}).appendTo(this.element);
 		this._canvas = Raphael(this._$canvas.get(0), this._map.getWidth(), this._map.getHeight());
 		mb_registerPanSubElement($(this._canvas.canvas).parent().get(0));
