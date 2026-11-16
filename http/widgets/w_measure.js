@@ -17,6 +17,10 @@ $.widget("mapbender.mb_measure", {
                 pointStrokeWidthDefault: 2
 	},
 	_measurePoints: [],
+	_completedMeasures: [],
+	_measureCounter: 0,
+	_selectedMeasureId: null,
+	_$overlay: null,
 	_map: undefined,
 	_srs: undefined,
 	_currentDistance: 0,
@@ -96,7 +100,7 @@ $.widget("mapbender.mb_measure", {
 		if (this._measurePoints.length < 2) {
 			return null;
 		}
-		this._measurePoints.push(pos);
+		this._measurePoints.push(pos.pos ? pos : { pos: pos });
 		var part, area = 0;
 		var p0 = this._measurePoints[0].pos, pi, pj;
 		for (var i = 0; i < this._measurePoints.length - 1; i++)  {
@@ -116,9 +120,7 @@ $.widget("mapbender.mb_measure", {
 		}
 
 		// add current point and first point
-		this._measurePoints.push({
-			pos: pos
-		});
+		this._measurePoints.push(pos.pos ? pos : { pos: pos });
 		this._measurePoints.push(this._measurePoints[0]);
 
         var area = 0.0;
@@ -156,11 +158,11 @@ $.widget("mapbender.mb_measure", {
 		var lat_from = this._toRad(a.y);
 		var lon_to = this._toRad(b.x);
 		var lat_to = this._toRad(b.y);
-		return Math.abs(6371229 * Math.acos(
-			Math.sin(lat_from) * Math.sin(lat_to) +
+		var cosVal = Math.sin(lat_from) * Math.sin(lat_to) +
 			Math.cos(lat_from) * Math.cos(lat_to) *
-			Math.cos(lon_from - lon_to)
-		));
+			Math.cos(lon_from - lon_to);
+		cosVal = Math.max(-1, Math.min(1, cosVal));
+		return Math.abs(6371229 * Math.acos(cosVal));
 	},
 	_calculateDistanceMetric: function (a, b) {
 		return Math.abs(Math.sqrt(
@@ -205,6 +207,66 @@ $.widget("mapbender.mb_measure", {
 		}
 		return null;
 	},
+	_formatMeasure: function (val, isArea, isShort) {
+		if (!val && val !== 0) return "";
+		if (isArea) {
+			var km2 = Math.round(val / 1e6 * 100) / 100;
+			var ha = Math.round(val / 1e4 * 100) / 100;
+			var km2Str = km2.toLocaleString("de-DE");
+			var m2Str = Math.round(val).toLocaleString("de-DE");
+			if (isShort) return (val >= 1e6 ? km2Str + " km²" : m2Str + " m²");
+			if (val >= 1e6) return m2Str + " m² (" + km2Str + " km²)";
+			return m2Str + " m² (" + ha.toLocaleString("de-DE") + " ha)";
+		}
+		var km = Math.round(val / 1000 * 100) / 100;
+		var kmStr = km.toLocaleString("de-DE");
+		var mStr = Math.round(val).toLocaleString("de-DE");
+		if (isShort) return (val >= 1000 ? (Math.round(val / 1000 * 10) / 10).toLocaleString("de-DE") + " km" : mStr + " m");
+		if (val >= 1000) return mStr + " m (" + kmStr + " km)";
+		return (Math.round(val * 10) / 10).toLocaleString("de-DE") + " m";
+	},
+	_calculateCentroid: function (points) {
+		var sx = 0, sy = 0;
+		for (var k = 0; k < points.length; k++) {
+			sx += points[k].pos.x;
+			sy += points[k].pos.y;
+		}
+		return { x: sx / points.length, y: sy / points.length };
+	},
+	_isPointInPolygon: function (px, py, points) {
+		if (!points || points.length < 3) return false;
+		var inside = false;
+		for (var i = 0, j = points.length - 1; i < points.length; j = i++) {
+			var xi = points[i].mousePos ? points[i].mousePos.x : 0, yi = points[i].mousePos ? points[i].mousePos.y : 0;
+			var xj = points[j].mousePos ? points[j].mousePos.x : 0, yj = points[j].mousePos ? points[j].mousePos.y : 0;
+			if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+		}
+		return inside;
+	},
+	_isPointNearLine: function (px, py, points, tol) {
+		if (!points || points.length < 2) return false;
+		var tolSq = (tol || 8) * (tol || 8);
+		for (var i = 0; i < points.length - 1; i++) {
+			var p1 = points[i].mousePos, p2 = points[i + 1].mousePos;
+			if (p1 && p2) {
+				var dx = p2.x - p1.x, dy = p2.y - p1.y, l2 = dx * dx + dy * dy;
+				var t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - p1.x) * dx + (py - p1.y) * dy) / l2));
+				var qx = p1.x + t * dx, qy = p1.y + t * dy;
+				var rx = px - qx, ry = py - qy;
+				if (rx * rx + ry * ry <= tolSq) return true;
+			}
+		}
+		return false;
+	},
+	_findMeasureAt: function (mousePos) {
+		if (!this._completedMeasures || this._completedMeasures.length === 0) return null;
+		for (var i = this._completedMeasures.length - 1; i >= 0; i--) {
+			var m = this._completedMeasures[i];
+			if (m.type === "polygon" && this._isPointInPolygon(mousePos.x, mousePos.y, m.points)) return m;
+			if (m.type === "line" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 8)) return m;
+		}
+		return null;
+	},
 	_isPointSnapped: function (p1, p2) {
 		return p1.dist(p2) <= this.options.measurePointDiameter/2;
 	},
@@ -229,6 +291,48 @@ $.widget("mapbender.mb_measure", {
 	_draw: function (pos, drawOptions) {
 		this._canvas.clear();
 
+		// 1. Draw all completed measurements
+		if (this._completedMeasures && this._completedMeasures.length > 0) {
+			for (var mIdx = 0; mIdx < this._completedMeasures.length; mIdx++) {
+				var m = this._completedMeasures[mIdx];
+				var isSel = (m.id === this._selectedMeasureId);
+				var mPath = "";
+				for (var pIdx = 0; pIdx < m.points.length; pIdx++) {
+					var pt = m.points[pIdx];
+					pt.mousePos = this._map.convertRealToPixel(pt.pos);
+					mPath += (pIdx === 0 ? "M" : "L") + pt.mousePos.x + " " + pt.mousePos.y;
+				}
+
+				if (m.type === "polygon") {
+					var poly = this._canvas.path(mPath + "Z");
+					poly.attr({
+						fill: isSel ? "#ffa500" : (this.options.polygonFillDefault || "#ffaa00"),
+						"fill-opacity": isSel ? 0.45 : (this.options.opacity || 0.35),
+						stroke: isSel ? "#e65100" : (this.options.lineStrokeDefault || "#ea6c00"),
+						"stroke-width": isSel ? 3.5 : (this.options.polygonStrokeWidthDefault || 2)
+					});
+				} else {
+					var line = this._canvas.path(mPath);
+					line.attr({
+						stroke: isSel ? "#e65100" : (this.options.lineStrokeDefault || "#ea6c00"),
+						"stroke-width": isSel ? 4 : (this.options.lineStrokeWidthDefault || 3)
+					});
+				}
+
+				// Draw vertex circles for completed measurement
+				for (var pIdx = 0; pIdx < m.points.length; pIdx++) {
+					var pt = m.points[pIdx];
+					var c = this._canvas.circle(pt.mousePos.x, pt.mousePos.y, isSel ? 4 : 3);
+					c.attr({
+						fill: isSel ? "#e65100" : "#ff7f00",
+						stroke: "#ffffff",
+						"stroke-width": 1.5
+					});
+				}
+			}
+		}
+
+		// 2. Draw active in-progress geometry
 		var str_path = "";
 
 		if (pos && drawOptions && !drawOptions.highlightFirst) {
@@ -244,10 +348,9 @@ $.widget("mapbender.mb_measure", {
 				str_path += (k === 0) ? 'M' : 'L';
 				str_path += q.x + ' ' + q.y;
 
-				if (drawOptions.highlightFirst && k === len - 1) {
+				if (drawOptions && drawOptions.highlightFirst && k === len - 1) {
 					var p0 = this._measurePoints[0].mousePos;
 					str_path += 'L' + p0.x + ' ' + p0.y;
-
 				}
 				if (drawOptions && drawOptions.highlightLast && k === len - 1) {
 					continue;
@@ -262,20 +365,20 @@ $.widget("mapbender.mb_measure", {
 						circle.attr({
 							fill: drawOptions && drawOptions.highlightFirst ?
 								this.options.pointFillSnapped : this.options.pointFillDefault,
-                                                        "fill-opacity": this.options.opacity,
+							"fill-opacity": this.options.opacity,
 							stroke: drawOptions.highlightFirst || drawOptions.highlightLast ?
-                                                                this.options.pointStrokeSnapped: this.options.pointStrokeDefault,
-                                                        "stroke-width": this.options.pointStrokeWidthDefault
+								this.options.pointStrokeSnapped: this.options.pointStrokeDefault,
+							"stroke-width": this.options.pointStrokeWidthDefault
 						});
 					}
 					else {
 						circle.attr({
 							fill: drawOptions && drawOptions.highlightLast && k === len - 2 ?
 								this.options.pointFillSnapped : this.options.pointFillDefault,
-                                                        "fill-opacity": this.options.opacity,
+							"fill-opacity": this.options.opacity,
 							stroke: drawOptions.highlightFirst || drawOptions.highlightLast ?
-                                                                this.options.pointStrokeSnapped: this.options.pointStrokeDefault,
-                                                        "stroke-width": this.options.pointStrokeWidthDefault
+								this.options.pointStrokeSnapped: this.options.pointStrokeDefault,
+							"stroke-width": this.options.pointStrokeWidthDefault
 						});
 					}
 				}
@@ -285,8 +388,7 @@ $.widget("mapbender.mb_measure", {
 			this._measurePoints.pop();
 		}
 
-
-		if (this._isPolygon(this._measurePoints, pos) && drawOptions && !drawOptions.highlightLast && !this.polygonIsInvalid) {
+		if (this._isPolygon(this._measurePoints, pos) && drawOptions && !drawOptions.highlightLast && !this._polygonIsInvalid) {
 			var poly = this._canvas.path(str_path + 'Z');
 			poly.attr({
 				fill: drawOptions.highlightFirst ?
@@ -299,16 +401,232 @@ $.widget("mapbender.mb_measure", {
 			});
 		}
 
-		var line = this._canvas.path(str_path);
-		line.attr({
-			stroke: drawOptions && (drawOptions.highlightFirst || drawOptions.highlightLast) ?
-				this.options.lineStrokeSnapped : this.options.lineStrokeDefault,
-			"stroke-width": drawOptions && drawOptions.highlightLast ?
-				this.options.lineStrokeWidthSnapped : this.options.lineStrokeWidthDefault
-		});
-		line.toFront();
+		if (str_path.length > 0) {
+			var activeLine = this._canvas.path(str_path);
+			activeLine.attr({
+				stroke: drawOptions && (drawOptions.highlightFirst || drawOptions.highlightLast) ?
+					this.options.lineStrokeSnapped : this.options.lineStrokeDefault,
+				"stroke-width": drawOptions && drawOptions.highlightLast ?
+					this.options.lineStrokeWidthSnapped : this.options.lineStrokeWidthDefault
+			});
+			activeLine.toFront();
+		}
+
+		// 3. Update overlay badges and popup
+		this._updateOverlays();
+	},
+	_updateOverlays: function () {
+		if (!this._$overlay) {
+			return;
+		}
+		this._$overlay.empty();
+
+		if (!this._completedMeasures || this._completedMeasures.length === 0) {
+			return;
+		}
+
+		var that = this;
+		for (var i = 0; i < this._completedMeasures.length; i++) {
+			var m = this._completedMeasures[i];
+			var pixel = this._map.convertRealToPixel(m.centerPos);
+			m.centerPixel = pixel;
+
+			// Badge element
+			var $badge = $('<div class="mb-measure-badge" />').text(m.badgeText).css({
+				"position": "absolute",
+				"left": pixel.x + "px",
+				"top": pixel.y + "px",
+				"transform": "translate(-50%, -50%)",
+				"-webkit-transform": "translate(-50%, -50%)",
+				"-ms-transform": "translate(-50%, -50%)",
+				"background-color": (m.id === this._selectedMeasureId) ? "#e65100" : "#ff7f00",
+				"color": "#ffffff",
+				"font-family": "Arial, Helvetica, sans-serif",
+				"font-size": "12px",
+				"font-weight": "bold",
+				"padding": "3px 8px",
+				"border-radius": "3px",
+				"border": "1px solid #cc6600",
+				"box-shadow": "0 2px 5px rgba(0,0,0,0.35)",
+				"cursor": "pointer",
+				"pointer-events": "auto",
+				"white-space": "nowrap",
+				"z-index": 1002,
+				"user-select": "none"
+			});
+
+			(function (measureItem) {
+				// Prevent mousedown/mouseup from bubbling to map container so pan/featureInfo is not triggered
+				$badge.bind("mousedown mouseup click", function (e) {
+					e.stopPropagation();
+					if (e.type === "click") {
+						that.selectMeasure(measureItem.id);
+					}
+				});
+			})(m);
+
+			this._$overlay.append($badge);
+
+			// Popup card (if selected)
+			if (m.id === this._selectedMeasureId) {
+				var $popup = $('<div class="mb-measure-popup" />').css({
+					"position": "absolute",
+					"left": pixel.x + "px",
+					"background-color": "#ffffff",
+					"color": "#333333",
+					"font-family": "Arial, Helvetica, sans-serif",
+					"border-radius": "8px",
+					"box-shadow": "0 4px 18px rgba(0,0,0,0.22)",
+					"border": "1px solid #dcdcdc",
+					"padding": "12px 14px",
+					"min-width": "230px",
+					"max-width": "300px",
+					"z-index": 1005,
+					"pointer-events": "auto",
+					"cursor": "default"
+				});
+
+				// Stop all mouse and click events from bubbling up to #mapframe1 to prevent map pan or FeatureInfo
+				$popup.bind("mousedown mouseup click dblclick", function (e) {
+					e.stopPropagation();
+				});
+
+				var $arrow = $('<div />').css({
+					"position": "absolute",
+					"left": "50%",
+					"margin-left": "-8px",
+					"width": "0",
+					"height": "0",
+					"border-left": "8px solid transparent",
+					"border-right": "8px solid transparent",
+					"pointer-events": "none"
+				});
+
+				var showBelow = (pixel.y < 160);
+				if (showBelow) {
+					$popup.css({
+						"top": (pixel.y + 14) + "px",
+						"transform": "translate(-50%, 0)",
+						"-webkit-transform": "translate(-50%, 0)",
+						"-ms-transform": "translate(-50%, 0)"
+					});
+					$arrow.css({
+						"top": "-8px",
+						"border-bottom": "8px solid #ffffff"
+					});
+				} else {
+					$popup.css({
+						"top": (pixel.y - 14) + "px",
+						"transform": "translate(-50%, -100%)",
+						"-webkit-transform": "translate(-50%, -100%)",
+						"-ms-transform": "translate(-50%, -100%)"
+					});
+					$arrow.css({
+						"bottom": "-8px",
+						"border-top": "8px solid #ffffff"
+					});
+				}
+
+				// Header
+				var $header = $('<div />').css({
+					"display": "flex",
+					"justify-content": "space-between",
+					"align-items": "center",
+					"margin-bottom": "8px",
+					"padding-bottom": "6px",
+					"border-bottom": "1px solid #eeeeee"
+				});
+				var $title = $('<span />').text(m.title).css({
+					"font-weight": "bold",
+					"font-size": "13px",
+					"color": "#222222"
+				});
+				var $close = $('<span title="Schließen">&times;</span>').css({
+					"cursor": "pointer",
+					"font-size": "18px",
+					"color": "#888888",
+					"line-height": "1",
+					"padding": "0 2px"
+				}).hover(
+					function () { $(this).css("color", "#000"); },
+					function () { $(this).css("color", "#888"); }
+				).bind("click", function (e) {
+					e.preventDefault();
+					e.stopPropagation();
+					that.hideMeasurePopup();
+				});
+				$header.append($title).append($close);
+
+				// Body
+				var $body = $('<div />').css({
+					"font-size": "12px",
+					"line-height": "1.6",
+					"color": "#444444",
+					"margin-bottom": "8px"
+				});
+				if (m.type === "polygon") {
+					var $areaLine = $('<div />').text(m.areaFormatted);
+					var $perimLine = $('<div />').text(m.perimeterFormatted);
+					$body.append($areaLine).append($perimLine);
+				} else {
+					var $distLine = $('<div />').text(m.distanceFormatted);
+					$body.append($distLine);
+				}
+
+				// Footer
+				var $footer = $('<div />').css({
+					"display": "flex",
+					"justify-content": "space-between",
+					"align-items": "center",
+					"padding-top": "6px",
+					"border-top": "1px solid #eeeeee",
+					"font-size": "12px"
+				});
+				var $centerBtn = $('<a href="javascript:void(0);" />').html('&#9678; ' + 'Zentrieren').css({
+					"color": "#2a62bc",
+					"text-decoration": "none",
+					"cursor": "pointer",
+					"margin-right": "12px"
+				}).hover(
+					function () { $(this).css("text-decoration", "underline"); },
+					function () { $(this).css("text-decoration", "none"); }
+				);
+				(function (measureItem) {
+					$centerBtn.bind("click", function (e) {
+						e.preventDefault();
+						e.stopPropagation();
+						that.centerOnMeasure(measureItem.id);
+					});
+				})(m);
+
+				var $delBtn = $('<a href="javascript:void(0);" />').html('&#128465; ' + 'Löschen').css({
+					"color": "#d93025",
+					"text-decoration": "none",
+					"cursor": "pointer"
+				}).hover(
+					function () { $(this).css("text-decoration", "underline"); },
+					function () { $(this).css("text-decoration", "none"); }
+				);
+				(function (measureItem) {
+					$delBtn.bind("click", function (e) {
+						e.preventDefault();
+						e.stopPropagation();
+						that.deleteMeasure(measureItem.id);
+					});
+				})(m);
+
+				$footer.append($centerBtn).append($delBtn);
+
+				$popup.append($header).append($body).append($footer).append($arrow);
+				this._$overlay.append($popup);
+			}
+		}
 	},
 	_measure: function (e) {
+		if (this._measurePoints.length === 0) {
+			return;
+		}
+
 		var mousePos = this._map.getMousePosition(e);
 		var firstPointSnapped = this._isFirstPointSnapped(mousePos)
 			&& !this._polygonIsInvalid;
@@ -353,18 +671,18 @@ $.widget("mapbender.mb_measure", {
 					measureData.totalDistance = this._totalDistance;
 				}
 				if (!lastPointSnapped) {
-					measureData.perimeter = measureData.totalDistance + this._calculateDistance(
+					measureData.perimeter = this._totalDistance + this._calculateDistance(
 						this._measurePoints[0].pos,
 						measureData.pos.pos
 					);
 				}
 
-                                this._currentAngle = this._calculateAngle(
-                                    this._measurePoints[len-2].pos,
-                                    previousPoint,
-                                    measureData.pos.pos
-                                );
-                                measureData.currentAngle  = this._currentAngle;
+				this._currentAngle = this._calculateAngle(
+					this._measurePoints[len-2].pos,
+					previousPoint,
+					measureData.pos.pos
+				);
+				measureData.currentAngle = this._currentAngle;
 			}
 		}
 
@@ -387,25 +705,41 @@ $.widget("mapbender.mb_measure", {
 		});
 	},
 	_reinitialize: function (e) {
-		this.element
-			.unbind("click", $.proxy(this, "_reinitialize"))
+		this.element.unbind("click", $.proxy(this, "_reinitialize"));
 		this._trigger("reinitialize", e);
 		return false;
 	},
 	_addLastPoint: function (e) {
 		this._trigger("lastpointadded", e);
-
-		this.element.unbind("click", this._addPoint)
-			.unbind("mousemove", this._measure)
-			.css("cursor", "auto")
-			.bind("click", $.proxy(this, "_reinitialize"));
 	},
 	_addPoint: function (e) {
 		// Only primary left-click adds points (ignores middle/right clicks)
 		if (e.which && e.which !== 1) {
 			return;
 		}
+		// Ensure FeatureInfo does not trigger on map clicks during active measurement
+		if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
+			Mapbender.disableFeatureInfo();
+		}
 		var mousePos = this._map.getMousePosition(e);
+
+		// If adding a new measurement, bypass hit detection to start fresh drawing
+		if (this._isNewMeasureActive) {
+			this._isNewMeasureActive = false;
+			this.hideMeasurePopup();
+			this._selectedMeasureId = null;
+			this._draw();
+		} else if (this._measurePoints.length === 0) {
+			var hit = this._findMeasureAt(mousePos);
+			if (hit) {
+				this.selectMeasure(hit.id);
+				return true;
+			}
+			// Empty space click: close any open popup and start a new measurement
+			this.hideMeasurePopup();
+			this._selectedMeasureId = null;
+			this._draw();
+		}
 
 		var len = this._measurePoints.length;
 
@@ -432,14 +766,71 @@ $.widget("mapbender.mb_measure", {
 		this._currentPolygonIsInvalid = false;
 
 		if (lastPointSnapped || firstPointSnapped) {
-			this._draw(data.pos, {
-				highlightFirst: firstPointSnapped,
-				highlightLast: lastPointSnapped,
-				drawPoints: false
+			var isPolygon = firstPointSnapped;
+			var pts = [];
+			for (var i = 0; i < this._measurePoints.length; i++) {
+				pts.push({
+					pos: { x: this._measurePoints[i].pos.x, y: this._measurePoints[i].pos.y },
+					mousePos: { x: this._measurePoints[i].mousePos.x, y: this._measurePoints[i].mousePos.y }
+				});
+			}
+
+			var measureRecord;
+			if (isPolygon) {
+				var areaVal = this._currentArea;
+				var perimVal = this._totalDistance;
+				var center = this._calculateCentroid(pts);
+				measureRecord = {
+					id: "measure_" + (++this._measureCounter),
+					type: "polygon",
+					points: pts,
+					area: areaVal,
+					perimeter: perimVal,
+					totalDistance: perimVal,
+					centerPos: center,
+					title: "Flächenmessung",
+					areaFormatted: this._formatMeasure(areaVal, true, false),
+					perimeterFormatted: this._formatMeasure(perimVal, false, false) + " Umfang",
+					distanceFormatted: "",
+					badgeText: this._formatMeasure(areaVal, true, true)
+				};
+			} else {
+				var distVal = this._totalDistance;
+				var center = this._calculateCentroid(pts);
+				measureRecord = {
+					id: "measure_" + (++this._measureCounter),
+					type: "line",
+					points: pts,
+					area: null,
+					perimeter: null,
+					totalDistance: distVal,
+					centerPos: center,
+					title: "Streckenmessung",
+					areaFormatted: "",
+					perimeterFormatted: "",
+					distanceFormatted: this._formatMeasure(distVal, false, false) + " Gesamtlänge",
+					badgeText: this._formatMeasure(distVal, false, true)
+				};
+			}
+
+			this._completedMeasures.push(measureRecord);
+			this._selectedMeasureId = measureRecord.id;
+
+			// Reset in-progress state
+			this._measurePoints = [];
+			this._totalDistance = 0;
+			this._currentDistance = 0;
+			this._polygonIsInvalid = false;
+			this._currentPolygonIsInvalid = false;
+
+			// Redraw all completed measurements
+			this._draw();
+
+			// Trigger lastpointadded event with completed measure details
+			this._trigger("lastpointadded", e, {
+				measure: measureRecord,
+				allMeasures: this._completedMeasures
 			});
-			this._addLastPoint(e);
-			this._measurePoints.closedPolygon = firstPointSnapped;
-			this._measurePoints.closedLine = lastPointSnapped;
 		}
 		else {
 			this._measurePoints.push(data.pos);
@@ -460,49 +851,101 @@ $.widget("mapbender.mb_measure", {
 		if (!$(this.element).data("mb_measure")) {
 			return;
 		}
-		var len = this._measurePoints.length;
-		if (len === 0) {
+		// Keep FeatureInfo suppressed during active measurement
+		if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
+			Mapbender.disableFeatureInfo();
+		}
+		var hasCompleted = (this._completedMeasures && this._completedMeasures.length > 0);
+		var hasInProgress = (this._measurePoints && this._measurePoints.length > 0);
+		if (!hasCompleted && !hasInProgress) {
+			if (this._srs && this._map && this._map.getSrs() != this._srs) {
+				this._srs = this._map.getSrs();
+			}
 			return;
 		}
-		for (var i = 0; i < len; i++) {
-			var p = this._measurePoints[i];
-			p.mousePos = this._map.convertRealToPixel(p.pos);
+
+		if (this._$canvas) {
+			this._$canvas.css({ left: 0, top: 0 });
 		}
-		if (this._measurePoints.closedPolygon) {
-			this._draw(undefined, {
-				highlightFirst: true,
-				highlightLast: false,
-				drawPoints: false
-			});
+		if (this._$overlay) {
+			this._$overlay.css({ left: 0, top: 0 });
 		}
-		else if (this._measurePoints.closedLine) {
-			this._draw(undefined, {
-				highlightFirst: false,
-				highlightLast: true,
-				drawPoints: false
-			});
+
+		// Coordinate reference system changed (same logic as in w_hohe.js):
+		if (this._srs && this._map.getSrs() != this._srs && typeof Proj4js !== "undefined") {
+			var source = new Proj4js.Proj(this._srs);
+			var dest = new Proj4js.Proj(this._map.getSrs());
+			if (source.readyToUse && dest.readyToUse) {
+				for (var mIdx = 0; mIdx < this._completedMeasures.length; mIdx++) {
+					var m = this._completedMeasures[mIdx];
+					for (var pIdx = 0; pIdx < m.points.length; pIdx++) {
+						var pt = m.points[pIdx];
+						var p2 = Proj4js.transform(source, dest, new Proj4js.Point(pt.pos.x, pt.pos.y));
+						pt.pos = { x: p2.x, y: p2.y };
+					}
+					var cp = Proj4js.transform(source, dest, new Proj4js.Point(m.centerPos.x, m.centerPos.y));
+					m.centerPos = { x: cp.x, y: cp.y };
+					if (m.type === "polygon") {
+						var savedPts = this._measurePoints;
+						this._measurePoints = m.points.slice(0, m.points.length - 1);
+						m.area = this._calculateArea(m.points[m.points.length - 1]);
+						this._measurePoints = savedPts;
+
+						var pSum = 0;
+						for (var k = 0; k < m.points.length; k++) {
+							pSum += this._calculateDistance(m.points[k].pos, m.points[(k + 1) % m.points.length].pos);
+						}
+						m.perimeter = pSum;
+						m.totalDistance = pSum;
+						m.areaFormatted = this._formatMeasure(m.area, true, false);
+						m.perimeterFormatted = this._formatMeasure(m.perimeter, false, false) + " Umfang";
+						m.badgeText = this._formatMeasure(m.area, true, true);
+					}
+				}
+				for (var i = 0; i < this._measurePoints.length; i++) {
+					var mp = this._measurePoints[i];
+					var mp2 = Proj4js.transform(source, dest, new Proj4js.Point(mp.pos.x, mp.pos.y));
+					mp.pos = { x: mp2.x, y: mp2.y };
+				}
+			}
+			this._srs = this._map.getSrs();
+			// Ensure FeatureInfo remains disabled during measurement if mod_changeEPSG re-enabled it
+			if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
+				Mapbender.disableFeatureInfo();
+			}
+			this._trigger("srschanged", null, { allMeasures: this._completedMeasures });
 		}
-		else {
-			this._draw(undefined, {
-				highlightFirst: false,
-				highlightLast: false,
-				drawPoints: false
-			});
+
+		if (hasInProgress) {
+			for (var i = 0; i < this._measurePoints.length; i++) {
+				var p = this._measurePoints[i];
+				p.mousePos = this._map.convertRealToPixel(p.pos);
+			}
 		}
+
+		this._draw(undefined, {
+			highlightFirst: false,
+			highlightLast: false,
+			drawPoints: false
+		});
 	},
 	_init: function () {
-		if (this._measurePoints.closedLine || this._measurePoints.closedPolygon) {
-			this._measurePoints = [];
-			this._canvas.clear();
-		}
+		this._measureProxy = this._measureProxy || $.proxy(this, "_measure");
+		this._addPointProxy = this._addPointProxy || $.proxy(this, "_addPoint");
 		this.element
-			.bind("click", $.proxy(this, "_addPoint"))
-			.bind("mousemove", $.proxy(this, "_measure"))
+			.unbind("click", this._addPointProxy)
+			.unbind("mousemove", this._measureProxy)
+			.unbind("click", this._addPoint)
+			.unbind("mousemove", this._measure)
+			.bind("click", this._addPointProxy)
+			.bind("mousemove", this._measureProxy)
 			.css("cursor", "crosshair");
-
 	},
 	_create: function () {
 		this._measurePoints = [];
+		this._completedMeasures = [];
+		this._measureCounter = 0;
+		this._selectedMeasureId = null;
 
 		// ":maps" is a Mapbender selector which
 		// checks if an element is a Mapbender map
@@ -513,7 +956,11 @@ $.widget("mapbender.mb_measure", {
 		}
 
 		this._map = this.element.mapbender();
-		this._map.events.afterMapRequest.register($.proxy(this._redraw, this));
+		// Store proxy references so unbind/unregister match exact function identity
+		this._redrawProxy = $.proxy(this._redraw, this);
+		this._measureProxy = $.proxy(this, "_measure");
+		this._addPointProxy = $.proxy(this, "_addPoint");
+		this._map.events.afterMapRequest.register(this._redrawProxy);
 		this._srs = this._map.getSrs();
 
 		this._$canvas = $("<div id='measure_canvas' />").css({
@@ -524,9 +971,141 @@ $.widget("mapbender.mb_measure", {
 		}).appendTo(this.element);
 		this._canvas = Raphael(this._$canvas.get(0), this._map.getWidth(), this._map.getHeight());
 		mb_registerPanSubElement($(this._canvas.canvas).parent().get(0));
+
+		this._$overlay = $("<div id='measure_overlay' />").css({
+			"z-index": 1001,
+			"position": "absolute",
+			"top": 0,
+			"left": 0,
+			"width": "100%",
+			"height": "100%",
+			"pointer-events": "none",
+			"overflow": "visible"
+		}).appendTo(this.element);
+		mb_registerPanSubElement(this._$overlay.get(0));
+	},
+	getMeasures: function () {
+		return this._completedMeasures;
+	},
+	getMeasureById: function (id) {
+		if (!this._completedMeasures) {
+			return null;
+		}
+		for (var i = 0; i < this._completedMeasures.length; i++) {
+			if (this._completedMeasures[i].id === id) {
+				return this._completedMeasures[i];
+			}
+		}
+		return null;
+	},
+	selectMeasure: function (id) {
+		this._selectedMeasureId = id;
+		this._draw();
+	},
+	centerOnMeasure: function (id) {
+		var m = this.getMeasureById(id);
+		if (!m || !m.points || m.points.length === 0) {
+			return;
+		}
+
+		var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		for (var i = 0; i < m.points.length; i++) {
+			var p = m.points[i].pos;
+			if (p.x < minX) minX = p.x;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.y > maxY) maxY = p.y;
+		}
+
+		var width = maxX - minX;
+		var height = maxY - minY;
+
+		// Add 25% padding around the bounding box so the entire geometry is clearly framed
+		var padX = width * 0.25;
+		var padY = height * 0.25;
+		var isGeographic = (this._map.getSrs() === "EPSG:4326");
+		var minPad = isGeographic ? 0.001 : 25;
+		if (padX < minPad) padX = (padY >= minPad) ? padY : minPad;
+		if (padY < minPad) padY = (padX >= minPad) ? padX : minPad;
+
+		minX -= padX;
+		maxX += padX;
+		minY -= padY;
+		maxY += padY;
+
+		var newExtent = new Mapbender.Extent(minX, minY, maxX, maxY);
+		this._map.calculateExtent(newExtent);
+		this._map.setMapRequest();
+	},
+	deleteMeasure: function (id) {
+		var removed = null;
+		var updated = [];
+		for (var i = 0; i < this._completedMeasures.length; i++) {
+			if (this._completedMeasures[i].id === id) {
+				removed = this._completedMeasures[i];
+			} else {
+				updated.push(this._completedMeasures[i]);
+			}
+		}
+		this._completedMeasures = updated;
+		if (this._selectedMeasureId === id) {
+			this._selectedMeasureId = null;
+		}
+		this._draw();
+		var eventData = {
+			deleted: removed,
+			allMeasures: this._completedMeasures
+		};
+		this._trigger("deleted", null, eventData);
+		this._trigger("measuredeleted", null, eventData);
+		return this._completedMeasures;
+	},
+	clearAllMeasures: function () {
+		this._completedMeasures = [];
+		this._selectedMeasureId = null;
+		this._measurePoints = [];
+		this._totalDistance = 0;
+		this._currentDistance = 0;
+		this._draw();
+		var eventData = {
+			allMeasures: []
+		};
+		this._trigger("allcleared", null, eventData);
+		this._trigger("allmeasurescleared", null, eventData);
+		return this._completedMeasures;
+	},
+	startNewMeasure: function () {
+		// Ensure FeatureInfo remains disabled when starting a new measurement
+		if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
+			Mapbender.disableFeatureInfo();
+		}
+		this._isNewMeasureActive = true;
+		this._measurePoints = [];
+		this._totalDistance = 0;
+		this._currentDistance = 0;
+		this._selectedMeasureId = null;
+		this.hideMeasurePopup();
+		// Make measurement tool active: re-bind click and mousemove handlers and set crosshair cursor
+		this._init();
+		this._draw();
+	},
+	showMeasurePopup: function (id) {
+		this._selectedMeasureId = id;
+		this._draw();
+	},
+	hideMeasurePopup: function () {
+		this._selectedMeasureId = null;
+		this._draw();
 	},
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
+		this.hideMeasurePopup();
+		if (this._addPointProxy) {
+			this.element.unbind("click", this._addPointProxy);
+		}
+		if (this._measureProxy) {
+			this.element.unbind("mousemove", this._measureProxy);
+		}
 		this.element
 			.unbind("click", this._addPoint)
 			.unbind("mousemove", this._measure)
@@ -536,10 +1115,18 @@ $.widget("mapbender.mb_measure", {
 	// delete everything
 	destroy: function () {
 		this.deactivate();
-		this._canvas.clear();
-		this._measurePoints = [];
-		this._$canvas.remove();
-		this._map.events.afterMapRequest.unregister($.proxy(this._redraw, this));
+		this.clearAllMeasures();
+		if (this._$overlay) {
+			this._$overlay.remove();
+		}
+		if (this._$canvas) {
+			this._$canvas.remove();
+		}
+		// Cleanly unregister afterMapRequest event listener using stored proxy
+		if (this._redrawProxy) {
+			this._map.events.afterMapRequest.unregister(this._redrawProxy);
+			this._redrawProxy = null;
+		}
 
 		$.Widget.prototype.destroy.apply(this, arguments); // default destroy
 		$(this.element).data("mb_measure", null);

@@ -69,6 +69,7 @@ var MeasureApi = function (o) {
 	var measureDialog,
 		button,
 		that = this,
+		origEnableFeatureInfo = null,
 		inProgress = false,
 		title = o.title,
 		defaultHtml = "<div title='" + title + "'>" +
@@ -76,6 +77,9 @@ var MeasureApi = function (o) {
 				echo nl2br(htmlentities(_mb("Click in the map to start measuring."), ENT_QUOTES, "UTF-8"));
 			?></div></div>",
 		informationHtml =
+			"<div class='mb-measure-prompt' style='color:#555; font-size:12px; margin-bottom:8px; line-height:1.4; display:none;'><?php
+				echo nl2br(htmlentities(_mb("Click in the map to start measuring."), ENT_QUOTES, "UTF-8"));
+			?></div>" +
 			"<div><?php
 				echo nl2br(htmlentities(_mb("Last point: "), ENT_QUOTES, "UTF-8"));
 			?><span class='mb-measure-clicked-point' /></div>" +
@@ -96,7 +100,14 @@ var MeasureApi = function (o) {
 			?><span class='mb-measure-area' /> <span class='mb-measure-area-unit' /></div>" +
                         "<div><?php
 				echo nl2br(htmlentities(_mb("Angle: "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-angle' /> <span class='mb-measure-angle-unit' /></div>";
+			?><span class='mb-measure-angle' /> <span class='mb-measure-angle-unit' /></div>" +
+			"<div class='mb-measure-actions' style='margin-top:10px; padding-top:8px; border-top:1px solid #e2e8f0; display:none;'>" +
+				"<div style='display:flex; justify-content:space-between; align-items:center; gap:8px;'>" +
+					"<button type='button' class='mb-measure-add-btn' style='flex:1; cursor:pointer; padding:5px 10px; background:#f0f4f9; color:#1a5fb4; border:1px solid #c2d7ef; border-radius:4px; font-size:11px; font-weight:600; line-height:1.2; text-align:center;'>+ <?php echo htmlentities(_mb("Add measurement"), ENT_QUOTES, "UTF-8"); ?></button>" +
+					"<button type='button' class='mb-measure-clear-btn' style='cursor:pointer; padding:5px 10px; background:#fff; color:#d93025; border:1px solid #f1aeb5; border-radius:4px; font-size:11px; font-weight:500; line-height:1.2; text-align:center;'><?php echo htmlentities(_mb("Delete all"), ENT_QUOTES, "UTF-8"); ?></button>" +
+				"</div>" +
+			"</div>" +
+			"<div class='mb-measure-history' style='margin-top:8px; max-height:150px; overflow-y:auto;'></div>";
 
 	var hideMeasureData = function () {
 		measureDialog.find(".mb-measure-clicked-point").parent().hide();
@@ -109,11 +120,118 @@ var MeasureApi = function (o) {
 
 	};
 
-	var changeDialogContent = function () {
-		measureDialog.html(informationHtml);
-		hideMeasureData();
+	var syncPrintCoordinates = function () {
+		var allMeasures = [];
+		if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
+			allMeasures = o.$target.mb_measure("getMeasures");
+		}
+		var xs = [], ys = [];
+		if (allMeasures && allMeasures.length > 0) {
+			for (var m = 0; m < allMeasures.length; m++) {
+				var pts = allMeasures[m].points;
+				for (var p = 0; p < pts.length; p++) {
+					xs.push(pts[p].pos.x);
+					ys.push(pts[p].pos.y);
+				}
+			}
+		}
+		$('input[name="measured_x_values"]').val(xs.join(","));
+		$('input[name="measured_y_values"]').val(ys.join(","));
+	};
 
-		o.$target.unbind("click", changeDialogContent);
+	var renderMeasureHistory = function (measures) {
+		if (!measures && o.$target.size() > 0 && o.$target.data("mb_measure")) {
+			measures = o.$target.mb_measure("getMeasures");
+		}
+		var $hist = measureDialog.find(".mb-measure-history");
+		$hist.empty();
+		if (!measures || measures.length === 0) {
+			measureDialog.find(".mb-measure-prompt").show();
+			measureDialog.find(".mb-measure-actions").show();
+			measureDialog.find(".mb-measure-add-btn").show();
+			measureDialog.find(".mb-measure-clear-btn").hide();
+			return;
+		}
+		measureDialog.find(".mb-measure-prompt").hide();
+		measureDialog.find(".mb-measure-actions").show();
+		measureDialog.find(".mb-measure-add-btn").show();
+		measureDialog.find(".mb-measure-clear-btn").show();
+		for (var i = 0; i < measures.length; i++) {
+			(function (m, idx) {
+				var $row = $("<div style='display:flex; justify-content:space-between; align-items:center; padding:4px 6px; margin:2px 0; border-radius:4px; border:1px solid #f0f0f0; background:#fafafa; font-size:11px;' />");
+				$row.hover(
+					function () { $(this).css("background", "#f0f4f9"); },
+					function () { $(this).css("background", "#fafafa"); }
+				);
+				var labelText = "#" + (idx + 1) + " " + m.title + ": " + m.badgeText;
+				var $link = $("<a href='javascript:void(0);' style='color:#1a5fb4; text-decoration:none; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:215px;' />")
+					.text(labelText)
+					.attr("title", "<?php echo htmlentities(_mb("Click to select and zoom"), ENT_QUOTES, "UTF-8"); ?>")
+					.bind("click", function () {
+						if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
+							o.$target.mb_measure("selectMeasure", m.id);
+							o.$target.mb_measure("centerOnMeasure", m.id);
+						}
+					});
+				var $del = $("<a href='javascript:void(0);' style='color:#d93025; font-size:18px; line-height:1; text-decoration:none; margin-left:8px; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;' title='<?php echo htmlentities(_mb("Delete"), ENT_QUOTES, "UTF-8"); ?>'>&#128465;</a>")
+					.hover(
+						function () { $(this).css({"background": "#fee2e2", "color": "#b91c1c"}); },
+						function () { $(this).css({"background": "transparent", "color": "#d93025"}); }
+					)
+					.bind("click", function (e) {
+						e.stopPropagation();
+						if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
+							var remaining = o.$target.mb_measure("deleteMeasure", m.id);
+							renderMeasureHistory(remaining);
+							syncPrintCoordinates();
+						}
+					});
+				$row.append($link).append($del);
+				$hist.append($row);
+			})(measures[i], i);
+		}
+	};
+
+	var bindDialogButtons = function () {
+		measureDialog.find(".mb-measure-add-btn").hover(
+			function () { $(this).css({"background": "#e2ecf7", "border-color": "#9ec5fe"}); },
+			function () { $(this).css({"background": "#f0f4f9", "border-color": "#c2d7ef"}); }
+		).unbind("click").bind("click", function () {
+			// Suppress FeatureInfo when starting another measurement
+			if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
+				Mapbender.disableFeatureInfo();
+			}
+			// Make measurement tool active
+			Mapbender.bindPanEvents();
+			$('#measure_widget').addClass('myOnClass');
+			if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
+				o.$target.mb_measure("startNewMeasure");
+			} else {
+				that.activate();
+			}
+			hideMeasureData();
+			measureDialog.find(".mb-measure-prompt").show();
+		});
+		measureDialog.find(".mb-measure-clear-btn").hover(
+			function () { $(this).css({"background": "#fee2e2", "border-color": "#f87171", "color": "#b91c1c"}); },
+			function () { $(this).css({"background": "#fff", "border-color": "#f1aeb5", "color": "#d93025"}); }
+		).unbind("click").bind("click", function () {
+			if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
+				o.$target.mb_measure("clearAllMeasures");
+				renderMeasureHistory([]);
+				syncPrintCoordinates();
+			}
+			hideMeasureData();
+		});
+	};
+
+	var changeDialogContent = function () {
+		if (measureDialog.find(".mb-measure-actions").length === 0) {
+			measureDialog.html(informationHtml);
+			bindDialogButtons();
+		}
+		hideMeasureData();
+		renderMeasureHistory();
 	};
 
 	var create = function () {
@@ -131,17 +249,37 @@ var MeasureApi = function (o) {
 				// Enable panning during measurement and suppress FeatureInfo
 				Mapbender.bindPanEvents();
 				Mapbender.disableFeatureInfo();
+				// Guard Mapbender.enableFeatureInfo while measurement is active so external callers (e.g. mod_changeEPSG) cannot prematurely re-enable FeatureInfo
+				if (!origEnableFeatureInfo && typeof Mapbender !== "undefined" && typeof Mapbender.enableFeatureInfo === "function") {
+					origEnableFeatureInfo = Mapbender.enableFeatureInfo;
+					Mapbender.enableFeatureInfo = function() {
+						if ($('#measure_widget').hasClass('myOnClass') || (o.$target && o.$target.data('mb_measure'))) {
+							return;
+						}
+						if (origEnableFeatureInfo) {
+							origEnableFeatureInfo.apply(this, arguments);
+						}
+					};
+				}
 			},
 			close: function (){
 				$('#measure_widget').removeClass('myOnClass');
-				// Re-enable FeatureInfo after measurement closes
+				// Restore original enableFeatureInfo and re-enable FeatureInfo after measurement closes
+				if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
+					Mapbender.enableFeatureInfo = origEnableFeatureInfo;
+					origEnableFeatureInfo = null;
+				}
 				Mapbender.enableFeatureInfo();
 				mb_enableButton('pan1');				
 			}
 		}).bind("dialogclose", function () {
 			button.stop();
 			that.destroy();
-			// Re-enable FeatureInfo on dialog close
+			// Restore original enableFeatureInfo and re-enable FeatureInfo on dialog close
+			if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
+				Mapbender.enableFeatureInfo = origEnableFeatureInfo;
+				origEnableFeatureInfo = null;
+			}
 			Mapbender.enableFeatureInfo();
 			mb_enableButton('pan1');
 		});
@@ -170,6 +308,8 @@ var MeasureApi = function (o) {
 	};
 
 	var updateClickedPoint = function (evt, data) {
+		measureDialog.find(".mb-measure-prompt").hide();
+		measureDialog.find(".mb-measure-actions").hide();
 		if (data.pos) {
 			var p = data.pos;
 			measureDialog.find(".mb-measure-clicked-point").text(
@@ -283,9 +423,15 @@ var MeasureApi = function (o) {
                 updateAngle(evt, data);
 	};
 
-	var finishMeasure = function () {
+	var finishMeasure = function (evt, data) {
 		inProgress = false;
-		that.deactivate();
+		if (measureDialog.find(".mb-measure-actions").length === 0) {
+			measureDialog.html(informationHtml);
+			bindDialogButtons();
+		}
+		hideMeasureData();
+		renderMeasureHistory(data ? data.allMeasures : null);
+		syncPrintCoordinates();
 	};
 
 	var reinitializeMeasure = function () {
@@ -295,9 +441,9 @@ var MeasureApi = function (o) {
 	};
 
 	this.activate = function () {
-                //remove measured x and y values from print dialog
-                $('input[name="measured_x_values"]').val("");
-                $('input[name="measured_y_values"]').val("");
+		//remove measured x and y values from print dialog
+		$('input[name="measured_x_values"]').val("");
+		$('input[name="measured_y_values"]').val("");
 
 		if (o.$target.size() > 0) {
 			o.$target
@@ -305,12 +451,32 @@ var MeasureApi = function (o) {
 				.bind("mb_measureupdate", updateView)
 				.bind("mb_measurepointadded", updateClickedPoint)
 				.bind("mb_measurelastpointadded", finishMeasure)
+				.bind("mb_measuredeleted", function (evt, data) {
+					renderMeasureHistory(data ? data.allMeasures : null);
+					syncPrintCoordinates();
+				})
+				.bind("mb_measureallcleared", function () {
+					renderMeasureHistory([]);
+					syncPrintCoordinates();
+				})
+				.bind("mb_measuresrschanged", function (evt, data) {
+					// Maintain FeatureInfo disabled state across SRS changes while measurement is active
+					if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
+						Mapbender.disableFeatureInfo();
+					}
+					// Update measurement history display and sync print coordinates when coordinate reference system (SRS/EPSG) changes
+					renderMeasureHistory(data ? data.allMeasures : null);
+					syncPrintCoordinates();
+				})
 				.bind("mb_measurereinitialize", reinitializeMeasure)
 				.bind("click", changeDialogContent);
 		}
 		if (!inProgress) {
 			inProgress = true;
-			measureDialog.html(defaultHtml);
+			measureDialog.html(informationHtml);
+			bindDialogButtons();
+			hideMeasureData();
+			renderMeasureHistory([]);
 		}
 
 		measureDialog.dialog("open");
@@ -323,7 +489,11 @@ var MeasureApi = function (o) {
 				.unbind("mb_measureupdate", updateView)
 				.unbind("mb_measurepointadded", updateClickedPoint)
 				.unbind("mb_measurelastpointadded", finishMeasure)
-				.unbind("mb_measurereinitialize", reinitializeMeasure);
+				.unbind("mb_measuredeleted")
+				.unbind("mb_measureallcleared")
+				.unbind("mb_measuresrschanged")
+				.unbind("mb_measurereinitialize", reinitializeMeasure)
+				.unbind("click", changeDialogContent);
 		}
 		hideMeasureData();
 
@@ -332,9 +502,13 @@ var MeasureApi = function (o) {
 		}
 		measureDialog.html(defaultHtml);
 
-                //remove measured x and y values from print dialog
-                $('input[name="measured_x_values"]').val("");
-                $('input[name="measured_y_values"]').val("");
+		if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
+			Mapbender.enableFeatureInfo = origEnableFeatureInfo;
+			origEnableFeatureInfo = null;
+		}
+		//remove measured x and y values from print dialog
+		$('input[name="measured_x_values"]').val("");
+		$('input[name="measured_y_values"]').val("");
 	};
 	
 	this.deactivate = function () {

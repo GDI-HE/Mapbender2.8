@@ -167,8 +167,11 @@ Mapbender.events.init.register(function () {
             return false;
         } else {
             isDragging = false;
-            // Static click: skip map.moveMap() (map never moved) and trigger FeatureInfo only for primary left-click
-            if (releasedButton === 1 && typeof mod_featureInfo_event === 'function') {
+            // Static click: skip map.moveMap() and trigger FeatureInfo only for primary left-click when no drawing/measuring tool is active
+            if (releasedButton === 1 && typeof mod_featureInfo_event === 'function' &&
+                !$('#measure_widget').hasClass('myOnClass') &&
+                !$('#altitudeProfile').hasClass('myOnClass') &&
+                !$('#mapframe1').data('mb_measure')) {
                 mod_featureInfo_event(e);
             }
         }
