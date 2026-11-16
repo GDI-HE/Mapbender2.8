@@ -77,37 +77,37 @@ var MeasureApi = function (o) {
 				echo nl2br(htmlentities(_mb("Click in the map to start measuring."), ENT_QUOTES, "UTF-8"));
 			?></div></div>",
 		informationHtml =
+			"<div class='mb-measure-actions' style='display:none; gap:6px; margin-bottom:8px;'>" +
+				"<button type='button' class='mb-measure-add-btn' style='flex:1; padding:5px 8px; border:1px solid #c2d7ef; border-radius:4px; background:#f0f4f9; color:#1a5fb4; font-size:11px; font-weight:600; cursor:pointer;'>+ <?php echo htmlentities(_mb("Add measurement"), ENT_QUOTES, "UTF-8"); ?></button>" +
+				"<button type='button' class='mb-measure-clear-btn' style='padding:5px 8px; border:1px solid #f1aeb5; border-radius:4px; background:#fff; color:#d93025; font-size:11px; cursor:pointer;'><?php echo htmlentities(_mb("Delete all"), ENT_QUOTES, "UTF-8"); ?></button>" +
+			"</div>" +
+			"<div class='mb-measure-history' style='max-height:120px; overflow-y:auto; margin-bottom:8px;'></div>" +
 			"<div class='mb-measure-prompt' style='color:#555; font-size:12px; margin-bottom:8px; line-height:1.4; display:none;'><?php
 				echo nl2br(htmlentities(_mb("Click in the map to start measuring."), ENT_QUOTES, "UTF-8"));
 			?></div>" +
-			"<div><?php
-				echo nl2br(htmlentities(_mb("Last point: "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-clicked-point' /></div>" +
-			"<div><?php
-				echo nl2br(htmlentities(_mb("Current point: "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-current-point' /></div>" +
-			"<div><?php
-				echo nl2br(htmlentities(_mb("Distance (to last point): "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-distance-last' />  <span class='mb-measure-distance-last-unit' /></div>" +
-			"<div><?php
-				echo nl2br(htmlentities(_mb("Distance (total): "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-distance-total' /> <span class='mb-measure-distance-total-unit' /></div>" +
-			"<div><?php
-				echo nl2br(htmlentities(_mb("Perimeter: "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-perimeter' /> <span class='mb-measure-perimeter-unit' /></div>" +
-			"<div><?php
-				echo nl2br(htmlentities(_mb("Area: "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-area' /> <span class='mb-measure-area-unit' /></div>" +
-                        "<div><?php
-				echo nl2br(htmlentities(_mb("Angle: "), ENT_QUOTES, "UTF-8"));
-			?><span class='mb-measure-angle' /> <span class='mb-measure-angle-unit' /></div>" +
-			"<div class='mb-measure-actions' style='margin-top:10px; padding-top:8px; border-top:1px solid #e2e8f0; display:none;'>" +
-				"<div style='display:flex; justify-content:space-between; align-items:center; gap:8px;'>" +
-					"<button type='button' class='mb-measure-add-btn' style='flex:1; cursor:pointer; padding:5px 10px; background:#f0f4f9; color:#1a5fb4; border:1px solid #c2d7ef; border-radius:4px; font-size:11px; font-weight:600; line-height:1.2; text-align:center;'>+ <?php echo htmlentities(_mb("Add measurement"), ENT_QUOTES, "UTF-8"); ?></button>" +
-					"<button type='button' class='mb-measure-clear-btn' style='cursor:pointer; padding:5px 10px; background:#fff; color:#d93025; border:1px solid #f1aeb5; border-radius:4px; font-size:11px; font-weight:500; line-height:1.2; text-align:center;'><?php echo htmlentities(_mb("Delete all"), ENT_QUOTES, "UTF-8"); ?></button>" +
-				"</div>" +
-			"</div>" +
-			"<div class='mb-measure-history' style='margin-top:8px; max-height:150px; overflow-y:auto;'></div>";
+			"<div class='mb-measure-live-data' style='padding-top:4px;'>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Last point: "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-clicked-point' /></div>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Current point: "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-current-point' /></div>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Distance (to last point): "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-distance-last' />  <span class='mb-measure-distance-last-unit' /></div>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Distance (total): "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-distance-total' /> <span class='mb-measure-distance-total-unit' /></div>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Perimeter: "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-perimeter' /> <span class='mb-measure-perimeter-unit' /></div>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Area: "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-area' /> <span class='mb-measure-area-unit' /></div>" +
+				"<div><?php
+					echo nl2br(htmlentities(_mb("Angle: "), ENT_QUOTES, "UTF-8"));
+				?><span class='mb-measure-angle' /> <span class='mb-measure-angle-unit' /></div>" +
+			"</div>";
 
 	var hideMeasureData = function () {
 		measureDialog.find(".mb-measure-clicked-point").parent().hide();
@@ -146,14 +146,16 @@ var MeasureApi = function (o) {
 		var $hist = measureDialog.find(".mb-measure-history");
 		$hist.empty();
 		if (!measures || measures.length === 0) {
+			$hist.hide();
 			measureDialog.find(".mb-measure-prompt").show();
-			measureDialog.find(".mb-measure-actions").show();
+			measureDialog.find(".mb-measure-actions").css("display", "flex");
 			measureDialog.find(".mb-measure-add-btn").show();
 			measureDialog.find(".mb-measure-clear-btn").hide();
 			return;
 		}
+		$hist.show();
 		measureDialog.find(".mb-measure-prompt").hide();
-		measureDialog.find(".mb-measure-actions").show();
+		measureDialog.find(".mb-measure-actions").css("display", "flex");
 		measureDialog.find(".mb-measure-add-btn").show();
 		measureDialog.find(".mb-measure-clear-btn").show();
 		for (var i = 0; i < measures.length; i++) {
@@ -164,16 +166,16 @@ var MeasureApi = function (o) {
 					function () { $(this).css("background", "#fafafa"); }
 				);
 				var labelText = "#" + (idx + 1) + " " + m.title + ": " + m.badgeText;
-				var $link = $("<a href='javascript:void(0);' style='color:#1a5fb4; text-decoration:none; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:215px;' />")
+				var $link = $("<a href='javascript:void(0);' style='flex:1; min-width:0; color:#1a5fb4; text-decoration:none; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:6px;' />")
 					.text(labelText)
-					.attr("title", "<?php echo htmlentities(_mb("Click to select and zoom"), ENT_QUOTES, "UTF-8"); ?>")
+					.attr("title", labelText + " - <?php echo htmlentities(_mb("Click to select and zoom"), ENT_QUOTES, "UTF-8"); ?>")
 					.bind("click", function () {
 						if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
 							o.$target.mb_measure("selectMeasure", m.id);
 							o.$target.mb_measure("centerOnMeasure", m.id);
 						}
 					});
-				var $del = $("<a href='javascript:void(0);' style='color:#d93025; font-size:18px; line-height:1; text-decoration:none; margin-left:8px; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;' title='<?php echo htmlentities(_mb("Delete"), ENT_QUOTES, "UTF-8"); ?>'>&#128465;</a>")
+				var $del = $("<a href='javascript:void(0);' style='flex-shrink:0; color:#d93025; font-size:18px; line-height:1; text-decoration:none; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;' title='<?php echo htmlentities(_mb("Delete"), ENT_QUOTES, "UTF-8"); ?>'>&#128465;</a>")
 					.hover(
 						function () { $(this).css({"background": "#fee2e2", "color": "#b91c1c"}); },
 						function () { $(this).css({"background": "transparent", "color": "#d93025"}); }
@@ -226,12 +228,8 @@ var MeasureApi = function (o) {
 	};
 
 	var changeDialogContent = function () {
-		if (measureDialog.find(".mb-measure-actions").length === 0) {
-			measureDialog.html(informationHtml);
-			bindDialogButtons();
-		}
-		hideMeasureData();
-		renderMeasureHistory();
+		o.$target.unbind("click", changeDialogContent);
+		measureDialog.find(".mb-measure-prompt").hide();
 	};
 
 	var create = function () {
