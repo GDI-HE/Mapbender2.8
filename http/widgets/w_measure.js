@@ -432,28 +432,9 @@ $.widget("mapbender.mb_measure", {
 			m.centerPixel = pixel;
 
 			// Badge element
-			var $badge = $('<div class="mb-measure-badge" />').text(m.badgeText).css({
-				"position": "absolute",
-				"left": pixel.x + "px",
-				"top": pixel.y + "px",
-				"transform": "translate(-50%, -50%)",
-				"-webkit-transform": "translate(-50%, -50%)",
-				"-ms-transform": "translate(-50%, -50%)",
-				"background-color": (m.id === this._selectedMeasureId) ? "#e65100" : "#ff7f00",
-				"color": "#ffffff",
-				"font-family": "Arial, Helvetica, sans-serif",
-				"font-size": "12px",
-				"font-weight": "bold",
-				"padding": "3px 8px",
-				"border-radius": "3px",
-				"border": "1px solid #cc6600",
-				"box-shadow": "0 2px 5px rgba(0,0,0,0.35)",
-				"cursor": "pointer",
-				"pointer-events": "auto",
-				"white-space": "nowrap",
-				"z-index": 1002,
-				"user-select": "none"
-			});
+			var badgeBg = (m.id === this._selectedMeasureId) ? "#e65100" : "#ff7f00";
+			var $badge = $('<div class="mb-measure-badge" style="position:absolute; left:' + pixel.x + 'px; top:' + pixel.y + 'px; transform:translate(-50%,-50%); -webkit-transform:translate(-50%,-50%); -ms-transform:translate(-50%,-50%); background-color:' + badgeBg + '; color:#fff; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; padding:3px 8px; border-radius:3px; border:1px solid #cc6600; box-shadow:0 2px 5px rgba(0,0,0,0.35); cursor:pointer; pointer-events:auto; white-space:nowrap; z-index:1002; user-select:none;" />')
+				.text(m.badgeText);
 
 			(function (measureItem) {
 				// Prevent mousedown/mouseup from bubbling to map container so pan/featureInfo is not triggered
@@ -469,128 +450,45 @@ $.widget("mapbender.mb_measure", {
 
 			// Popup card (if selected)
 			if (m.id === this._selectedMeasureId) {
-				var $popup = $('<div class="mb-measure-popup" />').css({
-					"position": "absolute",
-					"left": pixel.x + "px",
-					"background-color": "#ffffff",
-					"color": "#333333",
-					"font-family": "Arial, Helvetica, sans-serif",
-					"border-radius": "8px",
-					"box-shadow": "0 4px 18px rgba(0,0,0,0.22)",
-					"border": "1px solid #dcdcdc",
-					"padding": "12px 14px",
-					"min-width": "230px",
-					"max-width": "300px",
-					"z-index": 1005,
-					"pointer-events": "auto",
-					"cursor": "default"
-				});
+				var showBelow = (pixel.y < 160);
+				var popupPos = showBelow
+					? 'top:' + (pixel.y + 14) + 'px; transform:translate(-50%,0); -webkit-transform:translate(-50%,0); -ms-transform:translate(-50%,0);'
+					: 'top:' + (pixel.y - 14) + 'px; transform:translate(-50%,-100%); -webkit-transform:translate(-50%,-100%); -ms-transform:translate(-50%,-100%);';
+
+				var $popup = $('<div class="mb-measure-popup" style="position:absolute; left:' + pixel.x + 'px; ' + popupPos + ' background:#fff; color:#333; font-family:Arial,Helvetica,sans-serif; border-radius:8px; box-shadow:0 4px 18px rgba(0,0,0,0.22); border:1px solid #dcdcdc; padding:12px 14px; min-width:230px; max-width:300px; z-index:1005; pointer-events:auto; cursor:default;" />');
 
 				// Stop all mouse and click events from bubbling up to #mapframe1 to prevent map pan or FeatureInfo
 				$popup.bind("mousedown mouseup click dblclick", function (e) {
 					e.stopPropagation();
 				});
 
-				var $arrow = $('<div />').css({
-					"position": "absolute",
-					"left": "50%",
-					"margin-left": "-8px",
-					"width": "0",
-					"height": "0",
-					"border-left": "8px solid transparent",
-					"border-right": "8px solid transparent",
-					"pointer-events": "none"
-				});
-
-				var showBelow = (pixel.y < 160);
-				if (showBelow) {
-					$popup.css({
-						"top": (pixel.y + 14) + "px",
-						"transform": "translate(-50%, 0)",
-						"-webkit-transform": "translate(-50%, 0)",
-						"-ms-transform": "translate(-50%, 0)"
-					});
-					$arrow.css({
-						"top": "-8px",
-						"border-bottom": "8px solid #ffffff"
-					});
-				} else {
-					$popup.css({
-						"top": (pixel.y - 14) + "px",
-						"transform": "translate(-50%, -100%)",
-						"-webkit-transform": "translate(-50%, -100%)",
-						"-ms-transform": "translate(-50%, -100%)"
-					});
-					$arrow.css({
-						"bottom": "-8px",
-						"border-top": "8px solid #ffffff"
-					});
-				}
+				var arrowPos = showBelow ? 'top:-8px; border-bottom:8px solid #fff;' : 'bottom:-8px; border-top:8px solid #fff;';
+				var $arrow = $('<div style="position:absolute; left:50%; margin-left:-8px; width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; pointer-events:none; ' + arrowPos + '" />');
 
 				// Header
-				var $header = $('<div />').css({
-					"display": "flex",
-					"justify-content": "space-between",
-					"align-items": "center",
-					"margin-bottom": "8px",
-					"padding-bottom": "6px",
-					"border-bottom": "1px solid #eeeeee"
-				});
-				var $title = $('<span />').text(m.title).css({
-					"font-weight": "bold",
-					"font-size": "13px",
-					"color": "#222222"
-				});
-				var $close = $('<span title="Schließen">&times;</span>').css({
-					"cursor": "pointer",
-					"font-size": "18px",
-					"color": "#888888",
-					"line-height": "1",
-					"padding": "0 2px"
-				}).hover(
-					function () { $(this).css("color", "#000"); },
-					function () { $(this).css("color", "#888"); }
-				).bind("click", function (e) {
-					e.preventDefault();
-					e.stopPropagation();
-					that.hideMeasurePopup();
-				});
+				var $header = $('<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #eee;" />');
+				var $title = $('<span style="font-weight:bold; font-size:13px; color:#222;" />').text(m.title);
+				var $close = $('<span style="cursor:pointer; font-size:18px; color:#888; line-height:1; padding:0 2px;" title="Schließen">&times;</span>')
+					.hover(function () { $(this).css("color", "#000"); }, function () { $(this).css("color", "#888"); })
+					.bind("click", function (e) {
+						e.preventDefault();
+						e.stopPropagation();
+						that.hideMeasurePopup();
+					});
 				$header.append($title).append($close);
 
 				// Body
-				var $body = $('<div />').css({
-					"font-size": "12px",
-					"line-height": "1.6",
-					"color": "#444444",
-					"margin-bottom": "8px"
-				});
+				var $body = $('<div style="font-size:12px; line-height:1.6; color:#444; margin-bottom:8px;" />');
 				if (m.type === "polygon") {
-					var $areaLine = $('<div />').text(m.areaFormatted);
-					var $perimLine = $('<div />').text(m.perimeterFormatted);
-					$body.append($areaLine).append($perimLine);
+					$body.append($('<div />').text(m.areaFormatted)).append($('<div />').text(m.perimeterFormatted));
 				} else {
-					var $distLine = $('<div />').text(m.distanceFormatted);
-					$body.append($distLine);
+					$body.append($('<div />').text(m.distanceFormatted));
 				}
 
 				// Footer
-				var $footer = $('<div />').css({
-					"display": "flex",
-					"justify-content": "space-between",
-					"align-items": "center",
-					"padding-top": "6px",
-					"border-top": "1px solid #eeeeee",
-					"font-size": "12px"
-				});
-				var $centerBtn = $('<a href="javascript:void(0);" />').html('&#9678; ' + 'Zentrieren').css({
-					"color": "#2a62bc",
-					"text-decoration": "none",
-					"cursor": "pointer",
-					"margin-right": "12px"
-				}).hover(
-					function () { $(this).css("text-decoration", "underline"); },
-					function () { $(this).css("text-decoration", "none"); }
-				);
+				var $footer = $('<div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:1px solid #eee; font-size:12px;" />');
+				var $centerBtn = $('<a href="javascript:void(0);" style="color:#2a62bc; text-decoration:none; cursor:pointer; margin-right:12px;">&#9678; Zentrieren</a>')
+					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$centerBtn.bind("click", function (e) {
 						e.preventDefault();
@@ -599,14 +497,8 @@ $.widget("mapbender.mb_measure", {
 					});
 				})(m);
 
-				var $delBtn = $('<a href="javascript:void(0);" />').html('&#128465; ' + 'Löschen').css({
-					"color": "#d93025",
-					"text-decoration": "none",
-					"cursor": "pointer"
-				}).hover(
-					function () { $(this).css("text-decoration", "underline"); },
-					function () { $(this).css("text-decoration", "none"); }
-				);
+				var $delBtn = $('<a href="javascript:void(0);" style="color:#d93025; text-decoration:none; cursor:pointer;">&#128465; Löschen</a>')
+					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$delBtn.bind("click", function (e) {
 						e.preventDefault();
@@ -616,7 +508,6 @@ $.widget("mapbender.mb_measure", {
 				})(m);
 
 				$footer.append($centerBtn).append($delBtn);
-
 				$popup.append($header).append($body).append($footer).append($arrow);
 				this._$overlay.append($popup);
 			}
