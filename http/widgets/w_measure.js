@@ -2,6 +2,7 @@ $.widget("mapbender.mb_measure", {
 	options: {
 		opacity: 0.6,
 		measurePointDiameter: 10,
+		measurePointDiameterSnapped: 15,
 		polygonFillSnapped: "#FC3",
 		polygonFillDefault: "#FFF",
 		polygonStrokeWidthDefault: 1,
@@ -12,9 +13,9 @@ $.widget("mapbender.mb_measure", {
 		lineStrokeWidthSnapped: 5,
 		pointFillSnapped: "#F90",
 		pointFillDefault: "#CCF",
-                pointStrokeDefault: "#FC3",
-                pointStrokeSnapped: "#F30",
-                pointStrokeWidthDefault: 2
+		pointStrokeDefault: "#FC3",
+		pointStrokeSnapped: "#F30",
+		pointStrokeWidthDefault: 2
 	},
 	_measurePoints: [],
 	_completedMeasures: [],
@@ -264,11 +265,14 @@ $.widget("mapbender.mb_measure", {
 			var m = this._completedMeasures[i];
 			if (m.type === "polygon" && this._isPointInPolygon(mousePos.x, mousePos.y, m.points)) return m;
 			if (m.type === "line" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 8)) return m;
+			if (m.type === "point" && m.points[0].mousePos && mousePos.dist(m.points[0].mousePos) <= 10) return m;
 		}
 		return null;
 	},
 	_isPointSnapped: function (p1, p2) {
-		return p1.dist(p2) <= this.options.measurePointDiameter/2;
+		if (!p1 || !p2 || typeof p1.dist !== "function") return false;
+		var radius = Math.max(10, (this.options.measurePointDiameter || 7));
+		return p1.dist(p2) <= radius;
 	},
 	_isFirstPointSnapped: function (p) {
 		if (this._measurePoints.length > 0 ) {
@@ -282,7 +286,7 @@ $.widget("mapbender.mb_measure", {
 	_isLastPointSnapped: function (p) {
 		if (this._measurePoints.length > 0 ) {
 			var posn = this._measurePoints[this._measurePoints.length - 1].mousePos;
-			if (this._measurePoints.length > 1 && this._isPointSnapped(posn, p)) {
+			if (this._measurePoints.length >= 1 && this._isPointSnapped(posn, p)) {
 				return true;
 			}
 		}
@@ -311,7 +315,7 @@ $.widget("mapbender.mb_measure", {
 						stroke: isSel ? "#e65100" : (this.options.lineStrokeDefault || "#ea6c00"),
 						"stroke-width": isSel ? 3.5 : (this.options.polygonStrokeWidthDefault || 2)
 					});
-				} else {
+				} else if (m.type === "line") {
 					var line = this._canvas.path(mPath);
 					line.attr({
 						stroke: isSel ? "#e65100" : (this.options.lineStrokeDefault || "#ea6c00"),
@@ -359,28 +363,20 @@ $.widget("mapbender.mb_measure", {
 				if (drawOptions && drawOptions.drawPoints &&
 					(k === 0 && !this._polygonIsInvalid || k >= len - 2 && !drawOptions.highlightFirst)) {
 
-					var circle = this._canvas.circle(q.x, q.y, this.options.measurePointDiameter);
+					var isSnapped = drawOptions && (
+						(k === 0 && (drawOptions.highlightFirst || (drawOptions.highlightLast && len === 2))) ||
+						(drawOptions.highlightLast && k === len - 2)
+					);
+					var isPointSnap = drawOptions && drawOptions.highlightLast && len === 2 && k === 0;
+					var radius = isPointSnap ? (this.options.measurePointDiameterSnapped || 15) : (this.options.measurePointDiameter || 10);
+					var circle = this._canvas.circle(q.x, q.y, radius);
 
-					if (k === 0) {
-						circle.attr({
-							fill: drawOptions && drawOptions.highlightFirst ?
-								this.options.pointFillSnapped : this.options.pointFillDefault,
-							"fill-opacity": this.options.opacity,
-							stroke: drawOptions.highlightFirst || drawOptions.highlightLast ?
-								this.options.pointStrokeSnapped: this.options.pointStrokeDefault,
-							"stroke-width": this.options.pointStrokeWidthDefault
-						});
-					}
-					else {
-						circle.attr({
-							fill: drawOptions && drawOptions.highlightLast && k === len - 2 ?
-								this.options.pointFillSnapped : this.options.pointFillDefault,
-							"fill-opacity": this.options.opacity,
-							stroke: drawOptions.highlightFirst || drawOptions.highlightLast ?
-								this.options.pointStrokeSnapped: this.options.pointStrokeDefault,
-							"stroke-width": this.options.pointStrokeWidthDefault
-						});
-					}
+					circle.attr({
+						fill: isSnapped ? this.options.pointFillSnapped : this.options.pointFillDefault,
+						"fill-opacity": this.options.opacity,
+						stroke: isSnapped ? this.options.pointStrokeSnapped : this.options.pointStrokeDefault,
+						"stroke-width": this.options.pointStrokeWidthDefault
+					});
 				}
 			}
 		}
@@ -433,7 +429,7 @@ $.widget("mapbender.mb_measure", {
 
 			// Badge element
 			var badgeBg = (m.id === this._selectedMeasureId) ? "#e65100" : "#ff7f00";
-			var $badge = $('<div class="mb-measure-badge" style="position:absolute; left:' + pixel.x + 'px; top:' + pixel.y + 'px; transform:translate(-50%,-50%); -webkit-transform:translate(-50%,-50%); -ms-transform:translate(-50%,-50%); background-color:' + badgeBg + '; color:#fff; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; padding:3px 8px; border-radius:3px; border:1px solid #cc6600; box-shadow:0 2px 5px rgba(0,0,0,0.35); cursor:pointer; pointer-events:auto; white-space:nowrap; z-index:1002; user-select:none;" />')
+			var $badge = $('<div class="mb-measure-badge" style="position:absolute; left:' + pixel.x + 'px; top:' + (m.type === "point" ? pixel.y - 12 : pixel.y) + 'px; transform:' + (m.type === "point" ? 'translate(-50%,-100%)' : 'translate(-50%,-50%)') + '; background-color:' + badgeBg + '; color:#fff; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; padding:3px 8px; border-radius:3px; border:1px solid #cc6600; box-shadow:0 2px 5px rgba(0,0,0,0.35); cursor:pointer; pointer-events:auto; white-space:nowrap; z-index:1002; user-select:none;" />')
 				.text(m.badgeText);
 
 			(function (measureItem) {
@@ -452,8 +448,8 @@ $.widget("mapbender.mb_measure", {
 			if (m.id === this._selectedMeasureId) {
 				var showBelow = (pixel.y < 160);
 				var popupPos = showBelow
-					? 'top:' + (pixel.y + 14) + 'px; transform:translate(-50%,0); -webkit-transform:translate(-50%,0); -ms-transform:translate(-50%,0);'
-					: 'top:' + (pixel.y - 14) + 'px; transform:translate(-50%,-100%); -webkit-transform:translate(-50%,-100%); -ms-transform:translate(-50%,-100%);';
+					? 'top:' + (pixel.y + 14) + 'px; transform:translate(-50%,0);'
+					: 'top:' + (pixel.y - (m.type === "point" ? 36 : 14)) + 'px; transform:translate(-50%,-100%);';
 
 				var $popup = $('<div class="mb-measure-popup" style="position:absolute; left:' + pixel.x + 'px; ' + popupPos + ' background:#fff; color:#333; font-family:Arial,Helvetica,sans-serif; border-radius:8px; box-shadow:0 4px 18px rgba(0,0,0,0.22); border:1px solid #dcdcdc; padding:12px 14px; min-width:230px; max-width:300px; z-index:1005; pointer-events:auto; cursor:default;" />');
 
@@ -667,7 +663,17 @@ $.widget("mapbender.mb_measure", {
 			}
 
 			var measureRecord;
-			if (isPolygon) {
+			if (pts.length === 1) {
+				var pt = pts[0].pos, isGeo = (this._map && this._map.getSrs() === "EPSG:4326");
+				var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
+				var cY = isGeo ? Number(pt.y).toFixed(5) : Math.round(pt.y).toLocaleString("de-DE");
+				measureRecord = {
+					id: "measure_" + (++this._measureCounter), type: "point", points: pts, totalDistance: 0,
+					centerPos: pt, title: "Punktmessung",
+					distanceFormatted: (isGeo ? "Länge: " : "Rechtswert: ") + cX + (isGeo ? "°, Breite: " : " m, Hochwert: ") + cY + (isGeo ? "°" : " m"),
+					badgeText: cX + ", " + cY
+				};
+			} else if (isPolygon) {
 				var areaVal = this._currentArea;
 				var perimVal = this._totalDistance;
 				var center = this._calculateCentroid(pts);
@@ -791,6 +797,12 @@ $.widget("mapbender.mb_measure", {
 						m.areaFormatted = this._formatMeasure(m.area, true, false);
 						m.perimeterFormatted = this._formatMeasure(m.perimeter, false, false) + " Umfang";
 						m.badgeText = this._formatMeasure(m.area, true, true);
+					} else if (m.type === "point") {
+						var pt = m.points[0].pos, isGeo = (this._map && this._map.getSrs() === "EPSG:4326");
+						var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
+						var cY = isGeo ? Number(pt.y).toFixed(5) : Math.round(pt.y).toLocaleString("de-DE");
+						m.distanceFormatted = (isGeo ? "Länge: " : "Rechtswert: ") + cX + (isGeo ? "°, Breite: " : " m, Hochwert: ") + cY + (isGeo ? "°" : " m");
+						m.badgeText = cX + ", " + cY;
 					}
 				}
 				for (var i = 0; i < this._measurePoints.length; i++) {
