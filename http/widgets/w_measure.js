@@ -310,10 +310,10 @@ $.widget("mapbender.mb_measure", {
 				if (m.type === "polygon") {
 					var poly = this._canvas.path(mPath + "Z");
 					poly.attr({
-						fill: isSel ? "#ffa500" : (this.options.polygonFillDefault || "#ffaa00"),
-						"fill-opacity": isSel ? 0.45 : (this.options.opacity || 0.35),
+						fill: (drawOptions && drawOptions.isPrinting) ? "none" : (isSel ? "#ffa500" : (this.options.polygonFillDefault || "#ffaa00")),
+						"fill-opacity": (drawOptions && drawOptions.isPrinting) ? 0 : (isSel ? 0.45 : (this.options.opacity || 0.35)),
 						stroke: isSel ? "#e65100" : (this.options.lineStrokeDefault || "#ea6c00"),
-						"stroke-width": isSel ? 3.5 : (this.options.polygonStrokeWidthDefault || 2)
+						"stroke-width": isSel ? 4 : (this.options.lineStrokeWidthDefault || 3)
 					});
 				} else if (m.type === "line") {
 					var line = this._canvas.path(mPath);
@@ -323,20 +323,40 @@ $.widget("mapbender.mb_measure", {
 					});
 				}
 
-				// Draw vertex circles for completed measurement
+				// Draw vertex circles for completed measurement, highlighting endpoints
 				for (var pIdx = 0; pIdx < m.points.length; pIdx++) {
 					var pt = m.points[pIdx];
-					var c = this._canvas.circle(pt.mousePos.x, pt.mousePos.y, isSel ? 4 : 3);
+					var isEnd = (pIdx === 0 || pIdx === m.points.length - 1);
+					var c = this._canvas.circle(pt.mousePos.x, pt.mousePos.y, isEnd ? (isSel ? 5.5 : 5) : (isSel ? 4 : 3.5));
 					c.attr({
-						fill: isSel ? "#e65100" : "#ff7f00",
+						fill: isEnd ? (isSel ? "#e65100" : "#ff7f00") : "#ffa726",
 						stroke: "#ffffff",
-						"stroke-width": 1.5
+						"stroke-width": isEnd ? 2 : 1.5
 					});
+				}
+
+				// Draw measurement info badge in SVG only when exporting for print
+				if (drawOptions && drawOptions.isPrinting && m.badgeText) {
+					var bPixel = this._map.convertRealToPixel(m.centerPos);
+					var bX = bPixel.x, bY = (m.type === "point") ? bPixel.y - 14 : bPixel.y;
+					var bw = Math.max(44, m.badgeText.length * 6.2 + 12), bh = 16;
+					this._canvas.rect(bX - bw / 2, bY - bh / 2, bw, bh, 3).attr({
+						fill: "#ff7f00", stroke: "#cc6600", "stroke-width": 1
+					}).toFront();
+					this._canvas.text(bX, bY, m.badgeText).attr({
+						fill: "#ffffff", "font-family": "Arial, Helvetica, sans-serif",
+						"font-size": 10, "font-weight": "bold", "text-anchor": "middle"
+					}).toFront();
 				}
 			}
 		}
 
-		// 2. Draw active in-progress geometry
+		// 2. Draw active in-progress geometry (skip if printing)
+		if (drawOptions && drawOptions.isPrinting) {
+			this._updateOverlays();
+			return;
+		}
+
 		var str_path = "";
 
 		if (pos && drawOptions && !drawOptions.highlightFirst) {
@@ -389,10 +409,10 @@ $.widget("mapbender.mb_measure", {
 			poly.attr({
 				fill: drawOptions.highlightFirst ?
 					this.options.polygonFillSnapped : this.options.polygonFillDefault,
-				stroke: drawOptions.highlightFirst || drawOptions.highlightLast ?
-					this.options.lineStrokeSnapped: this.options.lineStrokeDefault,
+				stroke: drawOptions.highlightFirst ?
+					this.options.lineStrokeSnapped : "none",
 				"stroke-width": drawOptions.highlightFirst ?
-					this.options.polygonStrokeWidthSnapped : this.options.polygonStrokeWidthDefault,
+					this.options.polygonStrokeWidthSnapped : 0,
 				opacity: this.options.opacity
 			});
 		}
@@ -998,6 +1018,12 @@ $.widget("mapbender.mb_measure", {
 	},
 	hideMeasurePopup: function () {
 		this._selectedMeasureId = null;
+		this._draw();
+	},
+	prepareForPrint: function () {
+		this._draw(null, { isPrinting: true });
+	},
+	redraw: function () {
 		this._draw();
 	},
 	// the measured geometry will be available, the events will be deleted
