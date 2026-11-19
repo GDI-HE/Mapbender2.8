@@ -48,7 +48,7 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         $xpath->registerNamespace("svg", "http://www.w3.org/2000/svg");
 
         // Sanitize client-supplied SVG against XXE, SSRF, local file inclusion, and unsafe elements/attributes
-        $allowed = array('svg', 'g', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'defs');
+        $allowed = array('svg', 'g', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'tspan', 'defs');
         foreach (iterator_to_array($xpath->query('//*')) as $node) {
             if (!in_array(strtolower($node->localName), $allowed, true)) {
                 if ($node->parentNode) {
