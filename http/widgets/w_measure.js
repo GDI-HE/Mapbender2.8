@@ -1176,28 +1176,42 @@ $.widget("mapbender.mb_measure", {
 
 		// Transform coordinates to WGS84 (EPSG:4326) as required by GeoJSON (RFC 7946) and KML standards
 		var wgs84 = [];
-		var needTransform = (srs !== "EPSG:4326" && typeof Proj4js !== "undefined" && Proj4js.Proj);
-		var srcProj = needTransform ? new Proj4js.Proj(srs) : null;
-		var dstProj = needTransform ? new Proj4js.Proj("EPSG:4326") : null;
+		var isGeo = (srs === "EPSG:4326");
+		var srcProj = null;
+		var dstProj = null;
 
-		for (var i = 0; i < measure.points.length; i++) {
-			var pt = measure.points[i].pos;
-			if (needTransform) {
-				try {
-					var res = Proj4js.transform(srcProj, dstProj, new Proj4js.Point(pt.x, pt.y));
-					wgs84.push([Number(res.x.toFixed(6)), Number(res.y.toFixed(6))]);
-				} catch (err) {
-					wgs84.push([Number(pt.x), Number(pt.y)]);
-				}
-			} else {
-				var x = (srs === "EPSG:4326") ? Number(pt.x.toFixed(6)) : Number(pt.x.toFixed(2));
-				var y = (srs === "EPSG:4326") ? Number(pt.y.toFixed(6)) : Number(pt.y.toFixed(2));
-				wgs84.push([x, y]);
+		if (!isGeo) {
+			if (typeof Proj4js === "undefined" || !Proj4js.Proj) {
+				alert("Koordinatentransformation nicht verfügbar – Export abgebrochen.");
+				return;
+			}
+			srcProj = new Proj4js.Proj(srs);
+			dstProj = new Proj4js.Proj("EPSG:4326");
+			if (!srcProj || !dstProj || !srcProj.readyToUse || !dstProj.readyToUse) {
+				alert("Koordinatentransformation nicht verfügbar – Export abgebrochen.");
+				return;
 			}
 		}
 
-		var fileBaseName = (measure.title || "messung").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+		for (var i = 0; i < measure.points.length; i++) {
+			var pt = measure.points[i].pos;
+			if (!isGeo) {
+				try {
+					var res = Proj4js.transform(srcProj, dstProj, new Proj4js.Point(pt.x, pt.y));
+					if (!res || isNaN(res.x) || isNaN(res.y)) {
+						throw new Error("Ungültige Koordinatentransformation");
+					}
+					wgs84.push([Number(res.x.toFixed(6)), Number(res.y.toFixed(6))]);
+				} catch (err) {
+					alert("Fehler bei der Koordinatentransformation – Export abgebrochen.");
+					return;
+				}
+			} else {
+				wgs84.push([Number(Number(pt.x).toFixed(6)), Number(Number(pt.y).toFixed(6))]);
+			}
+		}
 
+		var fileBaseName = (measure.title || "messung").toLowerCase().replace(/ä/g, "ae").replace(/[^a-z0-9_-]/g, "_");
 		if (format === "geojson") {
 			var geom = null;
 			var props = { title: measure.title, srs: "EPSG:4326", map_srs: srs };

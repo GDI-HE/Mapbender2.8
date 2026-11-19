@@ -37,7 +37,7 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         $yAxisOrientation = 1;
         $doc = new \DOMDocument();
         if ($this->hasValue("svg_extent") && count(explode(',', $this->getValue("svg_extent"))) === 4 &&
-            $this->hasValue($this->svgParam) && @$doc->loadXML($this->getValue($this->svgParam))) {
+            $this->hasValue($this->svgParam) && @$doc->loadXML($this->getValue($this->svgParam), LIBXML_NONET)) {
             $e = new mb_notice("mbSvgDecorator: svg: " . $this->getValue($this->svgParam));
         } else {
             return "No svg found.";
@@ -46,6 +46,29 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         $xpath = new \DOMXPath($doc);
         $xpath->registerNamespace("xlink", "http://www.w3.org/1999/xlink");
         $xpath->registerNamespace("svg", "http://www.w3.org/2000/svg");
+
+        // Sanitize client-supplied SVG against XXE, SSRF, local file inclusion, and unsafe elements/attributes
+        $allowed = array('svg', 'g', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'defs');
+        foreach (iterator_to_array($xpath->query('//*')) as $node) {
+            if (!in_array(strtolower($node->localName), $allowed, true)) {
+                if ($node->parentNode) {
+                    $node->parentNode->removeChild($node);
+                }
+                continue;
+            }
+            if ($node->hasAttributes()) {
+                foreach (iterator_to_array($node->attributes) as $attr) {
+                    $attrName = strtolower($attr->name);
+                    $attrVal = strtolower($attr->value);
+                    if (strpos($attrName, 'on') === 0 || $attrName === 'href' || $attrName === 'xlink:href' || strpos($attrVal, 'url(') !== false) {
+                        if ($attr->namespaceURI) {
+                            $node->removeAttributeNS($attr->namespaceURI, $attr->localName);
+                        }
+                        $node->removeAttribute($attr->name);
+                    }
+                }
+            }
+        }
         $coord = mb_split(",", $this->pdf->getMapExtent());
         $mapInfo = $this->pdf->getMapInfo();
         foreach ($mapInfo as $k => $v) {
@@ -112,6 +135,9 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         foreach ($xpath->query("//*[@d][not(ancestor::*[local-name()='defs'])]", $doc->documentElement) as $pathEl) {
             $d = trim($pathEl->getAttribute('d'));
             if (strlen($d) > 65536) {
+                if ($pathEl->parentNode) {
+                    $pathEl->parentNode->removeChild($pathEl);
+                }
                 continue;
             }
             $fillAttr = strtolower(trim($pathEl->getAttribute('fill')));
