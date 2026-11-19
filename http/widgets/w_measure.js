@@ -221,10 +221,11 @@ $.widget("mapbender.mb_measure", {
 		}
 		var km = Math.round(val / 1000 * 100) / 100;
 		var kmStr = km.toLocaleString("de-DE");
-		var mStr = Math.round(val).toLocaleString("de-DE");
+		var mRound = Math.round(val * 10) / 10;
+		var mStr = mRound.toLocaleString("de-DE");
 		if (isShort) return (val >= 1000 ? (Math.round(val / 1000 * 10) / 10).toLocaleString("de-DE") + " km" : mStr + " m");
 		if (val >= 1000) return mStr + " m (" + kmStr + " km)";
-		return (Math.round(val * 10) / 10).toLocaleString("de-DE") + " m";
+		return mStr + " m";
 	},
 	_calculateCentroid: function (points) {
 		var sx = 0, sy = 0;
@@ -695,7 +696,10 @@ $.widget("mapbender.mb_measure", {
 				};
 			} else if (isPolygon) {
 				var areaVal = this._currentArea;
-				var perimVal = this._totalDistance;
+				var perimVal = 0;
+				for (var k = 0; k < pts.length; k++) {
+					perimVal += this._calculateDistance(pts[k].pos, pts[(k + 1) % pts.length].pos);
+				}
 				var center = this._calculateCentroid(pts);
 				measureRecord = {
 					id: "measure_" + (++this._measureCounter),
@@ -712,7 +716,10 @@ $.widget("mapbender.mb_measure", {
 					badgeText: this._formatMeasure(areaVal, true, true)
 				};
 			} else {
-				var distVal = this._totalDistance;
+				var distVal = 0;
+				for (var k = 0; k < pts.length - 1; k++) {
+					distVal += this._calculateDistance(pts[k].pos, pts[k + 1].pos);
+				}
 				var center = this._calculateCentroid(pts);
 				measureRecord = {
 					id: "measure_" + (++this._measureCounter),
@@ -751,8 +758,6 @@ $.widget("mapbender.mb_measure", {
 		}
 		else {
 			this._measurePoints.push(data.pos);
-
-			this._totalDistance += this._currentDistance;
 			this._currentDistance = 0;
 
 			lastPointSnapped = this._isLastPointSnapped(mousePos);
@@ -817,6 +822,14 @@ $.widget("mapbender.mb_measure", {
 						m.areaFormatted = this._formatMeasure(m.area, true, false);
 						m.perimeterFormatted = this._formatMeasure(m.perimeter, false, false) + " Umfang";
 						m.badgeText = this._formatMeasure(m.area, true, true);
+					} else if (m.type === "line") {
+						var distSum = 0;
+						for (var k = 0; k < m.points.length - 1; k++) {
+							distSum += this._calculateDistance(m.points[k].pos, m.points[k + 1].pos);
+						}
+						m.totalDistance = distSum;
+						m.distanceFormatted = this._formatMeasure(distSum, false, false) + " Gesamtlänge";
+						m.badgeText = this._formatMeasure(distSum, false, true);
 					} else if (m.type === "point") {
 						var pt = m.points[0].pos, isGeo = (this._map && this._map.getSrs() === "EPSG:4326");
 						var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
