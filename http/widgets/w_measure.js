@@ -245,11 +245,12 @@ $.widget("mapbender.mb_measure", {
 		}
 		return inside;
 	},
-	_isPointNearLine: function (px, py, points, tol) {
+	_isPointNearLine: function (px, py, points, tol, isClosed) {
 		if (!points || points.length < 2) return false;
 		var tolSq = (tol || 8) * (tol || 8);
-		for (var i = 0; i < points.length - 1; i++) {
-			var p1 = points[i].mousePos, p2 = points[i + 1].mousePos;
+		var count = isClosed ? points.length : points.length - 1;
+		for (var i = 0; i < count; i++) {
+			var p1 = points[i].mousePos, p2 = points[(i + 1) % points.length].mousePos;
 			if (p1 && p2) {
 				var dx = p2.x - p1.x, dy = p2.y - p1.y, l2 = dx * dx + dy * dy;
 				var t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - p1.x) * dx + (py - p1.y) * dy) / l2));
@@ -264,8 +265,9 @@ $.widget("mapbender.mb_measure", {
 		if (!this._completedMeasures || this._completedMeasures.length === 0) return null;
 		for (var i = this._completedMeasures.length - 1; i >= 0; i--) {
 			var m = this._completedMeasures[i];
-			if (m.type === "polygon" && this._isPointInPolygon(mousePos.x, mousePos.y, m.points)) return m;
-			if (m.type === "line" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 8)) return m;
+			// Only select polygon if clicking directly near its boundary edge (allow drawing new measurements freely inside)
+			if (m.type === "polygon" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 6, true)) return m;
+			if (m.type === "line" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 8, false)) return m;
 			if (m.type === "point" && m.points[0].mousePos && mousePos.dist(m.points[0].mousePos) <= 10) return m;
 		}
 		return null;
@@ -472,7 +474,7 @@ $.widget("mapbender.mb_measure", {
 					? 'top:' + (pixel.y + 14) + 'px; transform:translate(-50%,0);'
 					: 'top:' + (pixel.y - (m.type === "point" ? 36 : 14)) + 'px; transform:translate(-50%,-100%);';
 
-				var $popup = $('<div class="mb-measure-popup" style="position:absolute; left:' + pixel.x + 'px; ' + popupPos + ' background:#fff; color:#333; font-family:Arial,Helvetica,sans-serif; border-radius:8px; box-shadow:0 4px 18px rgba(0,0,0,0.22); border:1px solid #dcdcdc; padding:12px 14px; min-width:230px; max-width:300px; z-index:1005; pointer-events:auto; cursor:default;" />');
+				var $popup = $('<div class="mb-measure-popup" style="position:absolute; left:' + pixel.x + 'px; ' + popupPos + ' background:#fff; color:#333; font-family:Arial,Helvetica,sans-serif; border-radius:8px; box-shadow:0 4px 18px rgba(0,0,0,0.22); border:1px solid #dcdcdc; padding:12px 14px; min-width:280px; max-width:360px; z-index:1005; pointer-events:auto; cursor:default;" />');
 
 				// Stop all mouse and click events from bubbling up to #mapframe1 to prevent map pan or FeatureInfo
 				$popup.bind("mousedown mouseup click dblclick", function (e) {
@@ -494,17 +496,64 @@ $.widget("mapbender.mb_measure", {
 					});
 				$header.append($title).append($close);
 
-				// Body
-				var $body = $('<div style="font-size:12px; line-height:1.6; color:#444; margin-bottom:8px;" />');
+				// Body with measurement value and German copy button
+				var $body = $('<div style="display:flex; justify-content:space-between; align-items:flex-start; font-size:12px; line-height:1.6; color:#444; margin-bottom:8px;" />');
+				var $valBox = $('<div style="flex:1; min-width:0;" />');
 				if (m.type === "polygon") {
-					$body.append($('<div />').text(m.areaFormatted)).append($('<div />').text(m.perimeterFormatted));
+					$valBox.append($('<div />').text(m.areaFormatted)).append($('<div />').text(m.perimeterFormatted));
 				} else {
-					$body.append($('<div />').text(m.distanceFormatted));
+					$valBox.append($('<div />').text(m.distanceFormatted));
 				}
 
-				// Footer
-				var $footer = $('<div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:1px solid #eee; font-size:12px;" />');
-				var $centerBtn = $('<a href="javascript:void(0);" style="color:#2a62bc; text-decoration:none; cursor:pointer; margin-right:12px;">&#9678; Zentrieren</a>')
+				// Build German copy text with EPSG
+				var srs = (this._map && typeof this._map.getSrs === "function") ? this._map.getSrs() : (this._srs || "EPSG:25832");
+				var copyText = "";
+				if (m.type === "point") {
+					var pt = m.points[0].pos;
+					var isGeo = (srs === "EPSG:4326");
+					// Format raw coordinate numbers for direct GIS use (no thousand-dots, no labels/units)
+					var x = isGeo ? Number(pt.x).toFixed(6) : (Math.round(pt.x * 100) / 100);
+					var y = isGeo ? Number(pt.y).toFixed(6) : (Math.round(pt.y * 100) / 100);
+					copyText = x + ", " + y + " (" + srs + ")";
+				} else if (m.type === "line") {
+					copyText = m.distanceFormatted + " (" + srs + ")";
+				} else if (m.type === "polygon") {
+					copyText = m.areaFormatted + ", " + m.perimeterFormatted + " (" + srs + ")";
+				}
+
+				var copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a5fb4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+				var checkSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+				var $copyBtn = $('<a href="javascript:void(0);" title="Messwert in Zwischenablage kopieren" style="flex-shrink:0; margin-left:8px; padding:3px 5px; border-radius:4px; border:1px solid #dcdcdc; background:#f9f9f9; display:inline-flex; align-items:center; cursor:pointer;" />')
+					.html(copySvg)
+					.hover(
+						function () { $(this).css("background", "#eef3fc"); },
+						function () { $(this).css("background", "#f9f9f9"); }
+					)
+					.bind("click", function (e) {
+						e.preventDefault();
+						e.stopPropagation();
+						if (navigator.clipboard && navigator.clipboard.writeText) {
+							navigator.clipboard.writeText(copyText);
+						} else {
+							var $ta = $('<textarea style="position:absolute;left:-9999px;top:0;" />').val(copyText).appendTo("body");
+							$ta.select();
+							document.execCommand("copy");
+							$ta.remove();
+						}
+						var $btn = $(this);
+						$btn.html(checkSvg);
+						setTimeout(function () {
+							$btn.html(copySvg);
+						}, 1500);
+					});
+
+				$body.append($valBox).append($copyBtn);
+
+				// Footer with Center, Export (GeoJSON, KML), and Delete (consistent Arial font, 11px size, normal weight)
+				var $footer = $('<div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid #eee; font-family:Arial,Helvetica,sans-serif; font-size:11px;" />');
+				var $leftActions = $('<div style="display:inline-flex; align-items:center; gap:5px; flex-shrink:0;" />');
+				var $centerBtn = $('<a href="javascript:void(0);" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">&#9678; Zentrieren</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$centerBtn.bind("click", function (e) {
@@ -514,7 +563,34 @@ $.widget("mapbender.mb_measure", {
 					});
 				})(m);
 
-				var $delBtn = $('<a href="javascript:void(0);" style="color:#d93025; text-decoration:none; cursor:pointer;">&#128465; Löschen</a>')
+				var $expGeoJson = $('<a href="javascript:void(0);" title="Als GeoJSON exportieren (SRID ist vordefiniert: EPSG:4326)" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">GeoJSON</a>')
+					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
+				(function (measureItem) {
+					$expGeoJson.bind("click", function (e) {
+						e.preventDefault();
+						e.stopPropagation();
+						that._exportMeasureFile(measureItem, "geojson");
+					});
+				})(m);
+
+				var $expKml = $('<a href="javascript:void(0);" title="Als KML exportieren (SRID ist vordefiniert: EPSG:4326)" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">KML</a>')
+					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
+				(function (measureItem) {
+					$expKml.bind("click", function (e) {
+						e.preventDefault();
+						e.stopPropagation();
+						that._exportMeasureFile(measureItem, "kml");
+					});
+				})(m);
+
+				$leftActions.append($centerBtn)
+					.append($('<span style="color:#ddd; margin:0 2px;">|</span>'))
+					.append($('<span style="color:#777; font-family:Arial,Helvetica,sans-serif; font-size:11px;" title="SRID ist vordefiniert: EPSG:4326 (WGS 84)">Export:</span>'))
+					.append($expGeoJson)
+					.append($('<span style="color:#bbb; margin:0 1px;">,</span>'))
+					.append($expKml);
+
+				var $delBtn = $('<a href="javascript:void(0);" style="color:#d93025; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal; margin-left:14px; flex-shrink:0; white-space:nowrap;">&#128465; Löschen</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$delBtn.bind("click", function (e) {
@@ -524,7 +600,7 @@ $.widget("mapbender.mb_measure", {
 					});
 				})(m);
 
-				$footer.append($centerBtn).append($delBtn);
+				$footer.append($leftActions).append($delBtn);
 				$popup.append($header).append($body).append($footer).append($arrow);
 				this._$overlay.append($popup);
 			}
@@ -685,13 +761,14 @@ $.widget("mapbender.mb_measure", {
 
 			var measureRecord;
 			if (pts.length === 1) {
-				var pt = pts[0].pos, isGeo = (this._map && this._map.getSrs() === "EPSG:4326");
+				var srs = (this._map && typeof this._map.getSrs === "function") ? this._map.getSrs() : (this._srs || "EPSG:25832");
+				var pt = pts[0].pos, isGeo = (srs === "EPSG:4326");
 				var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
 				var cY = isGeo ? Number(pt.y).toFixed(5) : Math.round(pt.y).toLocaleString("de-DE");
 				measureRecord = {
 					id: "measure_" + (++this._measureCounter), type: "point", points: pts, totalDistance: 0,
 					centerPos: pt, title: "Punktmessung",
-					distanceFormatted: (isGeo ? "Länge: " : "Rechtswert: ") + cX + (isGeo ? "°, Breite: " : " m, Hochwert: ") + cY + (isGeo ? "°" : " m"),
+					distanceFormatted: (isGeo ? ("Länge: " + cX + "°, Breite: " + cY + "°") : ("Rechtswert: " + cX + " m, Hochwert: " + cY + " m")) + " (" + srs + ")",
 					badgeText: cX + ", " + cY
 				};
 			} else if (isPolygon) {
@@ -831,10 +908,11 @@ $.widget("mapbender.mb_measure", {
 						m.distanceFormatted = this._formatMeasure(distSum, false, false) + " Gesamtlänge";
 						m.badgeText = this._formatMeasure(distSum, false, true);
 					} else if (m.type === "point") {
-						var pt = m.points[0].pos, isGeo = (this._map && this._map.getSrs() === "EPSG:4326");
+						var srs = (this._map && typeof this._map.getSrs === "function") ? this._map.getSrs() : (this._srs || "EPSG:25832");
+						var pt = m.points[0].pos, isGeo = (srs === "EPSG:4326");
 						var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
 						var cY = isGeo ? Number(pt.y).toFixed(5) : Math.round(pt.y).toLocaleString("de-DE");
-						m.distanceFormatted = (isGeo ? "Länge: " : "Rechtswert: ") + cX + (isGeo ? "°, Breite: " : " m, Hochwert: ") + cY + (isGeo ? "°" : " m");
+						m.distanceFormatted = (isGeo ? ("Länge: " + cX + "°, Breite: " + cY + "°") : ("Rechtswert: " + cX + " m, Hochwert: " + cY + " m")) + " (" + srs + ")";
 						m.badgeText = cX + ", " + cY;
 					}
 				}
@@ -1038,6 +1116,125 @@ $.widget("mapbender.mb_measure", {
 	},
 	redraw: function () {
 		this._draw();
+	},
+	// Export measurement geometry to GeoJSON or KML file
+	_exportMeasureFile: function (measure, format) {
+		if (!measure || !measure.points || measure.points.length === 0) {
+			return;
+		}
+		var srs = (this._map && typeof this._map.getSrs === "function") ? this._map.getSrs() : (this._srs || "EPSG:25832");
+
+		// Transform coordinates to WGS84 (EPSG:4326) as required by GeoJSON (RFC 7946) and KML standards
+		var wgs84 = [];
+		var needTransform = (srs !== "EPSG:4326" && typeof Proj4js !== "undefined" && Proj4js.Proj);
+		var srcProj = needTransform ? new Proj4js.Proj(srs) : null;
+		var dstProj = needTransform ? new Proj4js.Proj("EPSG:4326") : null;
+
+		for (var i = 0; i < measure.points.length; i++) {
+			var pt = measure.points[i].pos;
+			if (needTransform) {
+				try {
+					var res = Proj4js.transform(srcProj, dstProj, new Proj4js.Point(pt.x, pt.y));
+					wgs84.push([Number(res.x.toFixed(6)), Number(res.y.toFixed(6))]);
+				} catch (err) {
+					wgs84.push([Number(pt.x), Number(pt.y)]);
+				}
+			} else {
+				var x = (srs === "EPSG:4326") ? Number(pt.x.toFixed(6)) : Number(pt.x.toFixed(2));
+				var y = (srs === "EPSG:4326") ? Number(pt.y.toFixed(6)) : Number(pt.y.toFixed(2));
+				wgs84.push([x, y]);
+			}
+		}
+
+		var fileBaseName = (measure.title || "messung").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+
+		if (format === "geojson") {
+			var geom = null;
+			var props = { title: measure.title, srs: "EPSG:4326", map_srs: srs };
+			if (measure.type === "point") {
+				geom = { type: "Point", coordinates: wgs84[0] };
+			} else if (measure.type === "line") {
+				geom = { type: "LineString", coordinates: wgs84 };
+				props.total_distance_m = Math.round(measure.totalDistance * 10) / 10;
+				props.formatted = measure.distanceFormatted;
+			} else if (measure.type === "polygon") {
+				var ring = wgs84.slice(0);
+				if (ring.length > 0 && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+					ring.push(ring[0]);
+				}
+				geom = { type: "Polygon", coordinates: [ring] };
+				props.area_sqm = Math.round(measure.area * 10) / 10;
+				props.perimeter_m = Math.round(measure.perimeter * 10) / 10;
+				props.area_formatted = measure.areaFormatted;
+				props.perimeter_formatted = measure.perimeterFormatted;
+			}
+			var geojson = {
+				type: "FeatureCollection",
+				name: measure.title,
+				features: [{
+					type: "Feature",
+					properties: props,
+					geometry: geom
+				}]
+			};
+			this._downloadBlob(JSON.stringify(geojson, null, 2), fileBaseName + ".geojson", "application/geo+json");
+		} else if (format === "kml") {
+			var coordsStr = "";
+			for (var k = 0; k < wgs84.length; k++) {
+				coordsStr += wgs84[k][0] + "," + wgs84[k][1] + ",0 ";
+			}
+			coordsStr = coordsStr.trim();
+
+			var geomXml = "";
+			var desc = "";
+			if (measure.type === "point") {
+				geomXml = "<Point><coordinates>" + wgs84[0][0] + "," + wgs84[0][1] + ",0</coordinates></Point>";
+				desc = "Koordinaten: " + wgs84[0][0] + "°, " + wgs84[0][1] + "° (EPSG:4326)" + (srs !== "EPSG:4326" ? " | Karte: " + srs : "");
+			} else if (measure.type === "line") {
+				geomXml = "<LineString><tessellate>1</tessellate><coordinates>" + coordsStr + "</coordinates></LineString>";
+				desc = measure.distanceFormatted || "";
+			} else if (measure.type === "polygon") {
+				var closedCoords = coordsStr;
+				if (wgs84.length > 0 && (wgs84[0][0] !== wgs84[wgs84.length - 1][0] || wgs84[0][1] !== wgs84[wgs84.length - 1][1])) {
+					closedCoords += " " + wgs84[0][0] + "," + wgs84[0][1] + ",0";
+				}
+				geomXml = "<Polygon><outerBoundaryIs><LinearRing><coordinates>" + closedCoords + "</coordinates></LinearRing></outerBoundaryIs></Polygon>";
+				desc = (measure.areaFormatted || "") + ", " + (measure.perimeterFormatted || "");
+			}
+			function escapeXml(s) {
+				return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+			}
+			var kml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+				'<kml xmlns="http://www.opengis.net/kml/2.2">\n' +
+				'  <Document>\n' +
+				'    <name>' + escapeXml(measure.title || "Messung") + '</name>\n' +
+				'    <Placemark>\n' +
+				'      <name>' + escapeXml(measure.title || "Messung") + '</name>\n' +
+				'      <description>' + escapeXml(desc) + '</description>\n' +
+				'      ' + geomXml + '\n' +
+				'    </Placemark>\n' +
+				'  </Document>\n' +
+				'</kml>';
+			this._downloadBlob(kml, fileBaseName + ".kml", "application/vnd.google-earth.kml+xml");
+		}
+	},
+	// Trigger browser file download from string content
+	_downloadBlob: function (content, filename, mimeType) {
+		var blob = new Blob([content], { type: mimeType + ";charset=utf-8" });
+		if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+			window.navigator.msSaveOrOpenBlob(blob, filename);
+			return;
+		}
+		var url = URL.createObjectURL(blob);
+		var a = document.createElement("a");
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		setTimeout(function () {
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}, 100);
 	},
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
