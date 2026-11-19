@@ -1230,6 +1230,8 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
             inProgress = false;
             that.deactivate();
             status = 'created-new';
+            // Re-enable FeatureInfo after digitization completes
+            Mapbender.enableFeatureInfo();
 
             var kml = $('#mapframe1').data('kml');
             if (kml) {
@@ -1388,6 +1390,9 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
                         .unbind('mb_digitizereinitialize')
                         .bind("mb_digitizelastpointadded", finishDigitize)
                         .bind("mb_digitizereinitialize", reinitializeDigitize);
+                    // Enable panning during digitization and suppress FeatureInfo
+                    Mapbender.bindPanEvents();
+                    Mapbender.disableFeatureInfo();
                 }
             } else {
                 if (o.$target.size() > 0) {
@@ -1406,6 +1411,8 @@ require_once dirname(__FILE__) . "/../../core/globalSettings.php";
         };
 
         this.destroy = function() {
+            // Re-enable FeatureInfo
+            Mapbender.enableFeatureInfo();
             if (o.$target.size() > 0) {
                 o.$target.mb_digitize("destroy")
                     .unbind("mb_digitizelastpointadded", finishDigitize)

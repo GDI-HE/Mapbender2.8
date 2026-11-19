@@ -37,7 +37,7 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         $yAxisOrientation = 1;
         $doc = new \DOMDocument();
         if ($this->hasValue("svg_extent") && count(explode(',', $this->getValue("svg_extent"))) === 4 &&
-            $this->hasValue($this->svgParam) && @$doc->loadXML($this->getValue($this->svgParam))) {
+            $this->hasValue($this->svgParam) && @$doc->loadXML($this->getValue($this->svgParam), LIBXML_NONET)) {
             $e = new mb_notice("mbSvgDecorator: svg: " . $this->getValue($this->svgParam));
         } else {
             return "No svg found.";
@@ -46,6 +46,29 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         $xpath = new \DOMXPath($doc);
         $xpath->registerNamespace("xlink", "http://www.w3.org/1999/xlink");
         $xpath->registerNamespace("svg", "http://www.w3.org/2000/svg");
+
+        // Sanitize client-supplied SVG against XXE, SSRF, local file inclusion, and unsafe elements/attributes
+        $allowed = array('svg', 'g', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'tspan', 'defs');
+        foreach (iterator_to_array($xpath->query('//*')) as $node) {
+            if (!in_array(strtolower($node->localName), $allowed, true)) {
+                if ($node->parentNode) {
+                    $node->parentNode->removeChild($node);
+                }
+                continue;
+            }
+            if ($node->hasAttributes()) {
+                foreach (iterator_to_array($node->attributes) as $attr) {
+                    $attrName = strtolower($attr->name);
+                    $attrVal = strtolower($attr->value);
+                    if (strpos($attrName, 'on') === 0 || $attrName === 'href' || $attrName === 'xlink:href' || strpos($attrVal, 'url(') !== false) {
+                        if ($attr->namespaceURI) {
+                            $node->removeAttributeNS($attr->namespaceURI, $attr->localName);
+                        }
+                        $node->removeAttribute($attr->name);
+                    }
+                }
+            }
+        }
         $coord = mb_split(",", $this->pdf->getMapExtent());
         $mapInfo = $this->pdf->getMapInfo();
         foreach ($mapInfo as $k => $v) {
@@ -94,11 +117,45 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
             $doc->documentElement->setAttribute("height", $map_height_px);
             $doc->documentElement->setAttribute("width", $map_width_px);
         }
-        foreach ($xpath->query("//*[@d]", $doc->documentElement) as $elm) {
-            $elm->setAttribute('transform', "translate($x,$y) scale($scale,$scale)"); #rotate($angle, $rx0, $ry0)
+        // Normalize <text> for ImageMagick MSVG (Raphael inline style + <tspan> aborts parsing of remaining SVG elements)
+        foreach ($xpath->query("//*[local-name()='text'][not(ancestor::*[local-name()='defs'])]", $doc->documentElement) as $txt) {
+            $txt->removeAttribute('style');
+            $content = trim($txt->textContent);
+            while ($txt->firstChild) { $txt->removeChild($txt->firstChild); }
+            $txt->appendChild($doc->createTextNode($content));
+            $fillAttr = trim($txt->getAttribute('fill'));
+            $fill = preg_match('/^(#[0-9a-fA-F]{3,6}|[a-zA-Z]{3,20})$/', $fillAttr) ? $fillAttr : '#000000';
+            $txt->setAttribute('fill', $fill);
+            $txt->setAttribute('stroke', $fill);
+            $txt->setAttribute('stroke-width', '0.4');
+            $fs = floatval($txt->getAttribute('font-size')) ?: 11;
+            $txt->setAttribute('y', floatval($txt->getAttribute('y')) + $fs * 0.35);
         }
-        foreach ($xpath->query("//svg:text", $doc->documentElement) as $elm) {
-            $elm->setAttribute('transform', "translate($x,$y) scale($scale,$scale)"); #rotate($angle, $rx0, $ry0)
+        // Split open multi-segment paths into M..L pairs to prevent ImageMagick MSVG from auto-closing them like polygons
+        foreach ($xpath->query("//*[@d][not(ancestor::*[local-name()='defs'])]", $doc->documentElement) as $pathEl) {
+            $d = trim($pathEl->getAttribute('d'));
+            if (strlen($d) > 65536) {
+                if ($pathEl->parentNode) {
+                    $pathEl->parentNode->removeChild($pathEl);
+                }
+                continue;
+            }
+            $fillAttr = strtolower(trim($pathEl->getAttribute('fill')));
+            if (($fillAttr === '' || $fillAttr === 'none') && !preg_match('/[Zz]\s*$/', $d) && preg_match('/^M[\s,]*[0-9.\-eE]+[\s,]+[0-9.\-eE]+(?:[\s,]*L[\s,]*[0-9.\-eE]+[\s,]+[0-9.\-eE]+){2,}$/i', $d)) {
+                preg_match_all('/[ML]\s*([-\d.eE]+)[,\s]+([-\d.eE]+)/i', $d, $pairs, PREG_SET_ORDER);
+                $segs = array();
+                for ($i = 0; $i < count($pairs) - 1; $i++) {
+                    $segs[] = "M{$pairs[$i][1]},{$pairs[$i][2]}L{$pairs[$i + 1][1]},{$pairs[$i + 1][2]}";
+                }
+                if ($segs) {
+                    $pathEl->setAttribute('d', implode(' ', $segs));
+                    $pathEl->setAttribute('stroke-linecap', 'round');
+                }
+            }
+        }
+        $nodes = $xpath->query("//*[@d or local-name()='circle' or local-name()='rect' or local-name()='text' or local-name()='line' or local-name()='polygon' or local-name()='polyline'][not(ancestor::*[local-name()='defs'])]", $doc->documentElement);
+        foreach ($nodes as $elm) {
+            $elm->setAttribute('transform', "translate($x,$y) scale($scale,$scale)");
         }
 //        foreach ($xpath->query("//*[@style]", $doc->documentElement) as $elm) {
 //            $elm->removeAttribute('style');
@@ -161,8 +218,12 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         $imagick = new \Imagick();
         $imagick->setBackgroundColor(new \ImagickPixel('none'));
         $imagick->readImageBlob($doc->saveXML());
-        $quantum = $imagick->getQuantumRange()['quantumRangeLong'];
-        $imagick->transparentPaintImage($imagick->getImagePixelColor(0, 0), 0.0, $quantum * 0.05, false);
+        $p0 = $imagick->getImagePixelColor(0, 0);
+        $p0Color = $p0->getColor(true);
+        if ($p0Color['a'] > 0) {
+            $quantum = $imagick->getQuantumRange()['quantumRangeLong'];
+            $imagick->transparentPaintImage($p0, 0.0, $quantum * 0.05, false);
+        }
         $imagick->setImageFormat("png32");
         if ($angle != 0) {
             $imagick->rotateImage(new \ImagickPixel('none'), $angle);

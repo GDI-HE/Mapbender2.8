@@ -48,14 +48,17 @@ var MeasureApi = function (o) {
                     text: "Neu",
                     id: "hoheNewButton",
                     click: function() {
-                        Mapbender.unbindPanEvents();
                         resetII();
+                        // Keep panning active after reset
+                        Mapbender.bindPanEvents();
                     }
                 }
             ],
             open: function() {
                 $('#toolsContainer').hide();
                 $('a.toggleToolsContainer').removeClass('activeToggle');
+                // Enable panning during altitude profile measurement
+                Mapbender.bindPanEvents();
                 Mapbender.disableFeatureInfo();
             },
             close: function() {
@@ -166,7 +169,6 @@ var MeasureApi = function (o) {
 				.unbind("mb_hoheupdate", updateView)
 				.unbind("mb_measurelastpointadded", finishMeasure)
 				.unbind("mb_hohenew", reset)
-				.unbind("mousedown")
 				.unbind("mb_measurereinitialize", reinitializeMeasure);
 		}
 		ctx.clearRect(0, 0, 600, 250);
@@ -188,6 +190,9 @@ var MeasureApi = function (o) {
 				//remove measured x and y values from print dialog
 				$('input[name="measured_x_values"]').val("");
 				$('input[name="measured_y_values"]').val("");
+
+		// Ensure panning is active during altitude profile measurement
+		Mapbender.bindPanEvents();
 
 		if (o.$target.size() > 0) {
 			o.$target
@@ -217,7 +222,6 @@ var MeasureApi = function (o) {
 				.unbind("mb_hoheupdate", updateView)
 				.unbind("mb_measurelastpointadded", finishMeasure)
 				.unbind("mb_hohenew", reset)
-				.unbind("mousedown")
 				.unbind("mb_measurereinitialize", reinitializeMeasure);
 		}
 				ctx.clearRect(0, 0, 660, 250);
@@ -240,7 +244,7 @@ var MeasureApi = function (o) {
 	
 	this.deactivate = function () {
 		if (o.$target.size() > 0) {
-			o.$target.mb_hohe("deactivate").unbind("mousedown");
+			o.$target.mb_hohe("deactivate");
 		}
 	};
 
