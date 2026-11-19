@@ -111,13 +111,15 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         // Split open multi-segment paths into M..L pairs to prevent ImageMagick MSVG from auto-closing them like polygons
         foreach ($xpath->query("//*[@d][not(ancestor::*[local-name()='defs'])]", $doc->documentElement) as $pathEl) {
             $d = trim($pathEl->getAttribute('d'));
+            if (strlen($d) > 65536) {
+                continue;
+            }
             $fillAttr = strtolower(trim($pathEl->getAttribute('fill')));
             if (($fillAttr === '' || $fillAttr === 'none') && !preg_match('/[Zz]\s*$/', $d) && preg_match('/^M[\s,]*[0-9.\-eE]+[\s,]+[0-9.\-eE]+(?:[\s,]*L[\s,]*[0-9.\-eE]+[\s,]+[0-9.\-eE]+){2,}$/i', $d)) {
-                preg_match_all('/[0-9.\-eE]+/', $d, $nums);
-                $c = $nums[0];
+                preg_match_all('/[ML]\s*([-\d.eE]+)[,\s]+([-\d.eE]+)/i', $d, $pairs, PREG_SET_ORDER);
                 $segs = array();
-                for ($i = 0; $i + 3 < count($c); $i += 2) {
-                    $segs[] = "M{$c[$i]},{$c[$i + 1]}L{$c[$i + 2]},{$c[$i + 3]}";
+                for ($i = 0; $i < count($pairs) - 1; $i++) {
+                    $segs[] = "M{$pairs[$i][1]},{$pairs[$i][2]}L{$pairs[$i + 1][1]},{$pairs[$i + 1][2]}";
                 }
                 if ($segs) {
                     $pathEl->setAttribute('d', implode(' ', $segs));

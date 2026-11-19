@@ -452,7 +452,29 @@ $.widget("mapbender.mb_measure", {
 
 			// Badge element
 			var badgeBg = (m.id === this._selectedMeasureId) ? "#e65100" : "#ff7f00";
-			var $badge = $('<div class="mb-measure-badge" style="position:absolute; left:' + pixel.x + 'px; top:' + (m.type === "point" ? pixel.y - 12 : pixel.y) + 'px; transform:' + (m.type === "point" ? 'translate(-50%,-100%)' : 'translate(-50%,-50%)') + '; background-color:' + badgeBg + '; color:#fff; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; padding:3px 8px; border-radius:3px; border:1px solid #cc6600; box-shadow:0 2px 5px rgba(0,0,0,0.35); cursor:pointer; pointer-events:auto; white-space:nowrap; z-index:1002; user-select:none;" />')
+			var badgeTop = (m.type === "point" ? (pixel.y - 12) : pixel.y) + "px";
+			var badgeTransform = (m.type === "point") ? "translate(-50%,-100%)" : "translate(-50%,-50%)";
+			var $badge = $('<div class="mb-measure-badge" />')
+				.css({
+					"position": "absolute",
+					"left": pixel.x + "px",
+					"top": badgeTop,
+					"transform": badgeTransform,
+					"background-color": badgeBg,
+					"color": "#fff",
+					"font-family": "Arial,Helvetica,sans-serif",
+					"font-size": "12px",
+					"font-weight": "bold",
+					"padding": "3px 8px",
+					"border-radius": "3px",
+					"border": "1px solid #cc6600",
+					"box-shadow": "0 2px 5px rgba(0,0,0,0.35)",
+					"cursor": "pointer",
+					"pointer-events": "auto",
+					"white-space": "nowrap",
+					"z-index": 1002,
+					"user-select": "none"
+				})
 				.text(m.badgeText);
 
 			(function (measureItem) {
@@ -470,19 +492,48 @@ $.widget("mapbender.mb_measure", {
 			// Popup card (if selected)
 			if (m.id === this._selectedMeasureId) {
 				var showBelow = (pixel.y < 160);
-				var popupPos = showBelow
-					? 'top:' + (pixel.y + 14) + 'px; transform:translate(-50%,0);'
-					: 'top:' + (pixel.y - (m.type === "point" ? 36 : 14)) + 'px; transform:translate(-50%,-100%);';
+				var popupTop = showBelow ? (pixel.y + 14) + "px" : (pixel.y - (m.type === "point" ? 36 : 14)) + "px";
+				var popupTransform = showBelow ? "translate(-50%,0)" : "translate(-50%,-100%)";
 
-				var $popup = $('<div class="mb-measure-popup" style="position:absolute; left:' + pixel.x + 'px; ' + popupPos + ' background:#fff; color:#333; font-family:Arial,Helvetica,sans-serif; border-radius:8px; box-shadow:0 4px 18px rgba(0,0,0,0.22); border:1px solid #dcdcdc; padding:12px 14px; min-width:280px; max-width:360px; z-index:1005; pointer-events:auto; cursor:default;" />');
+				var $popup = $('<div class="mb-measure-popup" />')
+					.css({
+						"position": "absolute",
+						"left": pixel.x + "px",
+						"top": popupTop,
+						"transform": popupTransform,
+						"background": "#fff",
+						"color": "#333",
+						"font-family": "Arial,Helvetica,sans-serif",
+						"border-radius": "8px",
+						"box-shadow": "0 4px 18px rgba(0,0,0,0.22)",
+						"border": "1px solid #dcdcdc",
+						"padding": "12px 14px",
+						"min-width": "280px",
+						"max-width": "360px",
+						"z-index": 1005,
+						"pointer-events": "auto",
+						"cursor": "default"
+					});
 
 				// Stop all mouse and click events from bubbling up to #mapframe1 to prevent map pan or FeatureInfo
 				$popup.bind("mousedown mouseup click dblclick", function (e) {
 					e.stopPropagation();
 				});
 
-				var arrowPos = showBelow ? 'top:-8px; border-bottom:8px solid #fff;' : 'bottom:-8px; border-top:8px solid #fff;';
-				var $arrow = $('<div style="position:absolute; left:50%; margin-left:-8px; width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; pointer-events:none; ' + arrowPos + '" />');
+				var $arrow = $('<div />').css({
+					"position": "absolute",
+					"left": "50%",
+					"margin-left": "-8px",
+					"width": 0,
+					"height": 0,
+					"border-left": "8px solid transparent",
+					"border-right": "8px solid transparent",
+					"pointer-events": "none",
+					"top": showBelow ? "-8px" : "auto",
+					"bottom": showBelow ? "auto" : "-8px",
+					"border-bottom": showBelow ? "8px solid #fff" : "none",
+					"border-top": showBelow ? "none" : "8px solid #fff"
+				});
 
 				// Header
 				var $header = $('<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #eee;" />');
@@ -524,7 +575,7 @@ $.widget("mapbender.mb_measure", {
 				var copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a5fb4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 				var checkSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
-				var $copyBtn = $('<a href="javascript:void(0);" title="Messwert in Zwischenablage kopieren" style="flex-shrink:0; margin-left:8px; padding:3px 5px; border-radius:4px; border:1px solid #dcdcdc; background:#f9f9f9; display:inline-flex; align-items:center; cursor:pointer;" />')
+				var $copyBtn = $('<a href="#" title="Messwert in Zwischenablage kopieren" style="flex-shrink:0; margin-left:8px; padding:3px 5px; border-radius:4px; border:1px solid #dcdcdc; background:#f9f9f9; display:inline-flex; align-items:center; cursor:pointer;" />')
 					.html(copySvg)
 					.hover(
 						function () { $(this).css("background", "#eef3fc"); },
@@ -553,7 +604,7 @@ $.widget("mapbender.mb_measure", {
 				// Footer with Center, Export (GeoJSON, KML), and Delete (consistent Arial font, 11px size, normal weight)
 				var $footer = $('<div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid #eee; font-family:Arial,Helvetica,sans-serif; font-size:11px;" />');
 				var $leftActions = $('<div style="display:inline-flex; align-items:center; gap:5px; flex-shrink:0;" />');
-				var $centerBtn = $('<a href="javascript:void(0);" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">&#9678; Zentrieren</a>')
+				var $centerBtn = $('<a href="#" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">&#9678; Zentrieren</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$centerBtn.bind("click", function (e) {
@@ -563,7 +614,7 @@ $.widget("mapbender.mb_measure", {
 					});
 				})(m);
 
-				var $expGeoJson = $('<a href="javascript:void(0);" title="Als GeoJSON exportieren (SRID ist vordefiniert: EPSG:4326)" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">GeoJSON</a>')
+				var $expGeoJson = $('<a href="#" title="Als GeoJSON exportieren (SRID ist vordefiniert: EPSG:4326)" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">GeoJSON</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$expGeoJson.bind("click", function (e) {
@@ -573,7 +624,7 @@ $.widget("mapbender.mb_measure", {
 					});
 				})(m);
 
-				var $expKml = $('<a href="javascript:void(0);" title="Als KML exportieren (SRID ist vordefiniert: EPSG:4326)" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">KML</a>')
+				var $expKml = $('<a href="#" title="Als KML exportieren (SRID ist vordefiniert: EPSG:4326)" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">KML</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$expKml.bind("click", function (e) {
@@ -590,7 +641,7 @@ $.widget("mapbender.mb_measure", {
 					.append($('<span style="color:#bbb; margin:0 1px;">,</span>'))
 					.append($expKml);
 
-				var $delBtn = $('<a href="javascript:void(0);" style="color:#d93025; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal; margin-left:14px; flex-shrink:0; white-space:nowrap;">&#128465; Löschen</a>')
+				var $delBtn = $('<a href="#" style="color:#d93025; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal; margin-left:14px; flex-shrink:0; white-space:nowrap;">&#128465; Löschen</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
 					$delBtn.bind("click", function (e) {
@@ -882,8 +933,7 @@ $.widget("mapbender.mb_measure", {
 						var p2 = Proj4js.transform(source, dest, new Proj4js.Point(pt.pos.x, pt.pos.y));
 						pt.pos = { x: p2.x, y: p2.y };
 					}
-					var cp = Proj4js.transform(source, dest, new Proj4js.Point(m.centerPos.x, m.centerPos.y));
-					m.centerPos = { x: cp.x, y: cp.y };
+					m.centerPos = (m.type === "point") ? m.points[0].pos : this._calculateCentroid(m.points);
 					if (m.type === "polygon") {
 						var savedPts = this._measurePoints;
 						this._measurePoints = m.points.slice(0, m.points.length - 1);

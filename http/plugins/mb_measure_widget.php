@@ -166,21 +166,23 @@ var MeasureApi = function (o) {
 					function () { $(this).css("background", "#fafafa"); }
 				);
 				var labelText = "#" + (idx + 1) + " " + m.title + ": " + m.badgeText;
-				var $link = $("<a href='javascript:void(0);' style='flex:1; min-width:0; color:#1a5fb4; text-decoration:none; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:6px;' />")
+				var $link = $("<a href='#' style='flex:1; min-width:0; color:#1a5fb4; text-decoration:none; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:6px;' />")
 					.text(labelText)
 					.attr("title", labelText + " - <?php echo htmlentities(_mb("Click to select and zoom"), ENT_QUOTES, "UTF-8"); ?>")
-					.bind("click", function () {
+					.bind("click", function (e) {
+						if (e && e.preventDefault) e.preventDefault();
 						if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
 							o.$target.mb_measure("selectMeasure", m.id);
 							o.$target.mb_measure("centerOnMeasure", m.id);
 						}
 					});
-				var $del = $("<a href='javascript:void(0);' style='flex-shrink:0; color:#d93025; font-size:18px; line-height:1; text-decoration:none; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;' title='<?php echo htmlentities(_mb("Delete"), ENT_QUOTES, "UTF-8"); ?>'>&#128465;</a>")
+				var $del = $("<a href='#' style='flex-shrink:0; color:#d93025; font-size:18px; line-height:1; text-decoration:none; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;' title='<?php echo htmlentities(_mb("Delete"), ENT_QUOTES, "UTF-8"); ?>'>&#128465;</a>")
 					.hover(
 						function () { $(this).css({"background": "#fee2e2", "color": "#b91c1c"}); },
 						function () { $(this).css({"background": "transparent", "color": "#d93025"}); }
 					)
 					.bind("click", function (e) {
+						if (e && e.preventDefault) e.preventDefault();
 						e.stopPropagation();
 						if (o.$target.size() > 0 && o.$target.data("mb_measure")) {
 							var remaining = o.$target.mb_measure("deleteMeasure", m.id);
@@ -232,6 +234,13 @@ var MeasureApi = function (o) {
 		measureDialog.find(".mb-measure-prompt").hide();
 	};
 
+	var restoreEnableFeatureInfo = function () {
+		if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
+			Mapbender.enableFeatureInfo = origEnableFeatureInfo;
+			origEnableFeatureInfo = null;
+		}
+	};
+
 	var create = function () {
 		//
 		// Initialise measure dialog
@@ -263,22 +272,20 @@ var MeasureApi = function (o) {
 			close: function (){
 				$('#measure_widget').removeClass('myOnClass');
 				// Restore original enableFeatureInfo and re-enable FeatureInfo after measurement closes
-				if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
-					Mapbender.enableFeatureInfo = origEnableFeatureInfo;
-					origEnableFeatureInfo = null;
+				restoreEnableFeatureInfo();
+				if (typeof Mapbender !== "undefined" && typeof Mapbender.enableFeatureInfo === "function") {
+					Mapbender.enableFeatureInfo();
 				}
-				Mapbender.enableFeatureInfo();
 				mb_enableButton('pan1');				
 			}
 		}).bind("dialogclose", function () {
 			button.stop();
 			that.destroy();
 			// Restore original enableFeatureInfo and re-enable FeatureInfo on dialog close
-			if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
-				Mapbender.enableFeatureInfo = origEnableFeatureInfo;
-				origEnableFeatureInfo = null;
+			restoreEnableFeatureInfo();
+			if (typeof Mapbender !== "undefined" && typeof Mapbender.enableFeatureInfo === "function") {
+				Mapbender.enableFeatureInfo();
 			}
-			Mapbender.enableFeatureInfo();
 			mb_enableButton('pan1');
 		});
 
@@ -500,9 +507,9 @@ var MeasureApi = function (o) {
 		}
 		measureDialog.html(defaultHtml);
 
-		if (origEnableFeatureInfo && typeof Mapbender !== "undefined") {
-			Mapbender.enableFeatureInfo = origEnableFeatureInfo;
-			origEnableFeatureInfo = null;
+		restoreEnableFeatureInfo();
+		if (typeof Mapbender !== "undefined" && typeof Mapbender.enableFeatureInfo === "function") {
+			Mapbender.enableFeatureInfo();
 		}
 		//remove measured x and y values from print dialog
 		$('input[name="measured_x_values"]').val("");
@@ -510,6 +517,7 @@ var MeasureApi = function (o) {
 	};
 	
 	this.deactivate = function () {
+		restoreEnableFeatureInfo();
 		if (o.$target.size() > 0) {
 			o.$target.mb_measure("deactivate");
 		}
