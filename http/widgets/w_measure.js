@@ -302,7 +302,7 @@ $.widget("mapbender.mb_measure", {
 		if (this._completedMeasures && this._completedMeasures.length > 0) {
 			for (var mIdx = 0; mIdx < this._completedMeasures.length; mIdx++) {
 				var m = this._completedMeasures[mIdx];
-				var isSel = (m.id === this._selectedMeasureId);
+				var isSel = (m.id === this._selectedMeasureId || (this._activeSnap && this._activeSnap.measure.id === m.id) || (this._hoveredMeasure && this._hoveredMeasure.id === m.id));
 				var mPath = "";
 				for (var pIdx = 0; pIdx < m.points.length; pIdx++) {
 					var pt = m.points[pIdx];
@@ -330,11 +330,11 @@ $.widget("mapbender.mb_measure", {
 				for (var pIdx = 0; pIdx < m.points.length; pIdx++) {
 					var pt = m.points[pIdx];
 					var isEnd = (pIdx === 0 || pIdx === m.points.length - 1);
-					var c = this._canvas.circle(pt.mousePos.x, pt.mousePos.y, isEnd ? (isSel ? 5.5 : 5) : (isSel ? 4 : 3.5));
+					var c = this._canvas.circle(pt.mousePos.x, pt.mousePos.y, isEnd ? (isSel ? 5.5 : 5) : (isSel ? 4.5 : 3.5));
 					c.attr({
-						fill: isEnd ? (isSel ? "#e65100" : "#ff7f00") : "#ffa726",
+						fill: isEnd ? (isSel ? "#e65100" : "#ff7f00") : (isSel ? "#ff9800" : "#ffa726"),
 						stroke: "#ffffff",
-						"stroke-width": isEnd ? 2 : 1.5
+						"stroke-width": isEnd ? 2 : (isSel ? 1.5 : 1)
 					});
 				}
 
@@ -508,16 +508,17 @@ $.widget("mapbender.mb_measure", {
 						"box-shadow": "0 4px 18px rgba(0,0,0,0.22)",
 						"border": "1px solid #dcdcdc",
 						"padding": "12px 14px",
-						"min-width": "310px",
-						"max-width": "390px",
+						"min-width": "300px",
+						"max-width": "380px",
 						"z-index": 1005,
 						"pointer-events": "auto",
 						"cursor": "default"
 					});
 
 				// Stop all mouse and click events from bubbling up to #mapframe1 to prevent map pan or FeatureInfo
-				$popup.bind("mousedown mouseup click dblclick", function (e) {
+				$popup.bind("mousedown mouseup click dblclick mousemove", function (e) {
 					e.stopPropagation();
+					that._hideTooltip();
 				});
 
 				var $arrow = $('<div />').css({
@@ -669,8 +670,375 @@ $.widget("mapbender.mb_measure", {
 			}
 		}
 	},
+	_escapeHtml: function (str) {
+		return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+	},
+	_getDragHandle: function () {
+		if (!this._$dragHandle) {
+			var that = this;
+			this._$dragHandle = $('<div class="mb-measure-drag-handle" />').css({
+				"position": "absolute",
+				"display": "none",
+				"width": "14px",
+				"height": "14px",
+				"border-radius": "50%",
+				"background": "#ffffff",
+				"border": "2.5px solid #e65100",
+				"box-shadow": "0 2px 6px rgba(0,0,0,0.45)",
+				"cursor": "move",
+				"pointer-events": "auto",
+				"z-index": 1005
+			}).appendTo(this.element);
+
+			this._$dragHandle.bind("mousedown", function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+				that._onHandleMouseDown(e);
+				return false;
+			});
+		}
+		return this._$dragHandle;
+	},
+	_findSnapTarget: function (mousePos) {
+		if (!this._completedMeasures || this._completedMeasures.length === 0) return null;
+		// 1. Check vertices first (14px tolerance)
+		for (var mIdx = this._completedMeasures.length - 1; mIdx >= 0; mIdx--) {
+			var m = this._completedMeasures[mIdx];
+			if (!m.points) continue;
+			for (var k = 0; k < m.points.length; k++) {
+				var pt = m.points[k];
+				if (!pt.mousePos) pt.mousePos = this._map.convertRealToPixel(pt.pos);
+				var dx = mousePos.x - pt.mousePos.x, dy = mousePos.y - pt.mousePos.y;
+				if (dx * dx + dy * dy <= 196) {
+					return { type: "vertex", measure: m, index: k, mousePos: pt.mousePos };
+				}
+			}
+		}
+		// 2. Check edges (10px tolerance)
+		for (var mIdx = this._completedMeasures.length - 1; mIdx >= 0; mIdx--) {
+			var m = this._completedMeasures[mIdx];
+			if (m.type === "point" || !m.points || m.points.length < 2) continue;
+			var count = (m.type === "polygon") ? m.points.length : (m.points.length - 1);
+			for (var i = 0; i < count; i++) {
+				var p1 = m.points[i].mousePos || this._map.convertRealToPixel(m.points[i].pos);
+				var p2 = m.points[(i + 1) % m.points.length].mousePos || this._map.convertRealToPixel(m.points[(i + 1) % m.points.length].pos);
+				var segDx = p2.x - p1.x, segDy = p2.y - p1.y, l2 = segDx * segDx + segDy * segDy;
+				if (l2 === 0) continue;
+				var t = ((mousePos.x - p1.x) * segDx + (mousePos.y - p1.y) * segDy) / l2;
+				if (t >= 0 && t <= 1) {
+					var qx = p1.x + t * segDx, qy = p1.y + t * segDy;
+					var rx = mousePos.x - qx, ry = mousePos.y - qy;
+				if (rx * rx + ry * ry <= 100) {
+					return {
+						type: "edge",
+						measure: m,
+						segmentIndex: i,
+						mousePos: { x: qx, y: qy },
+						realPos: this._map.convertPixelToReal({ x: qx, y: qy })
+					};
+				}
+				}
+			}
+		}
+		// 3. Check inside polygon body
+		for (var mIdx = this._completedMeasures.length - 1; mIdx >= 0; mIdx--) {
+			var m = this._completedMeasures[mIdx];
+			if (m.type === "polygon" && this._isPointInPolygon(mousePos.x, mousePos.y, m.points)) {
+				return { type: "body", measure: m };
+			}
+		}
+		return null;
+	},
+	_recalculateMeasure: function (m) {
+		if (!m || !m.points || m.points.length === 0) return;
+		var srs = (this._map && typeof this._map.getSrs === "function") ? this._map.getSrs() : (this._srs || "EPSG:25832");
+		var isGeo = (srs === "EPSG:4326");
+
+		if (m.type === "point") {
+			var pt = m.points[0].pos;
+			var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
+			var cY = isGeo ? Number(pt.y).toFixed(5) : Math.round(pt.y).toLocaleString("de-DE");
+			m.centerPos = { x: pt.x, y: pt.y };
+			m.distanceFormatted = (isGeo ? ("Länge: " + cX + "°, Breite: " + cY + "°") : ("Rechtswert: " + cX + " m, Hochwert: " + cY + " m")) + " (" + srs + ")";
+			m.badgeText = cX + ", " + cY;
+		} else if (m.type === "line") {
+			var distVal = 0;
+			for (var k = 0; k < m.points.length - 1; k++) {
+				distVal += this._calculateDistance(m.points[k].pos, m.points[k + 1].pos);
+			}
+			m.totalDistance = distVal;
+			m.centerPos = this._calculateCentroid(m.points);
+			m.distanceFormatted = this._formatMeasure(distVal, false, false) + " Gesamtlänge";
+			m.badgeText = this._formatMeasure(distVal, false, true);
+		} else if (m.type === "polygon") {
+			var saved = this._measurePoints;
+			this._measurePoints = m.points;
+			var areaVal = this._calculateArea(m.points[0]);
+			this._measurePoints = saved;
+
+			var perimVal = 0;
+			for (var k = 0; k < m.points.length; k++) {
+				perimVal += this._calculateDistance(m.points[k].pos, m.points[(k + 1) % m.points.length].pos);
+			}
+			m.area = areaVal;
+			m.perimeter = perimVal;
+			m.totalDistance = perimVal;
+			m.centerPos = this._calculateCentroid(m.points);
+			m.areaFormatted = this._formatMeasure(areaVal, true, false);
+			m.perimeterFormatted = this._formatMeasure(perimVal, false, false) + " Umfang";
+			m.badgeText = this._formatMeasure(areaVal, true, true);
+		}
+	},
+	_onHandleMouseDown: function (e) {
+		if (!this._activeSnap || this._activeSnap.type === "body") return;
+		var that = this;
+		var snap = this._activeSnap;
+		var m = snap.measure;
+		var vIndex;
+
+		if (typeof mb_panActive !== "undefined") mb_panActive = false;
+		var panWidget = $(this.element).data("pan") || $(this.element).data("mb_pan");
+		if (panWidget) panWidget.active = false;
+
+		if (snap.type === "vertex") {
+			vIndex = snap.index;
+		} else if (snap.type === "edge") {
+			var newPt = { pos: snap.realPos, mousePos: snap.mousePos };
+			m.points.splice(snap.segmentIndex + 1, 0, newPt);
+			vIndex = snap.segmentIndex + 1;
+			this._recalculateMeasure(m);
+			this._draw();
+		} else {
+			return;
+		}
+
+		this._isDraggingVertex = true;
+
+		$(document)
+			.unbind("mousemove.mb_drag")
+			.unbind("mouseup.mb_drag")
+			.bind("mousemove.mb_drag", function (moveEvt) {
+				moveEvt.preventDefault();
+				moveEvt.stopPropagation();
+				if (typeof mb_panActive !== "undefined") mb_panActive = false;
+				if (panWidget) panWidget.active = false;
+
+				var curMousePos = that._map.getMousePosition(moveEvt);
+				m.points[vIndex].mousePos = curMousePos;
+				m.points[vIndex].pos = that._map.convertPixelToReal(curMousePos);
+				that._recalculateMeasure(m);
+				that._draw();
+
+				that._getDragHandle().css({
+					left: (curMousePos.x - 7) + "px",
+					top: (curMousePos.y - 7) + "px"
+				}).show();
+
+				var liveVal = (m.type === "polygon") ?
+					("Fläche: " + m.areaFormatted + " (Umfang: " + m.perimeterFormatted + ")") :
+					(m.type === "line" ? m.distanceFormatted : m.badgeText);
+				that._updateTooltip(curMousePos, liveVal, "Punkt wird verschoben...");
+			})
+			.bind("mouseup.mb_drag", function (upEvt) {
+				upEvt.preventDefault();
+				upEvt.stopPropagation();
+				that._isDraggingVertex = false;
+				$(document).unbind("mousemove.mb_drag").unbind("mouseup.mb_drag");
+
+				that._justFinishedDrag = true;
+				setTimeout(function () { that._justFinishedDrag = false; }, 150);
+
+				that._recalculateMeasure(m);
+				that._draw();
+				that._updateTooltip(m.points[vIndex].mousePos, "Punkt verschoben", "Klicken und ziehen zum Verschieben");
+			});
+	},
+	_updateTooltip: function (mousePos, line1, line2) {
+		if (!this._$tooltip) {
+			this._$tooltip = $("<div class='mb-measure-tooltip' />").css({
+				"position": "absolute",
+				"display": "none",
+				"pointer-events": "none",
+				"background": "rgba(20, 24, 35, 0.88)",
+				"color": "#ffffff",
+				"font-family": "Arial, Helvetica, sans-serif",
+				"padding": "5px 9px",
+				"border-radius": "4px",
+				"box-shadow": "0 2px 7px rgba(0,0,0,0.38)",
+				"z-index": 1006,
+				"min-width": "140px",
+				"white-space": "nowrap"
+			}).appendTo(this.element);
+		}
+		if (!line1) {
+			this._$tooltip.hide();
+			return;
+		}
+
+		var escLine1 = this._escapeHtml(line1);
+		var html = "";
+		if (line2) {
+			var escLine2 = this._escapeHtml(line2);
+			html = '<div style="font-weight:bold; font-size:11px; line-height:14px; margin-bottom:2px; color:#ffffff;">' +
+				escLine1 +
+				'</div><div style="font-size:10px; line-height:13px; color:#c8d4e5;">' +
+				escLine2 +
+				'</div>';
+		} else {
+			html = '<div style="font-size:11px; line-height:14px; color:#ffffff;">' + escLine1 + '</div>';
+		}
+
+		this._$tooltip.html(html).show();
+		var tipW = this._$tooltip.outerWidth() || 180;
+		var tipH = this._$tooltip.outerHeight() || 32;
+		var mapW = (this._map && typeof this._map.getWidth === "function") ? this._map.getWidth() : $(this.element).width();
+		var mapH = (this._map && typeof this._map.getHeight === "function") ? this._map.getHeight() : $(this.element).height();
+		var tx = mousePos.x + 15;
+		var ty = mousePos.y + 15;
+		if (mapW && (tx + tipW + 10 > mapW)) {
+			tx = Math.max(5, mousePos.x - tipW - 10);
+		}
+		if (mapH && (ty + tipH + 10 > mapH)) {
+			ty = Math.max(5, mousePos.y - tipH - 10);
+		}
+		this._$tooltip.css({ left: tx + "px", top: ty + "px" });
+	},
+	_hideTooltip: function () {
+		if (this._$tooltip) this._$tooltip.hide();
+		if (this._$dragHandle && !this._isDraggingVertex) this._$dragHandle.hide();
+	},
+	_onKeyDown: function (e) {
+		if ($(e.target).is("input, textarea, select") || (e.target && e.target.isContentEditable)) return;
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
+		var keyCode = e.which || e.keyCode;
+
+		// Esc (27): Cancel active drawing or close popup
+		if (keyCode === 27) {
+			if (this._measurePoints && this._measurePoints.length > 0) {
+				e.preventDefault(); e.stopPropagation();
+				this._measurePoints = [];
+				this._totalDistance = 0;
+				this._currentDistance = 0;
+				this._polygonIsInvalid = false;
+				this._currentPolygonIsInvalid = false;
+				this._draw();
+				if (this._lastMousePos) {
+					this._updateTooltip(this._lastMousePos, "Messung beginnen", "Klick: Punkt setzen | Doppelklick: Punktmessung");
+				} else {
+					this._hideTooltip();
+				}
+				return false;
+			} else if (this._selectedMeasureId) {
+				e.preventDefault(); e.stopPropagation();
+				this.hideMeasurePopup();
+				return false;
+			}
+		}
+
+		// Backspace (8) or Delete / Entf (46)
+		if (keyCode === 8 || keyCode === 46) {
+			if (this._measurePoints && this._measurePoints.length > 0) {
+				e.preventDefault(); e.stopPropagation();
+				this._measurePoints.pop();
+				this._polygonIsInvalid = false;
+				this._currentPolygonIsInvalid = false;
+				var len = this._measurePoints.length;
+				if (len === 0) {
+					this._totalDistance = 0;
+					this._currentDistance = 0;
+					this._draw();
+				if (this._lastMousePos) {
+					this._updateTooltip(this._lastMousePos, "Messung beginnen", "Klick: Punkt setzen | Doppelklick: Punktmessung");
+				} else {
+					this._hideTooltip();
+				}
+			} else {
+				this._totalDistance = this._measurePoints[len - 1].totalDistance || 0;
+				if (this._lastMouseMoveEvent) {
+					this._measure(this._lastMouseMoveEvent);
+				} else {
+					this._draw();
+				}
+			}
+			return false;
+		} else {
+			var delId = (this._activeSnap ? this._activeSnap.measure.id : null) ||
+				(this._hoveredMeasure ? this._hoveredMeasure.id : null) ||
+				this._selectedMeasureId;
+			if (delId) {
+				e.preventDefault(); e.stopPropagation();
+				this.deleteMeasure(delId);
+				this._activeSnap = null;
+				this._hoveredMeasure = null;
+				if (this._$dragHandle) this._$dragHandle.hide();
+				if (this._lastMousePos) {
+					this._updateTooltip(this._lastMousePos, "Messung gelöscht", "Klick: Messung beginnen | Doppelklick: Punktmessung");
+				} else {
+					this._hideTooltip();
+				}
+				return false;
+			}
+		}
+	}
+	},
 	_measure: function (e) {
+		var mousePos = this._map.getMousePosition(e);
+		this._lastMouseMoveEvent = e;
+		this._lastMousePos = mousePos;
+
+		if (this._isDraggingVertex) {
+			return;
+		}
+
+		// When not in the middle of drawing a new measurement
 		if (this._measurePoints.length === 0) {
+			var snap = this._findSnapTarget(mousePos);
+			var prevHoverId = this._hoveredMeasure ? this._hoveredMeasure.id : null;
+			var newHoverId = snap ? snap.measure.id : null;
+			this._activeSnap = (snap && snap.type !== "body") ? snap : null;
+			this._hoveredMeasure = snap ? snap.measure : null;
+
+			// Highlight changed: redraw canvas to highlight active line/polygon
+			if (prevHoverId !== newHoverId) {
+				this._draw();
+			}
+
+			if (snap) {
+				var m = snap.measure;
+				var valStr = (m.type === "polygon") ? m.areaFormatted : m.distanceFormatted;
+				if (snap.type === "vertex") {
+					this._getDragHandle().css({
+						left: (snap.mousePos.x - 7) + "px",
+						top: (snap.mousePos.y - 7) + "px",
+						background: "#ffffff",
+						borderColor: "#e65100",
+						cursor: "move"
+					}).show();
+					this._updateTooltip(snap.mousePos, "Punkt verschieben (" + m.title + ")", "Klicken und ziehen zum Verschieben | [Entf] Messung löschen");
+					return;
+				} else if (snap.type === "edge") {
+					this._getDragHandle().css({
+						left: (snap.mousePos.x - 6) + "px",
+						top: (snap.mousePos.y - 6) + "px",
+						background: "#ff9800",
+						borderColor: "#ffffff",
+						cursor: "copy"
+					}).show();
+					this._updateTooltip(snap.mousePos, "Neuer Stützpunkt (" + m.title + ")", "Klicken und ziehen zum Hinzufügen | [Entf] Messung löschen");
+					return;
+				} else if (snap.type === "body") {
+					if (this._$dragHandle) this._$dragHandle.hide();
+					this._updateTooltip(mousePos, m.title + (valStr ? ": " + valStr : ""), "[Entf] Messung löschen | Klick: Auswählen");
+					$(this.element).css("cursor", "pointer");
+					return;
+				}
+			}
+
+			// Empty map space
+			if (this._$dragHandle) this._$dragHandle.hide();
+			$(this.element).css("cursor", "crosshair");
+			this._updateTooltip(mousePos, "Messung beginnen", "Klick: Punkt setzen | Doppelklick: Punktmessung");
 			return;
 		}
 
@@ -743,6 +1111,26 @@ $.widget("mapbender.mb_measure", {
 			}
 		}
 
+		// Update live segment preview tooltip with flicker-free two-line layout
+		if (len === 1) {
+			if (lastPointSnapped) {
+				this._updateTooltip(mousePos, "Punktmessung", "Doppelklick zum Beenden");
+			} else {
+				var dist1 = this._formatMeasure(this._currentDistance, false, true);
+				this._updateTooltip(mousePos, dist1 || "Streckenmessung", "Doppelklick zum Beenden | [Esc] Abbrechen");
+			}
+		} else if (len >= 2) {
+			if (firstPointSnapped) {
+				var areaN = this._formatMeasure(this._currentArea, true, true);
+				var perimN = this._formatMeasure(measureData.perimeter || this._totalDistance, false, true);
+				this._updateTooltip(mousePos, "Fläche: " + areaN + (perimN ? " (Umfang: " + perimN + ")" : ""), "Klicken zum Beenden (Fläche schließen) | [Entf] letzter Punkt");
+			} else {
+				var distN = this._formatMeasure(this._totalDistance, false, true);
+				var areaN = (measureData.area && !this._polygonIsInvalid) ? this._formatMeasure(measureData.area, true, true) : null;
+				this._updateTooltip(mousePos, distN + (areaN ? " | " + areaN : ""), "Doppelklick zum Beenden | [Entf] letzter Punkt | [Esc] Abbrechen");
+			}
+		}
+
 		this._trigger("update", null, measureData);
 
 		this._draw(measureData.pos, {
@@ -764,25 +1152,26 @@ $.widget("mapbender.mb_measure", {
 		if (e.which && e.which !== 1) {
 			return;
 		}
+		// Ignore click immediately after vertex dragging
+		if (this._justFinishedDrag) {
+			this._justFinishedDrag = false;
+			return false;
+		}
 		// Ensure FeatureInfo does not trigger on map clicks during active measurement
 		if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
 			Mapbender.disableFeatureInfo();
 		}
 		var mousePos = this._map.getMousePosition(e);
 
-		// If adding a new measurement, bypass hit detection to start fresh drawing
-		if (this._isNewMeasureActive) {
-			this._isNewMeasureActive = false;
-			this.hideMeasurePopup();
-			this._selectedMeasureId = null;
-			this._draw();
-		} else if (this._measurePoints.length === 0) {
-			var hit = this._findMeasureAt(mousePos);
-			if (hit) {
-				this.selectMeasure(hit.id);
-				return true;
+		// When not drawing, clicking on an existing measure selects it; clicking empty space deselects
+		if (this._measurePoints.length === 0) {
+			if (this._activeSnap) {
+				return false;
 			}
-			// Empty space click: close any open popup and start a new measurement
+			if (this._hoveredMeasure) {
+				this.selectMeasure(this._hoveredMeasure.id);
+				return false;
+			}
 			this.hideMeasurePopup();
 			this._selectedMeasureId = null;
 			this._draw();
@@ -1006,22 +1395,48 @@ $.widget("mapbender.mb_measure", {
 		});
 	},
 	_init: function () {
+		var that = this;
 		this._measureProxy = this._measureProxy || $.proxy(this, "_measure");
 		this._addPointProxy = this._addPointProxy || $.proxy(this, "_addPoint");
+		this._onKeyDownProxy = this._onKeyDownProxy || $.proxy(this, "_onKeyDown");
+		this._hideTooltipProxy = this._hideTooltipProxy || $.proxy(this, "_hideTooltip");
+
 		this.element
+			.unbind("mousedown.mb_measure_block")
 			.unbind("click", this._addPointProxy)
 			.unbind("mousemove", this._measureProxy)
+			.unbind("mouseleave", this._hideTooltipProxy)
 			.unbind("click", this._addPoint)
 			.unbind("mousemove", this._measure)
+			.bind("mousedown.mb_measure_block", function (e) {
+				if (that._activeSnap && that._activeSnap.type !== "body") {
+					e.preventDefault();
+					e.stopPropagation();
+					e.stopImmediatePropagation();
+					that._onHandleMouseDown(e);
+					return false;
+				}
+			})
 			.bind("click", this._addPointProxy)
 			.bind("mousemove", this._measureProxy)
+			.bind("mouseleave", this._hideTooltipProxy)
 			.css("cursor", "crosshair");
+
+		$(document)
+			.unbind("keydown.mb_measure")
+			.bind("keydown.mb_measure", this._onKeyDownProxy);
 	},
 	_create: function () {
 		this._measurePoints = [];
 		this._completedMeasures = [];
 		this._measureCounter = 0;
 		this._selectedMeasureId = null;
+		this._lastMousePos = null;
+		this._lastMouseMoveEvent = null;
+		this._activeSnap = null;
+		this._hoveredMeasure = null;
+		this._isDraggingVertex = false;
+		this._justFinishedDrag = false;
 
 		// ":maps" is a Mapbender selector which
 		// checks if an element is a Mapbender map
@@ -1224,48 +1639,74 @@ $.widget("mapbender.mb_measure", {
 		}
 
 		var fileBaseName = (measure.title || "messung").toLowerCase().replace(/ä/g, "ae").replace(/[^a-z0-9_-]/g, "_");
-		var desc = (measure.type === "polygon") ? (measure.areaFormatted + ", " + measure.perimeterFormatted) : (measure.distanceFormatted || "");
-		var geom = null;
-		var props = {
-			title: measure.title,
-			description: desc,
-			srs: "EPSG:4326",
-			map_srs: srs
-		};
-
-		if (measure.type === "point") {
-			geom = { type: "Point", coordinates: wgs84[0] };
-		} else if (measure.type === "line") {
-			geom = { type: "LineString", coordinates: wgs84 };
-			props.total_distance_m = Math.round(measure.totalDistance * 10) / 10;
-		} else if (measure.type === "polygon") {
-			var ring = wgs84.slice(0);
-			if (ring.length > 0 && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
-				ring.push(ring[0]);
-			}
-			geom = { type: "Polygon", coordinates: [ring] };
-			props.area_sqm = Math.round(measure.area * 10) / 10;
-			props.perimeter_m = Math.round(measure.perimeter * 10) / 10;
-		}
-
-		var geojson = {
-			type: "FeatureCollection",
-			name: measure.title,
-			features: [{
-				type: "Feature",
-				properties: props,
-				geometry: geom
-			}]
-		};
-
 		if (format === "geojson") {
+			var geom = null;
+			var props = { title: measure.title, srs: "EPSG:4326", map_srs: srs };
+			if (measure.type === "point") {
+				geom = { type: "Point", coordinates: wgs84[0] };
+			} else if (measure.type === "line") {
+				geom = { type: "LineString", coordinates: wgs84 };
+				props.total_distance_m = Math.round(measure.totalDistance * 10) / 10;
+				props.formatted = measure.distanceFormatted;
+			} else if (measure.type === "polygon") {
+				var ring = wgs84.slice(0);
+				if (ring.length > 0 && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+					ring.push(ring[0]);
+				}
+				geom = { type: "Polygon", coordinates: [ring] };
+				props.area_sqm = Math.round(measure.area * 10) / 10;
+				props.perimeter_m = Math.round(measure.perimeter * 10) / 10;
+				props.area_formatted = measure.areaFormatted;
+				props.perimeter_formatted = measure.perimeterFormatted;
+			}
+			var geojson = {
+				type: "FeatureCollection",
+				name: measure.title,
+				features: [{
+					type: "Feature",
+					properties: props,
+					geometry: geom
+				}]
+			};
 			this._downloadBlob(JSON.stringify(geojson, null, 2), fileBaseName + ".geojson", "application/geo+json");
 		} else if (format === "kml") {
-			// Reuse tokml from digitization extension (extensions/tokml.js as used in mb_digitize_widget.php)
-			var kmlContent = (typeof tokml === "function") ? tokml(geojson, { documentName: measure.title, name: "title", description: "description", simplestyle: true }) : null;
-			if (kmlContent) {
-				this._downloadBlob(kmlContent, fileBaseName + ".kml", "application/vnd.google-earth.kml+xml");
+			var coordsStr = "";
+			for (var k = 0; k < wgs84.length; k++) {
+				coordsStr += wgs84[k][0] + "," + wgs84[k][1] + ",0 ";
 			}
+			coordsStr = coordsStr.trim();
+
+			var geomXml = "";
+			var desc = "";
+			if (measure.type === "point") {
+				geomXml = "<Point><coordinates>" + wgs84[0][0] + "," + wgs84[0][1] + ",0</coordinates></Point>";
+				desc = "Koordinaten: " + wgs84[0][0] + "°, " + wgs84[0][1] + "° (EPSG:4326)" + (srs !== "EPSG:4326" ? " | Karte: " + srs : "");
+			} else if (measure.type === "line") {
+				geomXml = "<LineString><tessellate>1</tessellate><coordinates>" + coordsStr + "</coordinates></LineString>";
+				desc = measure.distanceFormatted || "";
+			} else if (measure.type === "polygon") {
+				var closedCoords = coordsStr;
+				if (wgs84.length > 0 && (wgs84[0][0] !== wgs84[wgs84.length - 1][0] || wgs84[0][1] !== wgs84[wgs84.length - 1][1])) {
+					closedCoords += " " + wgs84[0][0] + "," + wgs84[0][1] + ",0";
+				}
+				geomXml = "<Polygon><outerBoundaryIs><LinearRing><coordinates>" + closedCoords + "</coordinates></LinearRing></outerBoundaryIs></Polygon>";
+				desc = (measure.areaFormatted || "") + ", " + (measure.perimeterFormatted || "");
+			}
+			function escapeXml(s) {
+				return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+			}
+			var kml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+				'<kml xmlns="http://www.opengis.net/kml/2.2">\n' +
+				'  <Document>\n' +
+				'    <name>' + escapeXml(measure.title || "Messung") + '</name>\n' +
+				'    <Placemark>\n' +
+				'      <name>' + escapeXml(measure.title || "Messung") + '</name>\n' +
+				'      <description>' + escapeXml(desc) + '</description>\n' +
+				'      ' + geomXml + '\n' +
+				'    </Placemark>\n' +
+				'  </Document>\n' +
+				'</kml>';
+			this._downloadBlob(kml, fileBaseName + ".kml", "application/vnd.google-earth.kml+xml");
 		} else if (format === "wkt") {
 			var isGeoMap = (srs === "EPSG:4326");
 			var wktCoords = [];
@@ -1310,13 +1751,23 @@ $.widget("mapbender.mb_measure", {
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
 		this.hideMeasurePopup();
+		this._hideTooltip();
+		this._isDraggingVertex = false;
+		$(document)
+			.unbind("keydown.mb_measure")
+			.unbind("mousemove.mb_drag")
+			.unbind("mouseup.mb_drag");
 		if (this._addPointProxy) {
 			this.element.unbind("click", this._addPointProxy);
 		}
 		if (this._measureProxy) {
 			this.element.unbind("mousemove", this._measureProxy);
 		}
+		if (this._hideTooltipProxy) {
+			this.element.unbind("mouseleave", this._hideTooltipProxy);
+		}
 		this.element
+			.unbind("mousedown.mb_measure_block")
 			.unbind("click", this._addPoint)
 			.unbind("mousemove", this._measure)
 			.unbind("click", this._reinitialize)
@@ -1326,6 +1777,14 @@ $.widget("mapbender.mb_measure", {
 	destroy: function () {
 		this.deactivate();
 		this.clearAllMeasures();
+		if (this._$dragHandle) {
+			this._$dragHandle.remove();
+			this._$dragHandle = null;
+		}
+		if (this._$tooltip) {
+			this._$tooltip.remove();
+			this._$tooltip = null;
+		}
 		if (this._$overlay) {
 			this._$overlay.remove();
 		}
