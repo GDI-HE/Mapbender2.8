@@ -509,7 +509,7 @@ $.widget("mapbender.mb_measure", {
 						"border": "1px solid #dcdcdc",
 						"padding": "12px 14px",
 						"min-width": "300px",
-						"max-width": "380px",
+						"max-width": "450px",
 						"z-index": 1005,
 						"pointer-events": "auto",
 						"cursor": "default"
@@ -604,7 +604,7 @@ $.widget("mapbender.mb_measure", {
 
 				// Footer with Center, Export (GeoJSON, KML), and Delete (consistent Arial font, 11px size, normal weight)
 				var $footer = $('<div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid #eee; font-family:Arial,Helvetica,sans-serif; font-size:11px;" />');
-				var $leftActions = $('<div style="display:inline-flex; align-items:center; gap:5px; flex-shrink:0;" />');
+				var $leftActions = $('<div style="display:inline-flex; align-items:center; flex-wrap:wrap; gap:5px;" />');
 				var $centerBtn = $('<a href="#" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">&#9678; Zentrieren</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
@@ -654,6 +654,19 @@ $.widget("mapbender.mb_measure", {
 					.append($('<span style="color:#bbb; margin:0 1px;">,</span>'))
 					.append($expWkt);
 
+				if (m.type === "line" && m.points && m.points.length >= 2 && typeof $.fn.mb_hohe === "function" && typeof Mapbender !== "undefined" && Mapbender.modules && Mapbender.modules.altitudeProfile) {
+					var $hoheBtn = $('<a href="#" title="Höhenprofil für diese Strecke anzeigen" style="color:#2a62bc; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal;">&#9968; Höhenprofil</a>')
+						.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
+					(function (measureItem) {
+						$hoheBtn.bind("click", function (e) {
+							e.preventDefault();
+							e.stopPropagation();
+							that._openElevationProfile(measureItem);
+						});
+					})(m);
+					$leftActions.append($('<span style="color:#ddd; margin:0 2px;">|</span>')).append($hoheBtn);
+				}
+
 				var $delBtn = $('<a href="#" style="color:#d93025; text-decoration:none; cursor:pointer; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:normal; margin-left:14px; flex-shrink:0; white-space:nowrap;">&#128465; Löschen</a>')
 					.hover(function () { $(this).css("text-decoration", "underline"); }, function () { $(this).css("text-decoration", "none"); });
 				(function (measureItem) {
@@ -670,6 +683,29 @@ $.widget("mapbender.mb_measure", {
 			}
 		}
 	},
+
+	_openElevationProfile: function (measure) {
+		var that = this, hoheMod = (typeof $.fn.mb_hohe === "function" && typeof Mapbender !== "undefined" && Mapbender.modules) ? Mapbender.modules.altitudeProfile : null;
+		if (!hoheMod || !measure || !measure.points || measure.points.length < 2) return;
+
+		this.deactivate();
+		if ($(this.element).data("mb_hohe") && typeof hoheMod.destroy === "function") hoheMod.destroy();
+		if (typeof mb_enableButton === "function" && $("#altitudeProfile").length) mb_enableButton("altitudeProfile");
+		else if (typeof hoheMod.activate === "function") hoheMod.activate();
+
+		$("#can").unbind("dialogclose.mb_measure_return").one("dialogclose.mb_measure_return", function () {
+			setTimeout(function () {
+				if (!$(that.element).data("mb_measure")) return;
+				if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") Mapbender.disableFeatureInfo();
+				$("#measure_widget").addClass("myOnClass");
+				that._init();
+				that._draw();
+			}, 0);
+		});
+
+		$(this.element).mb_hohe("loadFromMeasure", measure.points);
+	},
+
 	_escapeHtml: function (str) {
 		return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 	},
@@ -1794,6 +1830,7 @@ $.widget("mapbender.mb_measure", {
 	},
 	// delete everything
 	destroy: function () {
+		$("#can").unbind("dialogclose.mb_measure_return");
 		this.deactivate();
 		this.clearAllMeasures();
 		if (this._$dragHandle) {

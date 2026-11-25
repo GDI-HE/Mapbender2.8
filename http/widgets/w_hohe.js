@@ -355,7 +355,7 @@ $.widget("mapbender.mb_hohe", {
 		Das folgende if macht einen Abbruch, wenn p1 und p2 näher als distance bei
 		einander liegen, keine Zwischenpunkte nötig.
 		*/
-		if (laenge < distance) return [];
+		if (laenge < distance) return [p1];
 		/*
 		anzahl: wie viele Zwischenpunkte kommen auf die Strecke.
 		*/
@@ -538,6 +538,8 @@ $.widget("mapbender.mb_hohe", {
 	},
 
 	_init: function () {
+		$(".ownSuperClass .ui-dialog-buttonpane, #hoheNewButton").toggle(!this._fromMeasure);
+
 		// Use 'click' instead of 'mousedown' so drag-to-pan does not drop accidental points; unbind first to prevent duplicates
 		this.element
 			.unbind("mousemove", this._measureProxy)
@@ -550,6 +552,7 @@ $.widget("mapbender.mb_hohe", {
 	},
 
 	_create: function () {
+		this._fromMeasure = false;
 		this._measurePoints = [];
 		jsonPoints = [];
 		paintPoints = false;
@@ -582,6 +585,36 @@ $.widget("mapbender.mb_hohe", {
 		mb_registerPanSubElement($(this._canvas.canvas).parent().get(0));
 	},
 
+	// Load an existing polyline from mb_measure and trigger elevation profile rendering
+	loadFromMeasure: function (pts) {
+		if (!pts || pts.length < 2) return;
+		jsonPoints = [];
+		paintPoints = false;
+		uebergeben = false;
+		this._measurePoints = [];
+		this._totalDistance = 0;
+		this._srs = this._map.getSrs();
+
+		var prevPos = null;
+		for (var i = 0; i < pts.length; i++) {
+			var p = pts[i] && pts[i].pos;
+			if (!p || p.x === null || p.y === null || p.x === "" || p.y === "" || !isFinite(p.x) || !isFinite(p.y)) continue;
+			var pos = { x: Number(p.x), y: Number(p.y) };
+			var segDist = prevPos ? (this._calculateDistance(prevPos, pos) || 0) : 0;
+			this._totalDistance += segDist;
+			var mousePos = this._map.convertRealToPixel(pos);
+			this._measurePoints.push({ pos: pos, mousePos: mousePos });
+			jsonPoints.push({ pos: pos, mousePos: mousePos, abstand: segDist, hoehe: -1, stuetzpunkt: 1, ist_in_BBox: true });
+			prevPos = pos;
+		}
+		if (jsonPoints.length < 2 || this._totalDistance <= 0) return;
+
+		this._fromMeasure = true;
+		$(".ownSuperClass .ui-dialog-buttonpane, #hoheNewButton").hide();
+		this._totalDistance_ = this._totalDistance;
+		this._mache_punkte();
+	},
+
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
 		this.element
@@ -591,6 +624,8 @@ $.widget("mapbender.mb_hohe", {
 
 	// delete everything
 	destroy: function () {
+		this._fromMeasure = false;
+		$(".ownSuperClass .ui-dialog-buttonpane, #hoheNewButton").show();
 		this.deactivate();
 		this._canvas.clear();
 		this._measurePoints = [];
