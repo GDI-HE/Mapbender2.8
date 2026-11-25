@@ -741,13 +741,6 @@ $.widget("mapbender.mb_measure", {
 				}
 			}
 		}
-		// 3. Check inside polygon body
-		for (var mIdx = this._completedMeasures.length - 1; mIdx >= 0; mIdx--) {
-			var m = this._completedMeasures[mIdx];
-			if (m.type === "polygon" && this._isPointInPolygon(mousePos.x, mousePos.y, m.points)) {
-				return { type: "body", measure: m };
-			}
-		}
 		return null;
 	},
 	_recalculateMeasure: function (m) {
@@ -1027,15 +1020,10 @@ $.widget("mapbender.mb_measure", {
 					}).show();
 					this._updateTooltip(snap.mousePos, "Neuer Stützpunkt (" + m.title + ")", "Klicken und ziehen zum Hinzufügen | [Entf] Messung löschen");
 					return;
-				} else if (snap.type === "body") {
-					if (this._$dragHandle) this._$dragHandle.hide();
-					this._updateTooltip(mousePos, m.title + (valStr ? ": " + valStr : ""), "[Entf] Messung löschen | Klick: Auswählen");
-					$(this.element).css("cursor", "pointer");
-					return;
 				}
 			}
 
-			// Empty map space
+			// Free map space (or inside polygon interior): ready to start new measurement
 			if (this._$dragHandle) this._$dragHandle.hide();
 			$(this.element).css("cursor", "crosshair");
 			this._updateTooltip(mousePos, "Messung beginnen", "Klick: Punkt setzen | Doppelklick: Punktmessung");
@@ -1165,16 +1153,25 @@ $.widget("mapbender.mb_measure", {
 
 		// When not drawing, clicking on an existing measure selects it; clicking empty space deselects
 		if (this._measurePoints.length === 0) {
-			if (this._activeSnap) {
-				return false;
+			if (this._isNewMeasureActive) {
+				this._isNewMeasureActive = false;
+				this.hideMeasurePopup();
+				this._selectedMeasureId = null;
+				this._hoveredMeasure = null;
+				this._activeSnap = null;
+				this._draw();
+			} else {
+				if (this._activeSnap) {
+					return false;
+				}
+				if (this._hoveredMeasure) {
+					this.selectMeasure(this._hoveredMeasure.id);
+					return false;
+				}
+				this.hideMeasurePopup();
+				this._selectedMeasureId = null;
+				this._draw();
 			}
-			if (this._hoveredMeasure) {
-				this.selectMeasure(this._hoveredMeasure.id);
-				return false;
-			}
-			this.hideMeasurePopup();
-			this._selectedMeasureId = null;
-			this._draw();
 		}
 
 		var len = this._measurePoints.length;
@@ -1575,10 +1572,18 @@ $.widget("mapbender.mb_measure", {
 		this._totalDistance = 0;
 		this._currentDistance = 0;
 		this._selectedMeasureId = null;
+		this._hoveredMeasure = null;
+		this._activeSnap = null;
+		if (this._$dragHandle) {
+			this._$dragHandle.hide();
+		}
 		this.hideMeasurePopup();
 		// Make measurement tool active: re-bind click and mousemove handlers and set crosshair cursor
 		this._init();
 		this._draw();
+		if (this._lastMousePos) {
+			this._updateTooltip(this._lastMousePos, "Messung beginnen", "Klick: Punkt setzen | Doppelklick: Punktmessung");
+		}
 	},
 	showMeasurePopup: function (id) {
 		this._selectedMeasureId = id;
