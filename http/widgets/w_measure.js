@@ -696,7 +696,7 @@ $.widget("mapbender.mb_measure", {
 				e.stopImmediatePropagation();
 				that._onHandleMouseDown(e);
 				return false;
-			});
+			}).bind("click", false);
 		}
 		return this._$dragHandle;
 	},
@@ -784,11 +784,9 @@ $.widget("mapbender.mb_measure", {
 		}
 	},
 	_onHandleMouseDown: function (e) {
-		if (!this._activeSnap || this._activeSnap.type === "body") return;
-		var that = this;
-		var snap = this._activeSnap;
-		var m = snap.measure;
-		var vIndex;
+		if ((e.which && e.which !== 1) || !this._activeSnap || this._activeSnap.type === "body" || (this._measurePoints && this._measurePoints.length > 0)) return;
+		var that = this, snap = this._activeSnap, isEdge = (snap.type === "edge"), m = snap.measure;
+		var startPos = this._map.getMousePosition(e), moved = false, vIndex;
 
 		if (typeof mb_panActive !== "undefined") mb_panActive = false;
 		var panWidget = $(this.element).data("pan") || $(this.element).data("mb_pan");
@@ -796,9 +794,8 @@ $.widget("mapbender.mb_measure", {
 
 		if (snap.type === "vertex") {
 			vIndex = snap.index;
-		} else if (snap.type === "edge") {
-			var newPt = { pos: snap.realPos, mousePos: snap.mousePos };
-			m.points.splice(snap.segmentIndex + 1, 0, newPt);
+		} else if (isEdge) {
+			m.points.splice(snap.segmentIndex + 1, 0, { pos: snap.realPos, mousePos: snap.mousePos });
 			vIndex = snap.segmentIndex + 1;
 			this._recalculateMeasure(m);
 			this._draw();
@@ -818,15 +815,17 @@ $.widget("mapbender.mb_measure", {
 				if (panWidget) panWidget.active = false;
 
 				var curMousePos = that._map.getMousePosition(moveEvt);
+				if (!moved) {
+					var dx = curMousePos.x - startPos.x, dy = curMousePos.y - startPos.y;
+					if (dx * dx + dy * dy <= 16) return;
+					moved = true;
+				}
+
 				m.points[vIndex].mousePos = curMousePos;
 				m.points[vIndex].pos = that._map.convertPixelToReal(curMousePos);
 				that._recalculateMeasure(m);
 				that._draw();
-
-				that._getDragHandle().css({
-					left: (curMousePos.x - 7) + "px",
-					top: (curMousePos.y - 7) + "px"
-				}).show();
+				that._getDragHandle().css({ left: (curMousePos.x - 7) + "px", top: (curMousePos.y - 7) + "px" }).show();
 
 				var liveVal = (m.type === "polygon") ?
 					("Fläche: " + m.areaFormatted + " (Umfang: " + m.perimeterFormatted + ")") :
@@ -838,13 +837,27 @@ $.widget("mapbender.mb_measure", {
 				upEvt.stopPropagation();
 				that._isDraggingVertex = false;
 				$(document).unbind("mousemove.mb_drag").unbind("mouseup.mb_drag");
-
 				that._justFinishedDrag = true;
 				setTimeout(function () { that._justFinishedDrag = false; }, 150);
 
+				if (!moved && !isEdge) {
+					var minPts = (m.type === "polygon") ? 3 : (m.type === "line" ? 2 : 1);
+					if (m.points.length > minPts) {
+						m.points.splice(vIndex, 1);
+						that._recalculateMeasure(m);
+						that._activeSnap = that._hoveredMeasure = null;
+						if (that._$dragHandle) that._$dragHandle.hide();
+						that._draw();
+						that._updateTooltip(startPos, "Stützpunkt gelöscht (" + m.title + ")", "Klick: Messung beginnen | [Entf] Messung löschen");
+					} else {
+						that._updateTooltip(m.points[vIndex].mousePos, minPts === 1 ? "Punktmessung" : ("Mindestens " + minPts + " Punkte erforderlich"), "Ziehen: Verschieben | [Entf] Messung löschen");
+					}
+					return;
+				}
+
 				that._recalculateMeasure(m);
 				that._draw();
-				that._updateTooltip(m.points[vIndex].mousePos, "Punkt verschoben", "Klicken und ziehen zum Verschieben");
+				that._updateTooltip(m.points[vIndex].mousePos, (!moved && isEdge) ? "Stützpunkt hinzugefügt" : "Punkt verschoben", "Ziehen: Verschieben | Klick: Punkt löschen");
 			});
 	},
 	_updateTooltip: function (mousePos, line1, line2) {
@@ -1008,7 +1021,8 @@ $.widget("mapbender.mb_measure", {
 						borderColor: "#e65100",
 						cursor: "move"
 					}).show();
-					this._updateTooltip(snap.mousePos, "Punkt verschieben (" + m.title + ")", "Klicken und ziehen zum Verschieben | [Entf] Messung löschen");
+					var canDel = m.points.length > (m.type === "polygon" ? 3 : (m.type === "line" ? 2 : 1));
+					this._updateTooltip(snap.mousePos, "Stützpunkt (" + m.title + ")", canDel ? "Ziehen: Verschieben | Klick: Punkt löschen | [Entf] Messung" : "Ziehen: Verschieben | [Entf] Messung löschen");
 					return;
 				} else if (snap.type === "edge") {
 					this._getDragHandle().css({
@@ -1018,7 +1032,7 @@ $.widget("mapbender.mb_measure", {
 						borderColor: "#ffffff",
 						cursor: "copy"
 					}).show();
-					this._updateTooltip(snap.mousePos, "Neuer Stützpunkt (" + m.title + ")", "Klicken und ziehen zum Hinzufügen | [Entf] Messung löschen");
+					this._updateTooltip(snap.mousePos, "Neuer Stützpunkt (" + m.title + ")", "Klick/Ziehen: Punkt hinzufügen | [Entf] Messung löschen");
 					return;
 				}
 			}
@@ -1406,7 +1420,7 @@ $.widget("mapbender.mb_measure", {
 			.unbind("click", this._addPoint)
 			.unbind("mousemove", this._measure)
 			.bind("mousedown.mb_measure_block", function (e) {
-				if (that._activeSnap && that._activeSnap.type !== "body") {
+				if ((!e.which || e.which === 1) && (!that._measurePoints || that._measurePoints.length === 0) && that._activeSnap && that._activeSnap.type !== "body") {
 					e.preventDefault();
 					e.stopPropagation();
 					e.stopImmediatePropagation();
