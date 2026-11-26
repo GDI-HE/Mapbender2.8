@@ -235,43 +235,6 @@ $.widget("mapbender.mb_measure", {
 		}
 		return { x: sx / points.length, y: sy / points.length };
 	},
-	_isPointInPolygon: function (px, py, points) {
-		if (!points || points.length < 3) return false;
-		var inside = false;
-		for (var i = 0, j = points.length - 1; i < points.length; j = i++) {
-			var xi = points[i].mousePos ? points[i].mousePos.x : 0, yi = points[i].mousePos ? points[i].mousePos.y : 0;
-			var xj = points[j].mousePos ? points[j].mousePos.x : 0, yj = points[j].mousePos ? points[j].mousePos.y : 0;
-			if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
-		}
-		return inside;
-	},
-	_isPointNearLine: function (px, py, points, tol, isClosed) {
-		if (!points || points.length < 2) return false;
-		var tolSq = (tol || 8) * (tol || 8);
-		var count = isClosed ? points.length : points.length - 1;
-		for (var i = 0; i < count; i++) {
-			var p1 = points[i].mousePos, p2 = points[(i + 1) % points.length].mousePos;
-			if (p1 && p2) {
-				var dx = p2.x - p1.x, dy = p2.y - p1.y, l2 = dx * dx + dy * dy;
-				var t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - p1.x) * dx + (py - p1.y) * dy) / l2));
-				var qx = p1.x + t * dx, qy = p1.y + t * dy;
-				var rx = px - qx, ry = py - qy;
-				if (rx * rx + ry * ry <= tolSq) return true;
-			}
-		}
-		return false;
-	},
-	_findMeasureAt: function (mousePos) {
-		if (!this._completedMeasures || this._completedMeasures.length === 0) return null;
-		for (var i = this._completedMeasures.length - 1; i >= 0; i--) {
-			var m = this._completedMeasures[i];
-			// Only select polygon if clicking directly near its boundary edge (allow drawing new measurements freely inside)
-			if (m.type === "polygon" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 6, true)) return m;
-			if (m.type === "line" && this._isPointNearLine(mousePos.x, mousePos.y, m.points, 8, false)) return m;
-			if (m.type === "point" && m.points[0].mousePos && mousePos.dist(m.points[0].mousePos) <= 10) return m;
-		}
-		return null;
-	},
 	_isPointSnapped: function (p1, p2) {
 		if (!p1 || !p2 || typeof p1.dist !== "function") return false;
 		var radius = Math.max(10, (this.options.measurePointDiameter || 7));
@@ -696,7 +659,8 @@ $.widget("mapbender.mb_measure", {
 		$("#can").unbind("dialogclose.mb_measure_return").one("dialogclose.mb_measure_return", function () {
 			setTimeout(function () {
 				if (!$(that.element).data("mb_measure")) return;
-				if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") Mapbender.disableFeatureInfo();
+				if (typeof mb_enableButton === "function" && $("#measure_widget").length) mb_enableButton("measure_widget");
+				else if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") Mapbender.disableFeatureInfo();
 				$("#measure_widget").addClass("myOnClass");
 				that._init();
 				that._draw();
@@ -1633,10 +1597,6 @@ $.widget("mapbender.mb_measure", {
 		if (this._lastMousePos) {
 			this._updateTooltip(this._lastMousePos, "Messung beginnen", "Klick: Punkt setzen | Doppelklick: Punktmessung");
 		}
-	},
-	showMeasurePopup: function (id) {
-		this._selectedMeasureId = id;
-		this._draw();
 	},
 	hideMeasurePopup: function () {
 		this._selectedMeasureId = null;
