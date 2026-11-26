@@ -456,6 +456,10 @@ var MeasureApi = function (o) {
 				.bind("mb_measureupdate", updateView)
 				.bind("mb_measurepointadded", updateClickedPoint)
 				.bind("mb_measurelastpointadded", finishMeasure)
+				.bind("mb_measureedited", function (evt, data) {
+					renderMeasureHistory(data ? data.allMeasures : null);
+					syncPrintCoordinates();
+				})
 				.bind("mb_measuredeleted", function (evt, data) {
 					renderMeasureHistory(data ? data.allMeasures : null);
 					syncPrintCoordinates();
@@ -494,6 +498,7 @@ var MeasureApi = function (o) {
 				.unbind("mb_measureupdate", updateView)
 				.unbind("mb_measurepointadded", updateClickedPoint)
 				.unbind("mb_measurelastpointadded", finishMeasure)
+				.unbind("mb_measureedited")
 				.unbind("mb_measuredeleted")
 				.unbind("mb_measureallcleared")
 				.unbind("mb_measuresrschanged")

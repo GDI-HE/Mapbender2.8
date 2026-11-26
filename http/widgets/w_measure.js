@@ -884,6 +884,7 @@ $.widget("mapbender.mb_measure", {
 						that._activeSnap = that._hoveredMeasure = null;
 						if (that._$dragHandle) that._$dragHandle.hide();
 						that._draw();
+						that._trigger("edited", null, { measure: m, allMeasures: that._completedMeasures });
 						that._updateTooltip(startPos, "Stützpunkt gelöscht (" + m.title + ")", "Klick: Messung beginnen | [Entf] Messung löschen");
 					} else {
 						that._updateTooltip(m.points[vIndex].mousePos, minPts === 1 ? "Punktmessung" : ("Mindestens " + minPts + " Punkte erforderlich"), "Ziehen: Verschieben | [Entf] Messung löschen");
@@ -893,6 +894,7 @@ $.widget("mapbender.mb_measure", {
 
 				that._recalculateMeasure(m);
 				that._draw();
+				that._trigger("edited", null, { measure: m, allMeasures: that._completedMeasures });
 				that._updateTooltip(m.points[vIndex].mousePos, (!moved && isEdge) ? "Stützpunkt hinzugefügt" : "Punkt verschoben", "Ziehen: Verschieben | Klick: Punkt löschen");
 			});
 	},
