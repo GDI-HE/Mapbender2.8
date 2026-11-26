@@ -766,8 +766,8 @@ $.widget("mapbender.mb_measure", {
 			m.badgeText = this._formatMeasure(distVal, false, true);
 		} else if (m.type === "polygon") {
 			var saved = this._measurePoints;
-			this._measurePoints = m.points;
-			var areaVal = this._calculateArea(m.points[0]);
+			this._measurePoints = m.points.slice(0, m.points.length - 1);
+			var areaVal = this._calculateArea(m.points[m.points.length - 1]);
 			this._measurePoints = saved;
 
 			var perimVal = 0;
@@ -1344,38 +1344,7 @@ $.widget("mapbender.mb_measure", {
 						var p2 = Proj4js.transform(source, dest, new Proj4js.Point(pt.pos.x, pt.pos.y));
 						pt.pos = { x: p2.x, y: p2.y };
 					}
-					m.centerPos = (m.type === "point") ? m.points[0].pos : this._calculateCentroid(m.points);
-					if (m.type === "polygon") {
-						var savedPts = this._measurePoints;
-						this._measurePoints = m.points.slice(0, m.points.length - 1);
-						m.area = this._calculateArea(m.points[m.points.length - 1]);
-						this._measurePoints = savedPts;
-
-						var pSum = 0;
-						for (var k = 0; k < m.points.length; k++) {
-							pSum += this._calculateDistance(m.points[k].pos, m.points[(k + 1) % m.points.length].pos);
-						}
-						m.perimeter = pSum;
-						m.totalDistance = pSum;
-						m.areaFormatted = this._formatMeasure(m.area, true, false);
-						m.perimeterFormatted = this._formatMeasure(m.perimeter, false, false) + " Umfang";
-						m.badgeText = this._formatMeasure(m.area, true, true);
-					} else if (m.type === "line") {
-						var distSum = 0;
-						for (var k = 0; k < m.points.length - 1; k++) {
-							distSum += this._calculateDistance(m.points[k].pos, m.points[k + 1].pos);
-						}
-						m.totalDistance = distSum;
-						m.distanceFormatted = this._formatMeasure(distSum, false, false) + " Gesamtlänge";
-						m.badgeText = this._formatMeasure(distSum, false, true);
-					} else if (m.type === "point") {
-						var srs = (this._map && typeof this._map.getSrs === "function") ? this._map.getSrs() : (this._srs || "EPSG:25832");
-						var pt = m.points[0].pos, isGeo = (srs === "EPSG:4326");
-						var cX = isGeo ? Number(pt.x).toFixed(5) : Math.round(pt.x).toLocaleString("de-DE");
-						var cY = isGeo ? Number(pt.y).toFixed(5) : Math.round(pt.y).toLocaleString("de-DE");
-						m.distanceFormatted = (isGeo ? ("Länge: " + cX + "°, Breite: " + cY + "°") : ("Rechtswert: " + cX + " m, Hochwert: " + cY + " m")) + " (" + srs + ")";
-						m.badgeText = cX + ", " + cY;
-					}
+					this._recalculateMeasure(m);
 				}
 				for (var i = 0; i < this._measurePoints.length; i++) {
 					var mp = this._measurePoints[i];
@@ -1741,7 +1710,7 @@ $.widget("mapbender.mb_measure", {
 				}
 				wkt = "POLYGON ((" + wktCoords.join(", ") + "))";
 			}
-			this._downloadBlob(wkt, fileBaseName + ".wkt", "text/plain");
+			this._downloadBlob(wkt, fileBaseName + "_" + srs.toLowerCase().replace(/[^a-z0-9_-]/g, "_") + ".wkt", "text/plain");
 		}
 	},
 	// Trigger browser file download from string content
