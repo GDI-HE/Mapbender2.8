@@ -820,13 +820,10 @@ $.widget("mapbender.mb_measure", {
 		}
 	},
 	_onHandleMouseDown: function (e) {
-		if ((e.which && e.which !== 1) || !this._activeSnap || this._activeSnap.type === "body" || (this._measurePoints && this._measurePoints.length > 0)) return;
+		if (this._isDraggingVertex || (e.which && e.which !== 1) || !this._activeSnap || this._activeSnap.type === "body" || (this._measurePoints && this._measurePoints.length > 0)) return;
 		var that = this, snap = this._activeSnap, isEdge = (snap.type === "edge"), m = snap.measure;
 		var startPos = this._map.getMousePosition(e), moved = false, vIndex;
-
-		if (typeof mb_panActive !== "undefined") mb_panActive = false;
-		var panWidget = $(this.element).data("pan") || $(this.element).data("mb_pan");
-		if (panWidget) panWidget.active = false;
+		var hasPanApi = (typeof Mapbender !== "undefined" && typeof Mapbender.unbindPanEvents === "function" && typeof Mapbender.bindPanEvents === "function");
 
 		if (snap.type === "vertex") {
 			vIndex = snap.index;
@@ -839,6 +836,7 @@ $.widget("mapbender.mb_measure", {
 			return;
 		}
 
+		if (hasPanApi) Mapbender.unbindPanEvents();
 		this._isDraggingVertex = true;
 
 		$(document)
@@ -847,8 +845,6 @@ $.widget("mapbender.mb_measure", {
 			.bind("mousemove.mb_drag", function (moveEvt) {
 				moveEvt.preventDefault();
 				moveEvt.stopPropagation();
-				if (typeof mb_panActive !== "undefined") mb_panActive = false;
-				if (panWidget) panWidget.active = false;
 
 				var curMousePos = that._map.getMousePosition(moveEvt);
 				if (!moved) {
@@ -872,6 +868,7 @@ $.widget("mapbender.mb_measure", {
 				upEvt.preventDefault();
 				upEvt.stopPropagation();
 				that._isDraggingVertex = false;
+				if (hasPanApi) Mapbender.bindPanEvents();
 				$(document).unbind("mousemove.mb_drag").unbind("mouseup.mb_drag");
 				that._justFinishedDrag = true;
 				setTimeout(function () { that._justFinishedDrag = false; }, 150);
@@ -1458,7 +1455,7 @@ $.widget("mapbender.mb_measure", {
 			.unbind("click", this._addPoint)
 			.unbind("mousemove", this._measure)
 			.bind("mousedown.mb_measure_block", function (e) {
-				if ((!e.which || e.which === 1) && (!that._measurePoints || that._measurePoints.length === 0) && that._activeSnap && that._activeSnap.type !== "body") {
+				if ((!e.which || e.which === 1) && (!that._measurePoints || that._measurePoints.length === 0) && that._activeSnap && that._activeSnap.type !== "body" && !$(e.target).closest(".mb-measure-popup, .mb-measure-badge").length) {
 					e.preventDefault();
 					e.stopPropagation();
 					e.stopImmediatePropagation();
@@ -1807,6 +1804,7 @@ $.widget("mapbender.mb_measure", {
 	},
 	// the measured geometry will be available, the events will be deleted
 	deactivate: function () {
+		if (this._isDraggingVertex && typeof Mapbender !== "undefined" && typeof Mapbender.bindPanEvents === "function") Mapbender.bindPanEvents();
 		this.hideMeasurePopup();
 		this._hideTooltip();
 		this._isDraggingVertex = false;
