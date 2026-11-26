@@ -201,6 +201,7 @@ var MeasureApi = function (o) {
 			function () { $(this).css({"background": "#e2ecf7", "border-color": "#9ec5fe"}); },
 			function () { $(this).css({"background": "#f0f4f9", "border-color": "#c2d7ef"}); }
 		).unbind("click").bind("click", function () {
+			if (typeof mb_enableButton === "function") mb_enableButton(o.id);
 			// Suppress FeatureInfo when starting another measurement
 			if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") {
 				Mapbender.disableFeatureInfo();
@@ -446,12 +447,18 @@ var MeasureApi = function (o) {
 	};
 
 	this.activate = function () {
+		if (typeof mb_disableThisButton !== "function" || !mb_disableThisButton("altitudeProfile")) {
+			if (typeof Mapbender !== "undefined" && Mapbender.modules && Mapbender.modules.altitudeProfile && typeof Mapbender.modules.altitudeProfile.deactivate === "function") Mapbender.modules.altitudeProfile.deactivate();
+			else if (o.$target.size() > 0 && o.$target.data("mb_hohe")) o.$target.mb_hohe("deactivate");
+		}
 		//remove measured x and y values from print dialog
 		$('input[name="measured_x_values"]').val("");
 		$('input[name="measured_y_values"]').val("");
 
 		if (o.$target.size() > 0) {
 			o.$target
+				.unbind("mb_measureupdate mb_measurepointadded mb_measurelastpointadded mb_measureedited mb_measuredeleted mb_measureallcleared mb_measuresrschanged mb_measurereinitialize")
+				.unbind("click", changeDialogContent)
 				.mb_measure(o)
 				.bind("mb_measureupdate", updateView)
 				.bind("mb_measurepointadded", updateClickedPoint)
@@ -485,11 +492,16 @@ var MeasureApi = function (o) {
 			measureDialog.html(informationHtml);
 			bindDialogButtons();
 			hideMeasureData();
-			renderMeasureHistory([]);
+			renderMeasureHistory();
+			syncPrintCoordinates();
 		}
 
-		measureDialog.dialog("open");
-		
+		if (!measureDialog.dialog("isOpen")) {
+			measureDialog.dialog("open");
+		} else {
+			Mapbender.bindPanEvents();
+			if (typeof Mapbender !== "undefined" && typeof Mapbender.disableFeatureInfo === "function") Mapbender.disableFeatureInfo();
+		}
 	};
 
 	this.destroy = function () {
@@ -522,6 +534,8 @@ var MeasureApi = function (o) {
 	};
 	
 	this.deactivate = function () {
+		$('#measure_widget').removeClass('myOnClass');
+		inProgress = false;
 		restoreEnableFeatureInfo();
 		if (o.$target.size() > 0) {
 			o.$target.mb_measure("deactivate");
