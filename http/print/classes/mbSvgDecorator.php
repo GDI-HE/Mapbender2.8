@@ -42,6 +42,9 @@ class mbSvgDecorator extends mbTemplatePdfDecorator
         } else {
             return "No svg found.";
         }
+        if ($doc->doctype !== null || !$doc->documentElement || strtolower($doc->documentElement->localName) !== 'svg') {
+            return "No svg found.";
+        }
 
         $xpath = new \DOMXPath($doc);
         $xpath->registerNamespace("xlink", "http://www.w3.org/1999/xlink");
