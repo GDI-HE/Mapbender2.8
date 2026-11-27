@@ -268,9 +268,28 @@ var JsonAutocompleteGazetteer = function() {
 		}
 		this.inputAddress.attr({'id':'geographicName'});
 //		this.inputAddress.attr({'autofocus':'autofocus'});
-		if (options.divOpen === 'true') {
-			that.toggleInput();
+		var isSmallViewport = function() {
+			return (window.innerWidth || $(window).width()) < 1234;
 		};
+		var wasSmall = isSmallViewport();
+		if (options.divOpen === 'true' && !wasSmall) {
+			that.toggleInput();
+		} else {
+			$("#geographicName, #helpSymbolId, #symbolForClearInputId, #symbolForInputCloseId, #coordsLookUp_Button, #extraButtonFlstSearch").hide();
+			$("#symboldForInputId").show();
+		}
+		$(window).bind('resize.gazetteer', function() {
+			var isSmall = isSmallViewport();
+			if (isSmall === wasSmall) {
+				return;
+			}
+			wasSmall = isSmall;
+			if (isSmall && $("#geographicName").css("display") !== 'none') {
+				that.toggleInput();
+			} else if (!isSmall && options.divOpen === 'true' && $("#geographicName").css("display") === 'none') {
+				that.toggleInput();
+			}
+		});
 		//that.toggleInput();	
 		//INSERTED BY BENZ----
 		this.inputAddress.attr({'placeholder':'<?php echo _mb('Search for addresses'); ?>'});
