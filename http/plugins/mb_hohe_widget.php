@@ -48,14 +48,17 @@ var MeasureApi = function (o) {
                     text: "Neu",
                     id: "hoheNewButton",
                     click: function() {
-                        Mapbender.unbindPanEvents();
                         resetII();
+                        // Keep panning active after reset
+                        Mapbender.bindPanEvents();
                     }
                 }
             ],
             open: function() {
                 $('#toolsContainer').hide();
                 $('a.toggleToolsContainer').removeClass('activeToggle');
+                // Enable panning during altitude profile measurement
+                Mapbender.bindPanEvents();
                 Mapbender.disableFeatureInfo();
             },
             close: function() {
@@ -166,7 +169,6 @@ var MeasureApi = function (o) {
 				.unbind("mb_hoheupdate", updateView)
 				.unbind("mb_measurelastpointadded", finishMeasure)
 				.unbind("mb_hohenew", reset)
-				.unbind("mousedown")
 				.unbind("mb_measurereinitialize", reinitializeMeasure);
 		}
 		ctx.clearRect(0, 0, 600, 250);
@@ -185,12 +187,21 @@ var MeasureApi = function (o) {
     };
 
 	this.activate = function () {
+		if (typeof mb_disableThisButton !== "function" || !mb_disableThisButton("measure_widget")) {
+			if (typeof Mapbender !== "undefined" && Mapbender.modules && Mapbender.modules.measure_widget && typeof Mapbender.modules.measure_widget.deactivate === "function") Mapbender.modules.measure_widget.deactivate();
+			else if (o.$target.size() > 0 && o.$target.data("mb_measure")) o.$target.mb_measure("deactivate");
+		}
 				//remove measured x and y values from print dialog
 				$('input[name="measured_x_values"]').val("");
 				$('input[name="measured_y_values"]').val("");
 
+		// Ensure panning is active during altitude profile measurement
+		Mapbender.bindPanEvents();
+
 		if (o.$target.size() > 0) {
 			o.$target
+				.unbind("mb_hohecleardia mb_hohepointadded mb_hoheupdate mb_hohelastpointadded mb_hohereinitialize mb_hohenew")
+				.unbind("click", changeDialogContent)
 				.mb_hohe(o)
 				.bind("mb_hohecleardia", clearJsonArray)
 				.bind("mb_hohepointadded", updateJsonArray)                                
@@ -217,7 +228,6 @@ var MeasureApi = function (o) {
 				.unbind("mb_hoheupdate", updateView)
 				.unbind("mb_measurelastpointadded", finishMeasure)
 				.unbind("mb_hohenew", reset)
-				.unbind("mousedown")
 				.unbind("mb_measurereinitialize", reinitializeMeasure);
 		}
 				ctx.clearRect(0, 0, 660, 250);
@@ -239,8 +249,9 @@ var MeasureApi = function (o) {
 	};
 	
 	this.deactivate = function () {
+		$('#altitudeProfile').removeClass('myOnClass');
 		if (o.$target.size() > 0) {
-			o.$target.mb_hohe("deactivate").unbind("mousedown");
+			o.$target.mb_hohe("deactivate");
 		}
 	};
 

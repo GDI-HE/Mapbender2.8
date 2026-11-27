@@ -1067,6 +1067,12 @@ var PrintPDF = function (options) {
         }
       }
       if ($jqForm.find('[name="map_svg_measures"]').length > 0) {
+        var $measureTarget = $('#mapframe1');
+        if ($measureTarget.data('mb_measure') && typeof $measureTarget.mb_measure === 'function') {
+          try {
+            $measureTarget.mb_measure('prepareForPrint');
+          } catch (e) {}
+        }
         if ($('#measure_canvas svg:first').length) {
           var svgStr = $('#measure_canvas').html();
           /* TODO start bug fix: multiple attributes xmlns="http://www.w3.org/2000/svg" by root svg at IE 9,10,11*/
@@ -1079,6 +1085,11 @@ var PrintPDF = function (options) {
           }
         } else {
           updateFormField(formData, "map_svg_measures", '');
+        }
+        if ($measureTarget.data('mb_measure') && typeof $measureTarget.mb_measure === 'function') {
+          try {
+            $measureTarget.mb_measure('redraw');
+          } catch (e) {}
         }
       }
     }
